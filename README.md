@@ -55,3 +55,5 @@ terms, the warranty disclaimer and the limitation of liability.
 
 Jellyfin plugins are linked against GPLv3 server code, so a plugin distributed
 to others has to be under the GPLv3 or a permissive license compatible with it.
+
+See [NOTICE.md](NOTICE.md) for the intended-use notice.
