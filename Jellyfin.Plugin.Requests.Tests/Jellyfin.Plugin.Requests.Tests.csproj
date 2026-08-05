@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Every framework the plugin targets, so a difference between the two server lines is caught
+         by the suite rather than by a user on the line nobody ran. -->
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <!-- A net9.0 test host runs on a machine that has only the .NET 10 runtime installed. Without
+         this the net9.0 leg is not a failing test, it is a test that never ran, which reads the
+         same in a summary line. -->
+    <RollForward>Major</RollForward>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <!-- The same posture as the plugin project, so a warning is an error here too and the suite
+         cannot be the one place in the tree where the bar is lower. GenerateDocumentationFile is
+         on because StyleCop refuses the whole project without it (SA0001), so the choice is
+         documented tests or no StyleCop, and every test here says what failure it stands for. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <CodeAnalysisRuleSet>../jellyfin.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- The test host stands in for the server. The plugin project excludes the Jellyfin runtime
+         assets on purpose, because a running server supplies them and a plugin package must not
+         carry a second copy, so nothing reaches the test output and every test touching a Jellyfin
+         type would fail to load one. These references put them under the test host instead. The
+         line has to match the line the plugin was compiled for, which is what
+         PluginIsCompiledAgainstTheServerLineThisTargetIsFor checks; the patch number does not,
+         because these assemblies are not strong-named and bind by simple name. -->
+    <JellyfinTestHostVersion Condition="'$(TargetFramework)' == 'net9.0'">10.11.11</JellyfinTestHostVersion>
+    <JellyfinTestHostVersion Condition="'$(TargetFramework)' == 'net10.0'">12.0.0-rc4</JellyfinTestHostVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinTestHostVersion)" />
+    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinTestHostVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SerilogAnalyzer" Version="0.15.0" PrivateAssets="All" />
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
+    <PackageReference Include="SmartAnalyzers.MultithreadingAnalyzer" Version="1.1.31" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The project, not a built assembly: a stale copy in a bin directory would pass a suite that
+         is testing last week's plugin. -->
+    <ProjectReference Include="..\Jellyfin.Plugin.Template\Jellyfin.Plugin.Template.csproj" />
+  </ItemGroup>
+
+</Project>
