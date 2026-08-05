@@ -15,6 +15,6 @@ public class DeliberateFailureTests
     [Fact]
     public void ThisTestFailsOnPurpose()
     {
-        Assert.True(false, "Deliberate failure: proving the gate reddens on a failing test.");
+        Assert.Fail("Deliberate failure: proving the gate reddens on a failing test.");
     }
 }
