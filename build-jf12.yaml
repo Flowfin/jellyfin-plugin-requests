@@ -1,0 +1,25 @@
+---
+# Packaging metadata for the Jellyfin 12.0 line. One plugin, two packages: a 10.11 server provides
+# .NET 9 and a 12.0 server provides .NET 10, and a plugin compiled for one runtime does not load on
+# the other. The identity fields below are word-identical with build.yaml on purpose, because a
+# catalogue holds one entry per plugin and a divergence there makes the entry flip between two texts
+# depending on which package was published last.
+name: "Template"
+# Same identifier as build.yaml, so a server that moves from 10.11 to 12.0 updates this plugin in
+# place instead of gaining a second, unrelated one. Still the template's identifier; #15 mints the
+# real one and has to change both files.
+guid: "eb5d7894-8eef-4b36-aa6f-5d124e828ce1"
+version: "1.0.0.0"
+# The 12.0 line's floor and the runtime it provides.
+targetAbi: "12.0.0.0"
+framework: "net10.0"
+overview: "Short description about your plugin"
+description: >
+  This is a longer description that can span more than one
+  line and include details about your plugin.
+category: "General"
+owner: "jellyfin"
+artifacts:
+- "Jellyfin.Plugin.Template.dll"
+changelog: >
+  changelog
