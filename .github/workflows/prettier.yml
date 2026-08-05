@@ -1,0 +1,53 @@
+# Formatting gate for everything the .NET analyzers do not reach. The plugin
+# ships HTML, CSS and JavaScript inside the assembly and none of it is compiled,
+# so without this nothing keeps those files consistent and every edit carries
+# reformatting noise that hides the change. Markdown is in the same set for the
+# same reason.
+#
+# The set of file types is the glob below and nothing else. It is written here
+# rather than left to a config file so that what is covered is readable in the
+# run itself, and so that adding a type is a visible change to this workflow.
+# Anything not in the glob is not checked: C# is the analyzers' job, and the
+# workflow YAML and the packaging metadata are deliberately out, because
+# reformatting them would rewrite files that other gates read line by line.
+#
+# The formatter version is pinned. An unpinned formatter reds a tree that was
+# green yesterday, for a default that changed rather than for anything anybody
+# wrote.
+name: Prettier
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: ["**"]
+
+# Read-only: the gate reads the tree and writes nothing back.
+permissions:
+  contents: read
+
+# Cancel a superseded run on the same ref so a new push or pull-request update
+# does not queue behind an obsolete check.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prettier:
+    name: Check formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes via git, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Check formatting of the web assets and the markdown
+        env:
+          PRETTIER_VERSION: "3.6.2"
+        # --check reports and exits non-zero, it never edits. The glob is the
+        # whole scope of this gate: HTML, CSS and JavaScript, which is what the
+        # plugin embeds, plus Markdown.
+        run: npx --yes "prettier@${PRETTIER_VERSION}" --check "**/*.{html,css,js,md}"
