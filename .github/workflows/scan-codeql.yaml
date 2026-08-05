@@ -15,6 +15,12 @@ on:
 
 jobs:
   call:
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/scan-codeql.yaml@master
+    # CodeQL init/autobuild/analyze: read the tree, read the workflow run for the
+    # analysis metadata, and write the results into the code-scanning tab.
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/scan-codeql.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master
     with:
       repository-name: jellyfin/jellyfin-plugin-template

@@ -13,7 +13,12 @@ on:
 
 jobs:
   call:
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/changelog.yaml@master
+    # release-drafter writes the release draft, and the called workflow pushes a
+    # prepare-<version> branch and opens the bump pull request against it.
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/changelog.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master
     with:
       repository-name: jellyfin/jellyfin-plugin-template
     secrets:

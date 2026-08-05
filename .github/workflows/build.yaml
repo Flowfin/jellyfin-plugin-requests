@@ -15,4 +15,8 @@ on:
 
 jobs:
   call:
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/build.yaml@master
+    # The called workflow checks out, builds and uploads an artifact. Reading the
+    # tree is all of that; artifact upload uses the runtime token, not this one.
+    permissions:
+      contents: read
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/build.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master

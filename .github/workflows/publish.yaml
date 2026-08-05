@@ -8,7 +8,10 @@ on:
 
 jobs:
   call:
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/publish.yaml@master
+    # The upload job attaches the built package and its checksums to the release.
+    permissions:
+      contents: write
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/publish.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master
     with:
       version: ${{ github.event.release.tag_name }}
       is-unstable: ${{ github.event.release.prerelease }}

@@ -8,6 +8,10 @@ on:
 
 jobs:
   call:
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/command-dispatch.yaml@master
+    # The dispatcher acts with the token passed in below, not with this job's.
+    # Reading the tree is all this job itself needs.
+    permissions:
+      contents: read
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/command-dispatch.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master
     secrets:
       token: .

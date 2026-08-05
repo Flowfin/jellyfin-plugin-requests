@@ -7,6 +7,9 @@ on:
 
 jobs:
   call:
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/sync-labels.yaml@master
+    # Label sync creates, edits and deletes labels, which is the issues scope.
+    permissions:
+      issues: write
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/sync-labels.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
