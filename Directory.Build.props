@@ -5,8 +5,10 @@
              FileVersion drifting apart is how a server reports one version, a package claims a
              second and a changelog names a third. PluginVersionMatchesThePackagingMetadata refuses
              a disagreement between this number and the version field of both packaging files. The
-             scheme this number follows, and what moves it, is #107. -->
-        <PluginVersion>1.0.0.0</PluginVersion>
+             scheme this number follows, what each part of it means to somebody who has the plugin
+             installed, and why it starts below one, are in docs/versioning.md. Raising it and
+             writing the changelog entry are one change. -->
+        <PluginVersion>0.1.0.0</PluginVersion>
         <Version>$(PluginVersion)</Version>
         <AssemblyVersion>$(PluginVersion)</AssemblyVersion>
         <FileVersion>$(PluginVersion)</FileVersion>
