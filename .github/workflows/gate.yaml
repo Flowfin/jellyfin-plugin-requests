@@ -1,0 +1,93 @@
+# The build and test legs of the merge gate, in one run.
+#
+# This is a called workflow rather than a job in its caller, because the two
+# check names the branch ruleset requires are `call / build` and `call / test`,
+# and a name is matched literally: renaming a job removes a required check
+# instead of renaming one, and a pull request then waits on a check that will
+# never report. The caller's job is `call`, the jobs here are `build` and
+# `test`, and those two names are the contract. `docs/quality-parity.md` and
+# #30 are where the required set is written down.
+#
+# Both claimed server lines are covered by one run, because the projects
+# multi-target and one command builds every target framework they declare. A
+# leg per line would let one line be green while the other was never built.
+name: Gate
+
+on:
+  workflow_call:
+
+# Explicit deny-all here; each job grants only what it needs.
+permissions: {}
+
+env:
+  # Both SDKs, named rather than inherited from whatever the runner image
+  # happens to carry: a runner that dropped one of them would otherwise turn
+  # into a build that quietly stopped covering a server line.
+  DOTNET_VERSIONS: |
+    9.0.x
+    10.0.x
+  # The gate has nothing to send anywhere and no first-run message to print.
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes via git, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSIONS }}
+
+      - name: Restore in locked mode
+        # A restore that resolves a transitive package differently from what the
+        # committed lockfile records fails here rather than producing a build
+        # nobody can reproduce.
+        run: dotnet restore Jellyfin.Plugin.Requests.sln --locked-mode
+
+      - name: Build every claimed target framework
+        # TreatWarningsAsErrors is on for every project from Directory.Build.props,
+        # and -warnaserror says so again at the command, so a build that reached
+        # this step with the property lowered still fails on a warning.
+        run: dotnet build Jellyfin.Plugin.Requests.sln --configuration Release --no-restore -warnaserror
+
+      - name: Show what was built
+        # The target frameworks are read out of the tree rather than listed here,
+        # so adding a line to the project is not also an edit to this file.
+        run: find . -path '*/bin/Release/*/Jellyfin.Plugin.Requests.dll' -print
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSIONS }}
+
+      - name: Restore in locked mode
+        run: dotnet restore Jellyfin.Plugin.Requests.sln --locked-mode
+
+      - name: Build every claimed target framework
+        run: dotnet build Jellyfin.Plugin.Requests.sln --configuration Release --no-restore -warnaserror
+
+      - name: Test every claimed target framework
+        # --no-build, so the assemblies under test are the ones the step above
+        # produced and not a second build made with different settings.
+        run: dotnet test Jellyfin.Plugin.Requests.sln --configuration Release --no-build
