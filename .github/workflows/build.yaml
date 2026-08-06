@@ -1,4 +1,17 @@
-name: '🏗️ Build Plugin'
+# The merge gate: build and test, on every claimed server line, in one run.
+#
+# It used to call two workflows from another organisation, one to build and one
+# to test. Those know nothing about this tree's multi-targeting, its lockfiles
+# or its analyzer settings, so what they ran and what a local build ran were two
+# different things. `gate.yaml` is this repository's own and is the same
+# procedure a contributor can run by hand.
+#
+# The job below is named `call` and the jobs it calls are `build` and `test`,
+# which is what makes the required check names `call / build` and `call / test`.
+# A ruleset matches a name literally, so renaming any of the three removes a
+# required check rather than renaming one, and every pull request afterwards
+# waits on a check that never reports.
+name: '🏗️ Build and test'
 
 on:
   push:
@@ -6,17 +19,28 @@ on:
       - master
     paths-ignore:
       - '**/*.md'
+  # Every branch, not only pull requests aimed at master: a release branch would
+  # otherwise take changes that nothing built.
   pull_request:
-    branches:
-      - master
+    branches: ['**']
     paths-ignore:
       - '**/*.md'
   workflow_dispatch:
 
+# Explicit deny-all at workflow level; the called jobs grant what they need.
+permissions: {}
+
+# Cancel a superseded run on the same ref, so a new push does not queue behind a
+# run whose result nobody will read.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   call:
-    # The called workflow checks out, builds and uploads an artifact. Reading the
-    # tree is all of that; artifact upload uses the runtime token, not this one.
+    # A called workflow's jobs cannot ask for more than the job that called
+    # them, so the read the two legs need is granted here. Nothing under it
+    # writes anything back.
     permissions:
       contents: read
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/build.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master
+    uses: ./.github/workflows/gate.yaml
