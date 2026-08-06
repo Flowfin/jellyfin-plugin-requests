@@ -103,31 +103,32 @@ produce several.
 
 Eight files here map onto a file there and are placed by the table above:
 `dco.yml`, `dependency-review.yml`, `prettier.yml`, `publish.yaml`,
-`scan-codeql.yaml`, `scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. The
-seven below are the rest, and eight plus seven is what the directory holds:
+`scan-codeql.yaml`, `scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Three
+of the rows below are the rest, and eight plus three is what the directory
+holds:
 
     $ ls .github/workflows/ | wc -l
-    15
+    11
 
-The first three do have a counterpart there and are listed here anyway, because
-what they are is not what it is: `dotnet.yml` is one file there and three here,
-and the split is the point rather than an accident.
+Those three do have a counterpart there and are listed here anyway, because what
+they are is not what it is: `dotnet.yml` is one file there and three here, and
+the split is the point rather than an accident.
 
-| File here               | Disposition     | Reasoning                                                                                                                                                                  |
-| ----------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `abi-floor.yaml`        | adopted, landed | The floor leg, split out because the lines and their floors are read out of the packaging files rather than listed in a job, so adding a line is adding a file.            |
-| `build.yaml`            | adopted, landed | The trigger surface and the two check names the ruleset matches literally; the legs themselves moved into `gate.yaml`.                                                     |
-| `gate.yaml`             | adopted, landed | The build and test legs, in this repository rather than called from another organisation, because a called workflow knows nothing about this tree's lockfiles.             |
-| `changelog.yaml`        | declined        | It drafts a release changelog against a version scheme this repository has not fixed, and nothing covers that risk here because there is nothing to release yet; #107.     |
-| `command-dispatch.yaml` | declined        | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                |
-| `command-rebase.yaml`   | declined        | Same comment-driven surface, the half that rewrites pull request branches on command, and the same absence.                                                                |
-| `sync-labels.yaml`      | declined        | It overwrites the label vocabulary from a file in another organisation, and the vocabulary here is this board's own, so adopting it would delete what it is meant to keep. |
+The four rows under them are files this repository declined and then deleted.
+The rows stay because the reasoning is what the table is for, and a file that
+vanishes without one is a question somebody asks again. `Disposition` says which
+of the two a row is, so no reader has to infer presence from a table that no
+longer tracks it.
 
-The four declined files are still in the tree. Declining a workflow and leaving
-it running is a document that disagrees with the thing it describes, which is
-the defect this table exists against, so the removal is #138 rather than a
-sentence here. `changelog.yaml` is not idle while it waits: its
-`update_release_draft` leg is red on the default branch as this is written.
+| File here               | Disposition       | Reasoning                                                                                                                                                                  |
+| ----------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `abi-floor.yaml`        | adopted, landed   | The floor leg, split out because the lines and their floors are read out of the packaging files rather than listed in a job, so adding a line is adding a file.            |
+| `build.yaml`            | adopted, landed   | The trigger surface and the two check names the ruleset matches literally; the legs themselves moved into `gate.yaml`.                                                     |
+| `gate.yaml`             | adopted, landed   | The build and test legs, in this repository rather than called from another organisation, because a called workflow knows nothing about this tree's lockfiles.             |
+| `changelog.yaml`        | declined, deleted | It drafts a release changelog against a version scheme this repository has not fixed, and nothing covers that risk here because there is nothing to release yet; #107.     |
+| `command-dispatch.yaml` | declined, deleted | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                |
+| `command-rebase.yaml`   | declined, deleted | Same comment-driven surface, the half that rewrites pull request branches on command, and the same absence.                                                                |
+| `sync-labels.yaml`      | declined, deleted | It overwrites the label vocabulary from a file in another organisation, and the vocabulary here is this board's own, so adopting it would delete what it is meant to keep. |
 
 ## What the inherited guards have been watched doing
 
