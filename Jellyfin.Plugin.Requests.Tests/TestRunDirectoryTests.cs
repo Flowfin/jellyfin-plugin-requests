@@ -60,6 +60,10 @@ public class TestRunDirectoryTests
     [Fact]
     public void DisposingADoubleLeavesTheRunDirectoryForTheOthers()
     {
+        // Read through the property once and hold the string. Asking for it again would create the
+        // directory before asserting it exists, which is an assertion that cannot fail.
+        var runDirectory = TestRunDirectory.Root;
+
         using var held = new FakeApplicationPaths();
 
         string disposedRoot;
@@ -71,6 +75,6 @@ public class TestRunDirectoryTests
 
         Assert.False(Directory.Exists(disposedRoot));
         Assert.True(Directory.Exists(held.ProgramDataPath));
-        Assert.True(Directory.Exists(TestRunDirectory.Root));
+        Assert.True(Directory.Exists(runDirectory));
     }
 }
