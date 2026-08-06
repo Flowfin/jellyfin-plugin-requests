@@ -1,0 +1,185 @@
+# The floor build, one job per claimed server line.
+#
+# The shipping build compiles against a current server SDK while the packaging
+# metadata claims a much older floor. Between those two numbers sits every API
+# added since the floor: the plugin can call one, compile clean, ship, and throw
+# a MissingMethodException on the oldest server it says it supports. That
+# failure lands on a user and on nothing before them.
+#
+# The lines are not listed here. They are read out of the packaging files at the
+# repository root, one file per package, and each file's own `targetAbi` and
+# `framework` fields decide what its job builds. Adding a line is adding a
+# packaging file, and raising a floor is editing one number in one file, which
+# is what makes the second half of #23 true: a floor raised to a version whose
+# SDK does not carry an API the plugin calls fails this run and nothing else.
+#
+# THIS IS NOT A REQUIRED CHECK. The required set is a repository setting rather
+# than a file in this tree, and #30 is where it is written down and applied, so
+# a red job here does not by itself hold a merge today.
+#
+# The floor SDK version is resolved from the feed rather than assumed to exist.
+# A `targetAbi` of `A.B.C.D` names the server version `A.B.C`, and the package
+# that goes with it is `A.B.C` when that has been released. WHERE IT HAS NOT,
+# the job falls back to the OLDEST published prerelease of `A.B.C` and says so
+# in the log, because that is the oldest build of that line anybody can be
+# running. That fallback is live today for the 12.0 line, which is still in
+# release candidates, and it means that line's job is currently building against
+# the same generation as the shipping build rather than against an older one. It
+# becomes a real floor build on that line the day 12.0.0 is published, with no
+# edit here.
+name: ABI floor
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '**/*.md'
+  pull_request:
+    branches: ['**']
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+# Explicit deny-all at workflow level; each job grants only what it needs.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lines:
+    name: lines
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes via git, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Read the claimed lines out of the packaging metadata
+        id: read
+        # One entry per packaging file, with that file's own floor and runtime.
+        # A file that declares neither fails here rather than producing a job
+        # that quietly builds against whatever the project file already says.
+        run: |
+          set -euo pipefail
+          entries=$(for f in build*.yaml; do
+            abi=$(sed -n 's/^targetAbi: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$f")
+            framework=$(sed -n 's/^framework: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$f")
+            if [ -z "$abi" ] || [ -z "$framework" ]; then
+              echo "::error file=$f::packaging metadata declares no targetAbi or no framework"
+              exit 1
+            fi
+            jq -nc --arg metadata "$f" --arg abi "$abi" --arg framework "$framework" \
+              '{metadata: $metadata, abi: $abi, framework: $framework}'
+          done | jq -sc .)
+          if [ "$(printf '%s' "$entries" | jq 'length')" -eq 0 ]; then
+            echo "::error::no packaging metadata found at the repository root"
+            exit 1
+          fi
+          printf '%s' "$entries" | jq .
+          echo "matrix=$entries" >> "$GITHUB_OUTPUT"
+
+  floor:
+    name: floor ${{ matrix.abi }}
+    needs: lines
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    strategy:
+      # One line failing must not hide the result of the other.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.lines.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          # Both SDKs, because which one this job needs is decided by the
+          # packaging file it was handed and not by this file.
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Resolve the floor SDK for this line
+        id: resolve
+        env:
+          ABI: ${{ matrix.abi }}
+          METADATA: ${{ matrix.metadata }}
+        # Both packages have to carry the resolved version. Checking only one of
+        # them would let a line resolve to a version that restores for half the
+        # references and fails for the other half, which reads as a broken job
+        # rather than as the missing publication it is.
+        run: |
+          set -euo pipefail
+          floor="${ABI%.*}"
+          resolve_one() {
+            curl -sSfL "https://api.nuget.org/v3-flatcontainer/$1/index.json" | jq -r '.versions[]'
+          }
+          controller=$(resolve_one jellyfin.controller)
+          model=$(resolve_one jellyfin.model)
+          pick() {
+            local published="$1"
+            if printf '%s\n' "$published" | grep -qxF "$floor"; then
+              printf '%s' "$floor"
+              return
+            fi
+            printf '%s\n' "$published" | awk -v p="$floor-" 'index($0, p) == 1 { print; exit }'
+          }
+          use_controller=$(pick "$controller")
+          use_model=$(pick "$model")
+          if [ -z "$use_controller" ] || [ -z "$use_model" ]; then
+            echo "::error::the floor $floor declared by $METADATA has no published SDK on either side"
+            exit 1
+          fi
+          if [ "$use_controller" != "$use_model" ]; then
+            echo "::error::the floor $floor resolves to $use_controller for Jellyfin.Controller and $use_model for Jellyfin.Model"
+            exit 1
+          fi
+          if [ "$use_controller" = "$floor" ]; then
+            echo "The floor $floor is published; building against it."
+          else
+            echo "::notice::$floor is not published. The oldest published build of that line is $use_controller, and this job builds against that instead, so it proves the API surface against a release candidate rather than against the declared floor."
+          fi
+          echo "version=$use_controller" >> "$GITHUB_OUTPUT"
+
+      - name: Build the plugin against the floor
+        env:
+          FRAMEWORK: ${{ matrix.framework }}
+          FLOOR: ${{ steps.resolve.outputs.version }}
+        # One framework, not both: the property that lowers the SDK is a single
+        # value, so a build left multi-targeting would hand the 10.11 floor to
+        # the net10.0 target as well and fail for a reason nobody wrote.
+        #
+        # No --locked-mode here, unlike the gate. The committed lockfiles record
+        # the graph the shipping build resolves, and lowering the SDK is exactly
+        # the thing they refuse; this job asks a different question and rewrites
+        # a lockfile nothing reads afterwards.
+        #
+        # -warnaserror, so an API that survives to a deprecation warning on the
+        # floor SDK is caught here and not on somebody's server.
+        run: |
+          set -euo pipefail
+          dotnet restore Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj \
+            -p:TargetFrameworks="$FRAMEWORK" -p:JellyfinVersion="$FLOOR"
+          dotnet build Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj \
+            --configuration Release --no-restore -warnaserror \
+            -p:TargetFrameworks="$FRAMEWORK" -p:JellyfinVersion="$FLOOR"
+
+      - name: Show what was built
+        env:
+          FRAMEWORK: ${{ matrix.framework }}
+        run: find . -path "*/bin/Release/$FRAMEWORK/Jellyfin.Plugin.Requests.dll" -print
