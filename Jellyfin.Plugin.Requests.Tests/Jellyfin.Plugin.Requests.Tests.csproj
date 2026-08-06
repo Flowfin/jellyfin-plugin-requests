@@ -10,15 +10,10 @@
     <RollForward>Major</RollForward>
     <IsPackable>false</IsPackable>
     <IsPublishable>false</IsPublishable>
-    <!-- The same posture as the plugin project, so a warning is an error here too and the suite
-         cannot be the one place in the tree where the bar is lower. GenerateDocumentationFile is
-         on because StyleCop refuses the whole project without it (SA0001), so the choice is
-         documented tests or no StyleCop, and every test here says what failure it stands for. -->
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Nullable>enable</Nullable>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
-    <CodeAnalysisRuleSet>../jellyfin.ruleset</CodeAnalysisRuleSet>
+    <!-- The analyzer posture, GenerateDocumentationFile included, is in Directory.Build.props and
+         applies here too. The documentation file is on because StyleCop refuses the whole project
+         without it (SA0001), so the choice is documented tests or no StyleCop, and every test here
+         says what failure it stands for. -->
   </PropertyGroup>
 
   <PropertyGroup>
@@ -45,9 +40,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="SerilogAnalyzer" Version="0.15.0" PrivateAssets="All" />
-    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
-    <PackageReference Include="SmartAnalyzers.MultithreadingAnalyzer" Version="1.1.31" PrivateAssets="All" />
+    <!-- The packaging metadata, next to the suite, so the version and identity checks read the
+         files the release path reads instead of a number restated in a test. -->
+    <None Include="../build.yaml" Link="build.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../build-jf12.yaml" Link="build-jf12.yaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
