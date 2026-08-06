@@ -1,26 +1,99 @@
+# Semantic code scanning, configured here rather than left to the repository
+# default.
+#
+# The default analyses the default branch and the pull requests aimed at it, and
+# nothing else, so a release branch and the pull requests aimed at that branch
+# would carry no scan at all. The triggers below name every branch on both
+# sides.
+#
+# The languages are the ones this repository actually contains, and each is
+# named rather than discovered: C#, the JavaScript inside the embedded
+# configuration page, and the workflow files themselves, which are as much a
+# part of the attack surface as the plugin is. A language that is added to the
+# tree and not added here is a language nobody scans, and that is a visible
+# change to this file rather than a silent gap.
+#
+# The query suite is security-extended. The default suite trades recall for
+# precision, and the finding this is meant to catch is the one nobody was
+# looking for.
 name: '🔬 Run CodeQL'
 
 on:
   push:
-    branches: [ master ]
+    branches: ['**']
     paths-ignore:
       - '**/*.md'
   pull_request:
-    branches: [ master ]
+    branches: ['**']
     paths-ignore:
       - '**/*.md'
   schedule:
     - cron: '24 2 * * 4'
   workflow_dispatch:
 
+# Explicit deny-all at workflow level; the job below grants only what it needs.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  call:
-    # CodeQL init/autobuild/analyze: read the tree, read the workflow run for the
-    # analysis metadata, and write the results into the code-scanning tab.
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
+      # Read the tree, read the run's own metadata, and write the results into
+      # the code-scanning tab. Nothing here pushes to the repository.
       contents: read
       actions: read
       security-events: write
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/scan-codeql.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master
-    with:
-      repository-name: iderex/jellyfin-plugin-requests
+
+    strategy:
+      # One language failing must not hide the result of the others.
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+          - language: actions
+            build-mode: none
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes via git, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          # Both claimed lines, so the analysis sees the same code the gate
+          # builds and not one target framework of two.
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@18420e3271f74589575af831a523c833acda327f # codeql-bundle-v2.26.2
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+
+      - name: Build for the analysis
+        # Manual rather than autobuild, so the analysis is over what this
+        # repository's own gate builds: every claimed target framework, restored
+        # from the committed lockfiles.
+        if: matrix.language == 'csharp'
+        run: |
+          dotnet restore Jellyfin.Plugin.Requests.sln --locked-mode
+          dotnet build Jellyfin.Plugin.Requests.sln --configuration Release --no-restore
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@18420e3271f74589575af831a523c833acda327f # codeql-bundle-v2.26.2
+        with:
+          category: /language:${{ matrix.language }}
