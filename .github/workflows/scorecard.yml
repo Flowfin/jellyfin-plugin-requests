@@ -7,6 +7,17 @@
 # check is triaged (fixed or documented-accept), same as the other security
 # insights.
 #
+# THIS WORKFLOW REPORTS AND REFUSES NOTHING. There is no threshold step below and
+# none is to be added: the job goes red only if the action itself errors, which
+# is a run that broke rather than a repository that scored badly. Do not read a
+# green run here as a supply-chain verdict. A floor was considered and declined
+# in #141; the reasoning, the score it was measured against and what covers the
+# checks worth refusing are in docs/quality-parity.md. Two facts from there
+# decide it for anyone editing this file: the aggregate score is not in
+# results.sarif at all, and the triggers below run this only on the default
+# branch, so a floor would fail after a merge and could never be proved to bite
+# on a branch.
+#
 # Runs where publishing is valid: on push to the default branch, on a weekly
 # schedule (keeps the Maintained check fresh and re-scores on upstream changes),
 # and on branch_protection_rule changes (the only event that lets the
