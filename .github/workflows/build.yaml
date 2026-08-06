@@ -38,4 +38,9 @@ concurrency:
 
 jobs:
   call:
+    # A called workflow's jobs cannot ask for more than the job that called
+    # them, so the read the two legs need is granted here. Nothing under it
+    # writes anything back.
+    permissions:
+      contents: read
     uses: ./.github/workflows/gate.yaml
