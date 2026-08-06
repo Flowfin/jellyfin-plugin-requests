@@ -6,7 +6,7 @@ using Xunit;
 
 // Aliased rather than imported: inside this namespace the bare name `Plugin` binds to the
 // `Jellyfin.Plugin` namespace segment, not to the type.
-using PluginUnderTest = Jellyfin.Plugin.Template.Plugin;
+using PluginUnderTest = global::Jellyfin.Plugin.Requests.Plugin;
 
 namespace Jellyfin.Plugin.Requests.Tests;
 

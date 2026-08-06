@@ -1,5 +1,5 @@
 using System;
-using PluginUnderTest = Jellyfin.Plugin.Template.Plugin;
+using PluginUnderTest = global::Jellyfin.Plugin.Requests.Plugin;
 
 namespace Jellyfin.Plugin.Requests.Tests.Doubles;
 
