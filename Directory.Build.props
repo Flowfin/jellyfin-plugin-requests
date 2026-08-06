@@ -1,7 +1,48 @@
 <Project>
+
     <PropertyGroup>
-        <Version>0.0.0.0</Version>
-        <AssemblyVersion>0.0.0.0</AssemblyVersion>
-        <FileVersion>0.0.0.0</FileVersion>
+        <!-- One number, three properties, and the packaging metadata. Version, AssemblyVersion and
+             FileVersion drifting apart is how a server reports one version, a package claims a
+             second and a changelog names a third. PluginVersionMatchesThePackagingMetadata refuses
+             a disagreement between this number and the version field of both packaging files. The
+             scheme this number follows, and what moves it, is #107. -->
+        <PluginVersion>1.0.0.0</PluginVersion>
+        <Version>$(PluginVersion)</Version>
+        <AssemblyVersion>$(PluginVersion)</AssemblyVersion>
+        <FileVersion>$(PluginVersion)</FileVersion>
     </PropertyGroup>
+
+    <PropertyGroup>
+        <!-- The analyzer posture for every project in the tree, the test project included, so a
+             local build and the gated build refuse the same things. Held here rather than repeated
+             per project, because a copy per project is a copy that can be lowered in one of them
+             without anybody reading the other. -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <Nullable>enable</Nullable>
+        <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+        <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)jellyfin.ruleset</CodeAnalysisRuleSet>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <!-- A committed lockfile per project. Without one, a restore is free to resolve a
+             transitive package to whatever the feed offers that day, so two builds of the same
+             commit can carry different code and neither says so. With one, that resolution is
+             recorded in the tree and a change to it is a diff somebody reads.
+
+             Locked mode is not turned on here. It belongs on the routes that must not move the
+             graph, and turning it on for every local build would refuse the ordinary act of
+             adding a package before the lockfile has been written. -->
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- The analyzers themselves, for the same reason the posture above is here: a project
+             that is missing one of them is a project judged by a shorter list than the rest of
+             the tree. -->
+        <PackageReference Include="SerilogAnalyzer" Version="0.15.0" PrivateAssets="All" />
+        <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
+        <PackageReference Include="SmartAnalyzers.MultithreadingAnalyzer" Version="1.1.31" PrivateAssets="All" />
+    </ItemGroup>
+
 </Project>

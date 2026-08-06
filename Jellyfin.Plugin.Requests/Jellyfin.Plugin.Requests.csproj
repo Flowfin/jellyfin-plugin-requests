@@ -9,11 +9,6 @@
          runs. -->
     <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
     <RootNamespace>Jellyfin.Plugin.Requests</RootNamespace>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Nullable>enable</Nullable>
-    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
-    <CodeAnalysisRuleSet>../jellyfin.ruleset</CodeAnalysisRuleSet>
     <!-- The Jellyfin SDK the plugin compiles against, per target. Overridable from the command line so
          an ABI floor build can lower it to the targetAbi each package claims and prove that every API
          the plugin calls also exists on the oldest server of that line. -->
@@ -31,12 +26,6 @@
     <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="SerilogAnalyzer" Version="0.15.0" PrivateAssets="All" />
-    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
-    <PackageReference Include="SmartAnalyzers.MultithreadingAnalyzer" Version="1.1.31" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>

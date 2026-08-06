@@ -24,6 +24,15 @@ indent_size = 2
 indent_size = 2
 
 ###############################
+# Analyzer severities         #
+###############################
+# What raises a security finding to an error here is TreatWarningsAsErrors in
+# Directory.Build.props, which applies to every project and to a plain build, not a severity in
+# this file. A category severity was tried and does not take effect: AnalysisMode set to
+# AllEnabledByDefault writes a severity per rule, and a per-rule setting outranks a per-category
+# one wherever it is written. The measurement and what it leaves uncovered are in issue #18.
+
+###############################
 # .NET Coding Conventions     #
 ###############################
 [*.{cs,vb}]
