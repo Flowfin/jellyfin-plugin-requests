@@ -23,4 +23,4 @@ jobs:
       security-events: write
     uses: jellyfin/jellyfin-meta-plugins/.github/workflows/scan-codeql.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master
     with:
-      repository-name: jellyfin/jellyfin-plugin-template
+      repository-name: iderex/jellyfin-plugin-requests

@@ -53,7 +53,7 @@
   <ItemGroup>
     <!-- The project, not a built assembly: a stale copy in a bin directory would pass a suite that
          is testing last week's plugin. -->
-    <ProjectReference Include="..\Jellyfin.Plugin.Template\Jellyfin.Plugin.Template.csproj" />
+    <ProjectReference Include="..\Jellyfin.Plugin.Requests\Jellyfin.Plugin.Requests.csproj" />
   </ItemGroup>
 
 </Project>

@@ -20,6 +20,6 @@ description: >
 category: "General"
 owner: "jellyfin"
 artifacts:
-- "Jellyfin.Plugin.Template.dll"
+- "Jellyfin.Plugin.Requests.dll"
 changelog: >
   changelog
