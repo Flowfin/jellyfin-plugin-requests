@@ -10,11 +10,11 @@
 # workflow YAML and the packaging metadata are deliberately out, because
 # reformatting them would rewrite files that other gates read line by line.
 #
-# MARKDOWN IS NOT IN THE GLOB YET, and #27 asks for it. `README.md` is the only
-# markdown on the tree and it is being replaced whole by #19, so formatting the
-# copy that is here would be thrown away by that change and would collide with
-# it on the way. Adding `md` to the glob is the one-line change that finishes
-# #27, once the replacement is in.
+# Markdown is in the glob. It was left out when this file arrived, because
+# `README.md` was the only markdown on the tree and #19 was replacing it whole,
+# so formatting the copy that was here would have been thrown away by that
+# change and collided with it on the way. The replacement landed with this
+# change, which is why `md` could be added with it.
 #
 # The formatter version is pinned. An unpinned formatter reds a tree that was
 # green yesterday, for a default that changed rather than for anything anybody
@@ -49,10 +49,11 @@ jobs:
           # No step pushes via git, so do not persist the GITHUB_TOKEN in .git/config.
           persist-credentials: false
 
-      - name: Check formatting of the embedded web assets
+      - name: Check formatting of the embedded web assets and the markdown
         env:
           PRETTIER_VERSION: "3.6.2"
         # --check reports and exits non-zero, it never edits. The glob is the
         # whole scope of this gate: HTML, CSS and JavaScript, which is what the
-        # plugin embeds.
-        run: npx --yes "prettier@${PRETTIER_VERSION}" --check "**/*.{html,css,js}"
+        # plugin embeds, and Markdown, which is where everything this tree
+        # argues is written down.
+        run: npx --yes "prettier@${PRETTIER_VERSION}" --check "**/*.{html,css,js,md}"
