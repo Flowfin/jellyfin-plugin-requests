@@ -237,16 +237,61 @@ table that reads as five gates.
 exists to refuse. The four that refuse have both. The one that reports has no
 red run and can have none, which is settled below rather than left blank.
 
-| Guard                          | Kind    | Red run                                                                        | Green run                          |
-| ------------------------------ | ------- | ------------------------------------------------------------------------------ | ---------------------------------- |
-| `Audit workflows (zizmor)`     | refuses | 31041799794, sixteen findings against the eight inherited callers              | 31095610752, at `1a18979`          |
-| `Reject Trojan Source Unicode` | refuses | 31047199620, a file carrying U+202E                                            | 31095610752, at `1a18979`          |
-| `DCO sign-off`                 | refuses | 31047200286, a commit with no `Signed-off-by` trailer                          | 31095610752, at `1a18979`          |
-| `dependency-review`            | refuses | 31047201526, Newtonsoft.Json 12.0.3, below the fix line of GHSA-5crp-9r3c-p9vr | 31095610752, at `1a18979`          |
-| `Scorecard analysis`           | reports | none, and none is possible                                                     | at `f1c8881` on the default branch |
+| Guard                          | Kind    | Red run                                                                        | Green run                 |
+| ------------------------------ | ------- | ------------------------------------------------------------------------------ | ------------------------- |
+| `Audit workflows (zizmor)`     | refuses | 31041799794, sixteen findings against the eight inherited callers              | 31095610611, at `1a18979` |
+| `Reject Trojan Source Unicode` | refuses | 31047199620, a file carrying U+202E                                            | 31095610670, at `1a18979` |
+| `DCO sign-off`                 | refuses | 31047200286, a commit with no `Signed-off-by` trailer                          | 31095610728, at `1a18979` |
+| `dependency-review`            | refuses | 31047201526, Newtonsoft.Json 12.0.3, below the fix line of GHSA-5crp-9r3c-p9vr | 31095610678, at `1a18979` |
+| `Scorecard analysis`           | reports | none, and none is possible                                                     | 31110915427, at `0ecd860` |
 
 The three red runs in the middle are on one head, `bee97c0`, which carried all
 three defects at once and was closed without merging.
+
+Every identifier in the green column is a run of the guard's own workflow, and
+the commit beside it is the commit that run happened on rather than the current
+head of the default branch. It stops being the current head at the next merge,
+and the commands below are what a reader can re-run when it has.
+
+    $ for r in 31095610611 31095610670 31095610728 31095610678 31110915427; do \
+        gh api repos/iderex/jellyfin-plugin-requests/actions/runs/$r \
+          --jq '"\(.id)  \(.name)  \(.head_sha[0:7])  \(.conclusion)"'; done
+    31095610611  Workflow Security Analysis  1a18979  success
+    31095610670  unicode-guard  1a18979  success
+    31095610728  DCO  1a18979  success
+    31095610678  Dependency review  1a18979  success
+    31110915427  Scorecard supply-chain security  0ecd860  success
+
+Two commits rather than one, because two of the four refusing guards start on a
+pull request and nothing else, and the scorecard has no pull request trigger at
+all, which the grep further down this page prints:
+
+    $ git grep -A1 "^on:" origin/master -- .github/workflows/dco.yml .github/workflows/dependency-review.yml
+    origin/master:.github/workflows/dco.yml:on:
+    origin/master:.github/workflows/dco.yml-  pull_request:
+    --
+    origin/master:.github/workflows/dependency-review.yml:on:
+    origin/master:.github/workflows/dependency-review.yml-  pull_request:
+
+So `1a18979` is a pull request head where all four refusing guards ran at once,
+and those triggers are why one commit carrying a run of all five is not
+something this repository can produce.
+
+The four cells above named 31095610752 until this correction, and that run is
+none of the four guards:
+
+    $ gh api repos/iderex/jellyfin-plugin-requests/actions/runs/31095610752/jobs --jq '.jobs[].name'
+    lines
+    floor 12.0.0.0
+    floor 10.11.0.0
+
+It is the ABI floor, which ran on the same head within seconds of the four and
+carries three jobs where each guard's run carries one. The identifier was read
+off the list of runs started by that pull request instead of off each guard's
+own check, which is the same shape as reading a working checkout and reporting
+it as mainline. The fifth cell carried a commit and no identifier at all. The
+claim each cell supported was true both times; what a reader following it landed
+in was a different workflow.
 
 ### The score is a report, and stays one
 
