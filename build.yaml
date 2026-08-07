@@ -1,7 +1,7 @@
 ---
 name: "Template"
 guid: "eb5d7894-8eef-4b36-aa6f-5d124e828ce1"
-version: "1.0.0.0"
+version: "0.1.0.0"
 # Packaging metadata for the Jellyfin 10.11 line. The oldest server of that line this package claims
 # to load on, and the runtime that line provides. The project compiles against a newer 10.11.x SDK,
 # so a floor build against this number is what would show that every API the plugin calls also exists
