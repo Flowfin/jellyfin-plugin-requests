@@ -26,11 +26,16 @@ indent_size = 2
 ###############################
 # Analyzer severities         #
 ###############################
-# What raises a security finding to an error here is TreatWarningsAsErrors in
-# Directory.Build.props, which applies to every project and to a plain build, not a severity in
-# this file. A category severity was tried and does not take effect: AnalysisMode set to
-# AllEnabledByDefault writes a severity per rule, and a per-rule setting outranks a per-category
-# one wherever it is written. The measurement and what it leaves uncovered are in issue #18.
+# What raises a security finding to an error here is not a severity in this file. A category
+# severity was tried and does not take effect: AnalysisMode set to AllEnabledByDefault writes a
+# severity per rule, and a per-rule setting outranks a per-category one wherever it is written.
+# The measurement is in issue #18.
+#
+# Two properties in Directory.Build.props do it instead. TreatWarningsAsErrors makes every warning
+# an error, and CodeAnalysisTreatWarningsAsErrors makes every analyzer finding one; the second is
+# what still refuses a security finding after the first has been lowered on a command line. Both
+# are outranked by jellyfin.ruleset, so a rule quietened there stays quiet whatever these say,
+# which today is CA5394. Measured in issue #132.
 
 ###############################
 # .NET Coding Conventions     #

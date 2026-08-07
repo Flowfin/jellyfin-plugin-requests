@@ -21,6 +21,15 @@
              without anybody reading the other. -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <!-- The analyzer half of the line above, as a property of its own. TreatWarningsAsErrors is
+             one property and one command line away from being lowered, and lowering it turned a
+             security finding from an error into a warning while every route stayed green. This
+             property is what the SDK reads to choose the severity it writes per analyzer rule, it
+             is not touched by lowering TreatWarningsAsErrors, and a build with that lowered still
+             refuses a security finding. What it does not do is outrank jellyfin.ruleset: a rule
+             that file quietens stays quiet, which today is CA5394. #132 is where this was measured
+             and #25 is where that ruleset is reviewed. -->
+        <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
         <Nullable>enable</Nullable>
         <AnalysisMode>AllEnabledByDefault</AnalysisMode>
         <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)jellyfin.ruleset</CodeAnalysisRuleSet>
