@@ -1,14 +1,15 @@
 using System;
-using System.Globalization;
 using System.IO;
 using MediaBrowser.Common.Configuration;
 
 namespace Jellyfin.Plugin.Requests.Tests.Doubles;
 
 /// <summary>
-/// The host's application paths, rooted at a directory this instance creates and deletes. Every
-/// path is under that root, so a test that writes through the plugin cannot reach a real server's
-/// data directory, and nothing survives the test that created it.
+/// The host's application paths, rooted at a subdirectory of <see cref="TestRunDirectory"/> that
+/// this instance creates and deletes. Every path is under that root, so a test that writes through
+/// the plugin cannot reach a real server's data directory, and nothing survives the test that
+/// created it. The root is a subdirectory rather than a directory of its own beside everything else
+/// on the machine, so what a run wrote is one directory rather than a scattering of them.
 /// </summary>
 internal sealed class FakeApplicationPaths : IApplicationPaths, IDisposable
 {
@@ -19,11 +20,8 @@ internal sealed class FakeApplicationPaths : IApplicationPaths, IDisposable
     /// </summary>
     public FakeApplicationPaths()
     {
-        ProgramDataPath = Path.Combine(
-            Path.GetTempPath(),
-            string.Create(CultureInfo.InvariantCulture, $"jellyfin-plugin-requests-tests-{Guid.NewGuid():N}"));
+        ProgramDataPath = TestRunDirectory.CreateSubdirectory();
 
-        Directory.CreateDirectory(ProgramDataPath);
         Directory.CreateDirectory(PluginConfigurationsPath);
     }
 
@@ -94,10 +92,7 @@ internal sealed class FakeApplicationPaths : IApplicationPaths, IDisposable
 
         disposed = true;
 
-        if (Directory.Exists(ProgramDataPath))
-        {
-            Directory.Delete(ProgramDataPath, true);
-        }
+        TestRunDirectory.Remove(ProgramDataPath);
     }
 
     private string Under(string name) => Path.Combine(ProgramDataPath, name);
