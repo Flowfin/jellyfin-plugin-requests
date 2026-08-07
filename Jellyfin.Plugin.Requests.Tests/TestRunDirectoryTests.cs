@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
 using Xunit;
 
@@ -76,5 +78,50 @@ public class TestRunDirectoryTests
         Assert.False(Directory.Exists(disposedRoot));
         Assert.True(Directory.Exists(held.ProgramDataPath));
         Assert.True(Directory.Exists(runDirectory));
+    }
+
+    /// <summary>
+    /// The same promise as the test above, made while doubles are being taken and given back at
+    /// once. The test above holds one double for its whole length, so the run's directory is never
+    /// a candidate for removal while it runs and the sequence that breaks this cannot occur in it.
+    /// <para>
+    /// That sequence is short. One double gives back the last subdirectory and the run's directory
+    /// becomes removable; another double has already asked for the run's directory and is about to
+    /// create its own inside it; the removal lands between the two and the second double creates a
+    /// directory inside one that is no longer there. The suite runs test classes in parallel, so
+    /// this is a failure in an unrelated test, on one target framework, that a re-run does not
+    /// reproduce.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void DoublesTakenAndGivenBackAtOnceDoNotRemoveTheRunDirectoryUnderEachOther()
+    {
+        var failures = new ConcurrentBag<string>();
+
+        Parallel.For(0, 32, _ =>
+        {
+            for (var round = 0; round < 32; round++)
+            {
+                try
+                {
+                    using var paths = new FakeApplicationPaths();
+
+                    if (!Directory.Exists(paths.ProgramDataPath))
+                    {
+                        failures.Add("a double's own directory was gone as soon as it was made");
+                    }
+                }
+                catch (IOException error)
+                {
+                    failures.Add(error.Message);
+                }
+                catch (UnauthorizedAccessException error)
+                {
+                    failures.Add(error.Message);
+                }
+            }
+        });
+
+        Assert.Empty(failures);
     }
 }
