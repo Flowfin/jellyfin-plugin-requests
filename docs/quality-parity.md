@@ -226,27 +226,147 @@ longer tracks it.
 
 ## What the inherited guards have been watched doing
 
-Five guards arrived with this repository. #25 asks for a red run and a green run
-for each, caused by the thing that guard exists to refuse. Four have both. The
-fifth cannot have a red run at all, for a reason that is about the guard rather
-than about the effort, and that is stated rather than filled in.
+Five workflows arrived with this repository, and they are not five of the same
+thing. Four of them read the tree or the change and go red on what they find.
+The fifth reads the repository, scores it, and publishes the score, and no step
+in it compares that score against anything. The `Kind` column says which of the
+two a row is, because four refusals and one report listed under one heading is a
+table that reads as five gates.
 
-| Guard                          | Red run                                                                        | Green run                          |
-| ------------------------------ | ------------------------------------------------------------------------------ | ---------------------------------- |
-| `Audit workflows (zizmor)`     | 31041799794, sixteen findings against the eight inherited callers              | 31095610752, at `1a18979`          |
-| `Reject Trojan Source Unicode` | 31047199620, a file carrying U+202E                                            | 31095610752, at `1a18979`          |
-| `DCO sign-off`                 | 31047200286, a commit with no `Signed-off-by` trailer                          | 31095610752, at `1a18979`          |
-| `dependency-review`            | 31047201526, Newtonsoft.Json 12.0.3, below the fix line of GHSA-5crp-9r3c-p9vr | 31095610752, at `1a18979`          |
-| `Scorecard analysis`           | none, and none is possible                                                     | at `f1c8881` on the default branch |
+#25 asks for a red run and a green run for each, caused by the thing that guard
+exists to refuse. The four that refuse have both. The one that reports has no
+red run and can have none, which is settled below rather than left blank.
+
+| Guard                          | Kind    | Red run                                                                        | Green run                          |
+| ------------------------------ | ------- | ------------------------------------------------------------------------------ | ---------------------------------- |
+| `Audit workflows (zizmor)`     | refuses | 31041799794, sixteen findings against the eight inherited callers              | 31095610752, at `1a18979`          |
+| `Reject Trojan Source Unicode` | refuses | 31047199620, a file carrying U+202E                                            | 31095610752, at `1a18979`          |
+| `DCO sign-off`                 | refuses | 31047200286, a commit with no `Signed-off-by` trailer                          | 31095610752, at `1a18979`          |
+| `dependency-review`            | refuses | 31047201526, Newtonsoft.Json 12.0.3, below the fix line of GHSA-5crp-9r3c-p9vr | 31095610752, at `1a18979`          |
+| `Scorecard analysis`           | reports | none, and none is possible                                                     | at `f1c8881` on the default branch |
 
 The three red runs in the middle are on one head, `bee97c0`, which carried all
 three defects at once and was closed without merging.
 
-The scorecard scores the repository and uploads the result. It declares no
-threshold and fails only if the action itself errors, so there is no input that
-makes it go red for the reason it names, and a guard that cannot refuse anything
-is not a guard. That is a defect in what was asked for rather than one this
-document can close, and #25 carries it.
+### The score is a report, and stays one
+
+#141 asked whether to give the score a floor so that it refuses something, or to
+record in writing that it stays a report. It stays a report. The reasoning is
+here rather than in the issue alone, because this table is where a reader would
+otherwise take the row for a gate.
+
+The score itself, at the head this document was last measured against:
+
+    $ curl -s https://api.securityscorecards.dev/projects/github.com/iderex/jellyfin-plugin-requests \
+        -o scorecard.json
+    $ python -c "import json;d=json.load(open('scorecard.json'));print(d['repo']['commit'],d['date'],d['score'])"
+    0ecd860c9adbb09f074a6f65106fa4219ad9e1c2 2026-08-06T14:27:46Z 6
+
+Three things stand against a floor, and the first is that the condition as
+written cannot be built. A floor was to read the aggregate score out of
+`results.sarif`. That file does not carry one. From the artifact of the run that
+produced the score above:
+
+    $ gh run download 31110915427 --repo iderex/jellyfin-plugin-requests \
+        --name 'SARIF file' --dir sarif
+    $ grep -ciE '"score"|aggregate|overall' sarif/results.sarif
+    0
+    $ grep -oiE 'score is [0-9-]+' sarif/results.sarif | sort | uniq -c
+          5 score is 0
+          1 score is 3
+          2 score is 8
+          2 score is 9
+
+Ten numbers, one per finding rather than one per check, each inside an English
+sentence in a finding's message, and only for the checks that produced a finding
+at all. A check scoring 10 emits none, so the aggregate cannot be recovered from
+the file either: the weights are not in it and neither are the checks that
+passed. The aggregate exists in the published result above, which is a different
+source and an external one.
+
+The second is that a floor here could refuse nothing that matters, because this
+workflow runs after a merge and never before one:
+
+    $ grep -nE "pull_request|^ +if:|branches:" .github/workflows/scorecard.yml
+    13:# Branch-Protection check see the ruleset). No pull_request trigger - that path
+    33:    branches: [master]
+    56:    if: github.event.repository.default_branch == github.ref_name
+
+No pull request trigger, a push trigger naming the default branch, and a job
+guarded to the default branch on top of it. A red run would land on `master`
+after the change that caused it was already in. The same two lines are why a
+floor could not be proved to bite the way every other guard here was: raising it
+on a throwaway branch runs nothing, because no branch but the default one starts
+this workflow. Proving it would mean pushing a deliberately failing commit to
+`master`.
+
+The third is what the number is made of:
+
+    $ python -c "import json;d=json.load(open('scorecard.json'));[print(c['score'],c['name']) for c in sorted(d['checks'],key=lambda c:c['score'])]"
+    -1 Packaging
+    -1 Signed-Releases
+    0 Code-Review
+    0 Maintained
+    0 CII-Best-Practices
+    0 Contributors
+    0 Fuzzing
+    0 Security-Policy
+    3 Branch-Protection
+    8 Pinned-Dependencies
+    9 Token-Permissions
+    10 Dangerous-Workflow
+    10 Dependency-Update-Tool
+    10 Binary-Artifacts
+    10 License
+    10 Vulnerabilities
+    10 SAST
+    10 CI-Tests
+
+`Fuzzing` is 0 because fuzzing is declined in the table above, by name and with a
+replacement. `Contributors` is 0 for a repository with one maintainer and cannot
+be anything else. `CII-Best-Practices` is 0 until somebody registers for a badge
+elsewhere. `Maintained` is 0 with the reason printed by the run itself, which is
+that the repository is younger than ninety days:
+
+    $ grep -oE 'score is 0: project was created within the last [0-9]+ days' \
+        sarif/results.sarif
+    score is 0: project was created within the last 90 days
+
+That one moves with the calendar rather than with a commit. `Packaging` and
+`Signed-Releases` are -1 and enter the mean the day a first release exists,
+moving the aggregate without one byte of this tree changing. A floor set just
+under 6 today would go red on a morning nobody pushed anything, for a reason
+nobody here caused, which is the guard that gets switched off rather than fixed.
+That an inactive period lowers `Maintained` again afterwards is a claim about
+how the check is scored upstream and is not measured here.
+
+What is left after those three are the checks that are about this tree, and the
+ones worth refusing are refused already, on every pull request, by a guard that
+has been watched going red. `Audit workflows (zizmor)` runs at
+`--min-severity=low`, which covers `unpinned-uses`, `excessive-permissions` and
+the dangerous-trigger rules, and run 31041799794 above is that gate refusing
+sixteen findings at once. That is the same ground as `Token-Permissions`,
+`Dangerous-Workflow` and the actions half of `Pinned-Dependencies`, refused
+before a merge instead of scored after one.
+
+The half that is covered by nothing is named rather than left out.
+`Pinned-Dependencies` is 8 for two findings that are not about actions, and no
+check on this board refuses either of them:
+
+    $ grep -oE 'score is 8: [a-zA-Z]+ not pinned by hash' sarif/results.sarif
+    score is 8: downloadThenRun not pinned by hash
+    score is 8: nugetCommand not pinned by hash
+
+`Branch-Protection` at 3 is a repository setting rather than a file here, and
+what the ruleset should require is #30. `Security-Policy` at 0 is a file this
+tree does not have yet, which is #106. Neither is closed by this decision and
+neither is a reason for a floor: a floor would report the same absences the
+report already reports.
+
+So the workflow keeps its shape, its header says in the file that it refuses
+nothing, and #25's second condition is answered for the fifth workflow by there
+being nothing to answer: it is not a guard, and the four that are have their red
+runs.
 
 ## What this document does not do
 
