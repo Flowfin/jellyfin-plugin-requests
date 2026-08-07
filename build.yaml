@@ -1,6 +1,6 @@
 ---
-name: "Template"
-guid: "eb5d7894-8eef-4b36-aa6f-5d124e828ce1"
+name: "Requests"
+guid: "0f9c9107-b31b-459e-81fa-6d35dac25e79"
 version: "0.1.0.0"
 # Packaging metadata for the Jellyfin 10.11 line. The oldest server of that line this package claims
 # to load on, and the runtime that line provides. The project compiles against a newer 10.11.x SDK,
@@ -8,12 +8,13 @@ version: "0.1.0.0"
 # on the oldest claimed server; no such build exists in the gate yet (#23).
 targetAbi: "10.11.0.0"
 framework: "net9.0"
-overview: "Short description about your plugin"
+overview: "A user asks the server for a film or a series, an administrator answers it in a queue. Under development."
 description: >
-  This is a longer description that can span more than one
-  line and include details about your plugin.
+  A user who cannot find something asks for it from inside Jellyfin rather than through a message to whoever runs the server. The ask lands in a queue an administrator works through, and the person who asked can see what happened to it.
+
+  This is not finished and there is no release yet. The tree holds the plugin shell and one data model. Installing it today adds nothing a user can see.
 category: "General"
-owner: "jellyfin"
+owner: "Flowfin"
 artifacts:
 - "Jellyfin.Plugin.Requests.dll"
 changelog: >

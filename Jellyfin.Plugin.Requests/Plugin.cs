@@ -29,7 +29,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public override string Name => "Requests";
 
     /// <inheritdoc />
-    public override Guid Id => Guid.Parse("eb5d7894-8eef-4b36-aa6f-5d124e828ce1");
+    public override Guid Id => Guid.Parse("0f9c9107-b31b-459e-81fa-6d35dac25e79");
 
     /// <summary>
     /// Gets the current plugin instance.
