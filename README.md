@@ -1,3 +1,8 @@
+> [!NOTE]
+>
+> **Part of [Flowfin](https://github.com/Flowfin).** It works with any Jellyfin
+> server, and with the Flowfin clients.
+
 # Jellyfin Requests
 
 Media requests for Jellyfin as first-class server objects. A user asks the

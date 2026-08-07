@@ -65,8 +65,102 @@ tree. What ran on the last change to land, at `1a18979`:
 
 Four of the thirteen have no counterpart running here at all: the two packaging
 contexts, the pull request hygiene checks and the greppable invariant lint.
-Those are #108, #109, #26 and #28. The rest run and are not required, and #30 is
-where the required set is decided and applied.
+Those are #108, #109, #26 and #28. The rest run and are not required, and the
+section below is the set that says which of them should be.
+
+## The set to require
+
+Thirteen contexts, named exactly as the checks name themselves. A required check
+is matched literally: the ruleset holds a string, GitHub compares it to the name
+a check run reports, and nothing reconciles the two. So renaming a job does not
+rename a requirement, it removes one and leaves the ruleset asking for a name
+nothing produces, which blocks every pull request until somebody notices. Every
+name below was copied out of a run rather than out of a workflow file.
+
+    Analyze (actions, none)
+    Analyze (csharp, manual)
+    Analyze (javascript-typescript, none)
+    Audit workflows (zizmor)
+    call / build
+    call / test
+    Check formatting
+    DCO sign-off
+    dependency-review
+    floor 10.11.0.0
+    floor 12.0.0.0
+    lines
+    Reject Trojan Source Unicode
+
+There are no bypass actors, and none is to be added. A rule with a bypass is a
+rule that holds for whoever did not think to ask, which is the opposite of what
+this list is for.
+
+Commits are to be signed. The ruleset carries no signature rule today and every
+commit on the default branch is already signed, so the rule costs nothing to add
+and closes the case where one is not:
+
+    $ gh api 'repos/iderex/jellyfin-plugin-requests/commits?sha=master&per_page=100'         --jq '[.[] | .commit.verification.verified]
+              | {total: length, verified: (map(select(.)) | length),
+                 unverified: (map(select(. == false)) | length)}'
+    {"total":39,"unverified":0,"verified":39}
+
+Three checks that run here are deliberately not in the list.
+
+`Scorecard analysis` runs on a push to the default branch, on a schedule and on
+a branch-protection change, and never on a pull request. Requiring it would
+require a check that no pull request can produce, which blocks every merge
+rather than gating one.
+
+`CodeQL` and `zizmor` are the code-scanning tab's own checks rather than jobs
+this tree runs, produced when results are uploaded. `CodeQL` reported `neutral`
+on the head of the last pull request to land:
+
+    $ gh api repos/iderex/jellyfin-plugin-requests/commits/6f3ccd2/check-runs         --jq '.check_runs[] | select(.name=="CodeQL") | .conclusion'
+    neutral
+
+A required check whose verdict is neither pass nor fail is a requirement nobody
+can read. The jobs behind those two, the three `Analyze` legs and
+`Audit workflows (zizmor)`, are in the list instead, and they are the ones that
+go red for a reason this repository wrote.
+
+What is live is printed rather than described, and where the two disagree the
+command is right:
+
+    $ gh api repos/iderex/jellyfin-plugin-requests/rules/branches/master         --jq '.[] | select(.type=="required_status_checks")
+              | .parameters.required_status_checks[].context'
+    call / build
+    call / test
+    Reject Trojan Source Unicode
+
+Three of the thirteen. The set above is not applied: a ruleset is a repository
+setting rather than a file in this tree, and nothing in this change touches one.
+#30 carries the application and the demonstration that a red check refuses a
+merge.
+
+### One line per difference from the other board's set
+
+- `build` there is `call / build` and `call / test` here, because the legs live
+  in a called workflow and a called job's context carries the calling job's
+  name.
+- `ABI floor build` there is `lines`, `floor 10.11.0.0` and `floor 12.0.0.0`
+  here, because the claimed lines are read out of the packaging files rather
+  than listed in a job, so a line is a file and not a name in a ruleset.
+- `Package (JPRM) / Build package` has no counterpart running here; #108.
+- `Package (JPRM) / Generate SBOM` has no counterpart running here; #109.
+- `CodeQL` there is required and is not here, because it is the code-scanning
+  tab's check rather than a job, and the three `Analyze` legs are required
+  instead.
+- `Analyze (csharp)` there is `Analyze (csharp, manual)` here, and two more
+  beside it, because the build mode is part of the matrix job's name and this
+  repository scans three languages rather than one.
+- `Deterministic PR-hygiene checks` has no counterpart running here; #26.
+- `Enforce greppable invariants` has no counterpart running here; #28.
+- `prettier` there is `Check formatting` here, which is the same workflow under
+  a job name of its own.
+- `DCO sign-off`, `dependency-review`, `Reject Trojan Source Unicode` and
+  `Audit workflows (zizmor)` are the same name on both boards.
+- Signed commits are required by neither ruleset today. This set asks for them
+  here, which is a difference from there rather than parity with it.
 
 ## One row per workflow on the other board
 
