@@ -79,6 +79,79 @@ rules:
         - "Jellyfin.Plugin.Requests/Model/**/*.cs"
         - "tools/opengrep/fixtures/model/**/*.cs"
 
+  # Invariant (time, #34): the plugin reads the time through the injected IClock
+  # and never off the machine. Decided in #34, whose done-when names this rule.
+  # Code that reads the wall clock can only be tested by waiting for it, so the
+  # test either sleeps, which makes it slow and then flaky, or it is written
+  # around the rule it was meant to check. SystemClock is the one place the wall
+  # clock enters, and it is excluded here because it is the implementation this
+  # rule points everything else at.
+  - id: clock-read-only-through-the-injected-clock
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not read the machine's clock here. Take an IClock and read IClock.UtcNow,
+      so a rule about retention, staleness or ordering can be tested by moving a
+      clock instead of by waiting (#34). SystemClock is the one place the wall
+      clock is read.
+    patterns:
+      - pattern-either:
+          - pattern: DateTime.UtcNow
+          - pattern: DateTime.Now
+          - pattern: DateTime.Today
+          - pattern: DateTimeOffset.UtcNow
+          - pattern: DateTimeOffset.Now
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.cs"
+        - "tools/opengrep/fixtures/clock/**/*.cs"
+      exclude:
+        - "Jellyfin.Plugin.Requests/Time/SystemClock.cs"
+
+  # Invariant (identity, #34): a request's identifier comes from the injected
+  # IIdentifierSource and never from the framework's generator. Decided in #34,
+  # whose done-when names this rule. An identifier a test cannot predict is one a
+  # test cannot assert on, so a suite ends up reading back whatever the code
+  # produced and comparing it to itself, which passes for any value including the
+  # wrong one. GuidIdentifierSource is the one place the generator is called.
+  - id: identifier-minted-only-by-the-identifier-source
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not mint an identifier here. Take an IIdentifierSource and call NewId,
+      so a test knows which identifier the next request will carry (#34).
+      GuidIdentifierSource is the one place the framework's generator is called.
+    patterns:
+      - pattern: Guid.NewGuid(...)
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.cs"
+        - "tools/opengrep/fixtures/identity/**/*.cs"
+      exclude:
+        - "Jellyfin.Plugin.Requests/Identity/GuidIdentifierSource.cs"
+
+  # Invariant (suite, #34): no test waits for real time to pass. Decided in #34,
+  # whose done-when is the grep this rule makes standing rather than a state
+  # somebody checked once. The headless rule in docs/testing.md names real
+  # wall-clock waiting among the things a test may not need. A sleep is what
+  # somebody reaches for first when a timing test fails, and it converts a
+  # reproducible failure into one that depends on how busy the machine is.
+  - id: no-waiting-in-a-test
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not wait in a test. Advance the TestClock instead, which moves time by
+      as much as the rule under test needs and takes none of it (#34). A sleep
+      makes a failure depend on how busy the machine is.
+    patterns:
+      - pattern-either:
+          - pattern: Thread.Sleep(...)
+          - pattern: Task.Delay(...)
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests.Tests/**/*.cs"
+        - "tools/opengrep/fixtures/sleep/**/*.cs"
+
   # Invariant (suite): the plugin is constructed in exactly one place, the
   # PluginHost double. Decided in
   # Jellyfin.Plugin.Requests.Tests/Doubles/PluginHost.cs, which says so in its
