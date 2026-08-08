@@ -16,10 +16,10 @@ name.
 2. Check that the commit you want to release is on that branch.
 3. Push the tag for that commit:
 
-   ```
-   git tag 1.4.0-stable <commit>
-   git push origin 1.4.0-stable
-   ```
+    ```
+    git tag 1.4.0-stable <commit>
+    git push origin 1.4.0-stable
+    ```
 
 The `Publish Release` workflow takes it from there.
 
@@ -32,10 +32,10 @@ serialising them by hand is what keeps the release order readable.
 The workflow builds the plugin from the tagged commit, creates the GitHub release
 for the tag, and attaches four files:
 
-* the plugin archive
-* the packaging metadata written beside it, `<archive>.zip.meta.json`
-* one `.md5` file, the checksum of the archive
-* one `.sha256` file for the same archive
+- the plugin archive
+- the packaging metadata written beside it, `<archive>.zip.meta.json`
+- one `.md5` file, the checksum of the archive
+- one `.sha256` file for the same archive
 
 The `.md5` is the value a Jellyfin catalog serves as the plugin checksum. There is
 exactly one per release so that no generator can pair a checksum with the wrong
@@ -57,23 +57,23 @@ is gone and no catalog is fed until a manifest generator is added.
 
 ## What fails the run
 
-* The tag does not end in `-stable`, or the workflow was started from something
+- The tag does not end in `-stable`, or the workflow was started from something
   other than a tag.
-* The numeric part of the tag differs from `version` in `build.yaml`.
-* `build.yaml` is missing a required field, or `version`, `targetAbi`, `framework`
+- The numeric part of the tag differs from `version` in `build.yaml`.
+- `build.yaml` is missing a required field, or `version`, `targetAbi`, `framework`
   or `guid` has the wrong shape.
-* `framework` in `build.yaml` names a target the plugin project is not built for.
-* A packaging manifest that shadows `build.yaml` is present, such as `jprm.yaml` or
+- `framework` in `build.yaml` names a target the plugin project is not built for.
+- A packaging manifest that shadows `build.yaml` is present, such as `jprm.yaml` or
   `meta.yaml`.
-* `build.yaml` declares an `image` file that is not in the repository.
-* The tagged commit is not contained in a release branch, or the tag was moved after
+- `build.yaml` declares an `image` file that is not in the repository.
+- The tagged commit is not contained in a release branch, or the tag was moved after
   the run started.
-* There is no `packages.lock.json` next to the plugin project, so the release build
+- There is no `packages.lock.json` next to the plugin project, so the release build
   cannot restore against a reviewed dependency graph. Create one with
   `dotnet restore <project> -p:RestorePackagesWithLockFile=true` and commit it.
-* The version stamped into the assembly is not the version in `build.yaml`.
-* The build produced no archive, or more than one, or no packaging metadata.
-* A release already exists for the tag.
+- The version stamped into the assembly is not the version in `build.yaml`.
+- The build produced no archive, or more than one, or no packaging metadata.
+- A release already exists for the tag.
 
 All of these fail before anything is published.
 
@@ -105,10 +105,10 @@ cannot, and the version has to be raised.
 
 ## Repository settings this expects
 
-* Default workflow permissions set to read only.
-* A rule that restricts who may push `*-stable` tags.
-* The `ABI floor build` check required on the release branches.
-* Immutable releases, if the repository wants the guarantee that a published release
+- Default workflow permissions set to read only.
+- A rule that restricts who may push `*-stable` tags.
+- The `ABI floor build` check required on the release branches.
+- Immutable releases, if the repository wants the guarantee that a published release
   can never be edited or deleted at all. The workflow does not depend on it: the
   refusal to touch an existing release is enforced in the release job. Turning it on
   removes the only recovery path for an incomplete release, so try it on one
