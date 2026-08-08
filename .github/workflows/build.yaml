@@ -21,14 +21,15 @@ on:
       - '**/*.md'
   # Every branch, not only pull requests aimed at master: a release branch would
   # otherwise take changes that nothing built.
-  # KEIN paths-ignore hier. Der Kommentar oben nennt die Falle bei den Namen;
-  # dies ist dieselbe Falle mit einer anderen Ursache. Das Ruleset verlangt
-  # `call / build` und `call / test`, und ein Filter, der den Lauf bei einer
-  # reinen Dokumentaenderung ueberspringt, laesst diese Kontexte NIE melden.
-  # Der PR ist dann nicht rot, sondern dauerhaft wartend, und nichts an ihm
-  # sieht falsch aus. Am 07.08. hing daran ein README-PR fest.
   #
-  # Beim push oben bleibt der Filter: dort gatet er nichts.
+  # No paths-ignore here. The comment at the top of this file names the trap at
+  # the check names; this is the same trap arrived at a different way. The
+  # ruleset requires `call / build` and `call / test`, so a filter that skips
+  # the run on a documentation-only change does not make those contexts pass,
+  # it stops them reporting at all. Such a pull request is not red, it waits
+  # forever, and nothing on it looks wrong to the person waiting.
+  #
+  # The filter stays on the push above, because nothing is gated there.
   pull_request:
     branches: ['**']
   workflow_dispatch:
