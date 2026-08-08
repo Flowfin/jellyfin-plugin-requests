@@ -176,3 +176,116 @@ rules:
         - "tools/opengrep/fixtures/suite/**/*.cs"
       exclude:
         - "Jellyfin.Plugin.Requests.Tests/Doubles/PluginHost.cs"
+
+  # Invariant (headless, #115): no browser automation package is referenced
+  # anywhere in this repository. Decided in docs/testing.md, whose first refusal
+  # is a browser-driven test of the administrator page and whose replacement is
+  # the endpoints tested in process. A package reference is how a display
+  # requirement arrives: nothing about the reference itself needs a display, and
+  # the first test written against it downloads a browser per machine and turns
+  # the suite into something a machine without one cannot run. The lock files are
+  # named beside the project files so a driver arriving as somebody else's
+  # dependency is refused too.
+  #
+  # What it does not reach: the four families below are the ones a .NET driver
+  # comes from today, matched case-sensitively against the canonical package
+  # identifier, which is the casing every file this rule reads carries. A fifth
+  # family is a fifth pattern here, and nothing finds one for you.
+  - id: no-browser-automation-package
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not reference a browser automation package. A browser-driven test needs
+      a display or a per-machine browser download, which docs/testing.md refuses;
+      test the endpoints the page calls in process instead (#115).
+    patterns:
+      - pattern-either:
+          - pattern: Playwright
+          - pattern: Selenium
+          - pattern: Puppeteer
+          - pattern: WebDriver
+    paths:
+      include:
+        - "**/*.csproj"
+        - "**/*.props"
+        - "**/*.targets"
+        - "**/packages.lock.json"
+        - "tools/opengrep/fixtures/display/**"
+
+  # Invariant (headless, #115): nothing in this tree reaches into a certificate
+  # store. Decided in docs/testing.md, which refuses a test needing an elevation
+  # or consent prompt and names a write to a machine trust store as one form of
+  # it. A trust store is shared with every other program on the machine and
+  # outlives the run that changed it, so this is the one refusal whose cost is
+  # paid by somebody who never ran the suite. X509Store is the whole managed
+  # entry point, because a store cannot be opened without constructing one;
+  # StoreName and StoreLocation are only ever its arguments and are left out
+  # rather than listed, so this rule cannot red on a storage type that happens to
+  # carry one of those words. `dotnet dev-certs` and `certutil` are the two
+  # command-line spellings of the same write.
+  - id: no-certificate-store-access
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not open or write a certificate store. It raises a consent prompt and
+      changes what every other program on the machine trusts, long after the run
+      ends, which docs/testing.md refuses (#115). Reach the client through an
+      in-process handler instead of trusting a certificate.
+    patterns:
+      - pattern-either:
+          - pattern: X509Store
+          - pattern: dotnet dev-certs
+          - pattern: certutil
+    paths:
+      include:
+        - "**/*.cs"
+        - "**/*.sh"
+        - "**/*.ps1"
+        - ".github/workflows/**"
+        - "tools/opengrep/fixtures/truststore/**"
+
+  # Invariant (headless, #115): the suite names no location outside the directory
+  # the run owns. Decided in Jellyfin.Plugin.Requests.Tests/Doubles/TestRunDirectory.cs,
+  # which is that directory and says so. The suite already asserts that every
+  # double is rooted under it, and a test that never went through a double is
+  # invisible to those assertions: it asks the machine for a temporary path, a
+  # known folder or the working directory, and writes beside everything else that
+  # uses them. Walking the machine's temporary root at the end of a run is the
+  # other way to catch that and is deliberately not done, because that root is
+  # shared with every process running as the same user and such a check reds for
+  # a file nobody in this repository created. This is the half that names a
+  # source line instead. TestRunDirectoryTests is excluded with the directory
+  # itself, because the assertion that the run's directory sits directly under
+  # the machine's temporary root has to name that root to make it.
+  #
+  # What it does not reach, and deliberately. AppContext.BaseDirectory is not
+  # refused: it is the test host's own output directory, it is where the
+  # packaging metadata is copied to be read, and nothing in the suite writes
+  # through it. A rooted path written as a literal is not refused either, because
+  # a pattern for one matches every version string and every URL in the suite,
+  # and a rule that reds on those is a rule somebody switches off. This catches
+  # the four calls that ask the machine where to put something, which is how a
+  # test that never went through a double actually gets written.
+  - id: suite-writes-only-under-the-run-directory
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not ask the machine for a location here. Take a subdirectory of
+      TestRunDirectory, which is the one directory a run owns and removes, so a
+      test cannot write beside everything else on a shared machine (#115).
+    patterns:
+      - pattern-either:
+          - pattern: Path.GetTempPath(...)
+          - pattern: Path.GetTempFileName(...)
+          - pattern: Environment.GetFolderPath(...)
+          - pattern: Environment.SpecialFolder
+          - pattern: Environment.CurrentDirectory
+          - pattern: Directory.GetCurrentDirectory(...)
+          - pattern: Directory.SetCurrentDirectory(...)
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests.Tests/**/*.cs"
+        - "tools/opengrep/fixtures/runpath/**/*.cs"
+      exclude:
+        - "Jellyfin.Plugin.Requests.Tests/Doubles/TestRunDirectory.cs"
+        - "Jellyfin.Plugin.Requests.Tests/TestRunDirectoryTests.cs"

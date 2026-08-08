@@ -1,0 +1,31 @@
+<!--
+  Fixture for no-browser-automation-package. This file is in no build and is
+  never restored; it exists so the rule can be watched refusing the mistake it
+  names. It carries the .xml extension rather than .csproj on purpose, so the
+  dependency bot does not try to resolve the packages below.
+
+  The near-miss is the reference somebody adds while the page is being built,
+  reasonably, because the page is the one part of this plugin that has no
+  in-process test and a driver is the obvious way to get one. Nothing about the
+  reference needs a display. The first test written against it downloads a
+  browser per machine, and the suite stops being `dotnet test` on a checkout.
+-->
+<Project>
+
+  <ItemGroup>
+    <!-- Legal neighbours, left here on purpose: these are what the test project
+         actually references and the rule has to stay quiet on them. -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The regression, in each family a driver arrives from. -->
+    <PackageReference Include="Microsoft.Playwright" Version="1.49.0" />
+    <PackageReference Include="Selenium.WebDriver" Version="4.27.0" />
+    <PackageReference Include="PuppeteerSharp" Version="20.0.5" />
+    <PackageReference Include="WebDriverManager" Version="2.17.5" />
+  </ItemGroup>
+
+</Project>
