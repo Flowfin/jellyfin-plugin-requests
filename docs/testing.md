@@ -100,6 +100,62 @@ makes visible today, and the conditions above are what decide the next one. A te
 condition not yet met by any proposal gets its own entry here when the proposal arrives, together
 with what replaces it.
 
+## Coverage, and the rule it does not replace
+
+Full unit-test coverage is a claim somebody has to be able to check, so the gate collects the number
+on every run and refuses a run below a floor.
+
+### What is measured
+
+The `test` job of `gate.yaml` collects coverage in the same run that tests, because a second run
+would be a second build and would report a number for code the gate did not test. The collector
+ships with `Microsoft.NET.Test.Sdk`, so nothing was added to the dependency graph for it. Both
+claimed target frameworks run and the collector writes one merged report, so a line reached on
+either server line counts as reached.
+
+The number is covered lines over recorded lines, for the plugin's own package only. The suite's
+coverage of itself is not counted: a suite measuring itself says nothing.
+
+The floor is 75%, and it is in `gate.yaml` beside the step that reads it. It is a ratchet rather
+than a target: raise it when the number rises, and never lower it to make a run pass. A run below
+it fails `call / test`, which is a required check, and the number is written to the run's summary
+and printed as an annotation on the pull request either way, so a change that adds untested code is
+visible while it is being reviewed rather than afterwards.
+
+A run that produced no report fails as well. A run that collected nothing must not read as a run
+that collected everything and found it fine.
+
+To read the same number on a checkout:
+
+    dotnet test Jellyfin.Plugin.Requests.sln --configuration Release --collect "Code Coverage;Format=cobertura" --results-directory coverage
+
+which was 79.50%, 128 of 161 recorded lines, on `b1d401b`.
+
+### The rule the percentage cannot carry
+
+A percentage says lines were executed. It does not say anything was asserted about them, and the
+lines that matter here are a small fraction of the total: a transition table has few lines and every
+one of them is a decision somebody can get wrong.
+
+So the rule beside the floor is this. **Every state transition, every authorisation refusal and
+every error path named in an issue on this board has a test that reaches it, and the test's name
+says which one.** The percentage catches drift; this catches the cases that matter.
+
+It is checkable by reading a test name against the issue that named the case, and it is meant to be
+checked that way rather than by a tool. An example of the shape, from the store contract in #45:
+
+    git grep -n 'AWriteAgainstAnOvertakenRevisionIsRefused' -- Jellyfin.Plugin.Requests.Tests/
+    Jellyfin.Plugin.Requests.Tests/Storage/RequestStoreContract.cs:129:    public async Task AWriteAgainstAnOvertakenRevisionIsRefusedAndSaysWhatTheStoreHolds()
+
+The issue named a refusal, the test names the same refusal, and a reader holding both can see in one
+line that the case is covered. A test called `ReplaceTest` would satisfy the percentage and fail
+this rule, which is the whole difference between the two.
+
+Nothing refuses a missing case. No check reads an issue, so this rule is read by a person, and a
+transition added with no test reaches the mainline as long as the percentage holds. What the floor
+does catch is the change large enough to move the number, which is not the same thing and is not
+offered as if it were.
+
 ## Does the plugin load on a real server
 
 A plugin that builds is not a plugin that loads. An ABI mismatch, an embedded resource path that
