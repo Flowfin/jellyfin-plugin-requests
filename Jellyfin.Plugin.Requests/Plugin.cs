@@ -36,6 +36,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// </summary>
     public static Plugin? Instance { get; private set; }
 
+    /// <summary>
+    /// Planted for proof/34-clock-and-identifier-refuse: the wall clock and the framework's
+    /// generator read straight out of the plugin, which is the shape the two rules refuse.
+    /// </summary>
+    public static string PlantedStamp =>
+        DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture) + Guid.NewGuid();
+
     /// <inheritdoc />
     public IEnumerable<PluginPageInfo> GetPages()
     {

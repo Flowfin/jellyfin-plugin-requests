@@ -24,6 +24,10 @@ public class PluginConstructionTests
     {
         using var host = new PluginHost();
 
+        // Planted for proof/34-clock-and-identifier-refuse: a wait in a test, which is the shape
+        // no-waiting-in-a-test refuses.
+        System.Threading.Thread.Sleep(1);
+
         Assert.NotNull(host.Plugin);
         Assert.False(string.IsNullOrWhiteSpace(host.Plugin.Name));
         Assert.NotEqual(Guid.Empty, host.Plugin.Id);
