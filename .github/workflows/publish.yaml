@@ -30,6 +30,9 @@ concurrency:
   group: publish-${{ github.ref_name }}
   cancel-in-progress: false
 
+# Planted for proof/28-invariants-refuse: a release cut by hand, which is the
+# shape release-created-only-by-a-tag-push exists to refuse.
+#   gh release create "$TAG" --title "$TAG" --notes-file CHANGELOG.md
 jobs:
   gate:
     name: Release metadata gate

@@ -88,7 +88,7 @@ public sealed record MediaRequest
     /// Gets where the request stands. Defaults to <see cref="RequestState.Open"/>, because a
     /// request that was never decided is the state a new one is in.
     /// </summary>
-    public RequestState State { get; init; } = RequestState.Open;
+    public RequestState State { get; set; } = RequestState.Open;
 
     /// <summary>
     /// Gets when the state last moved. On a request nothing has decided this is when it was

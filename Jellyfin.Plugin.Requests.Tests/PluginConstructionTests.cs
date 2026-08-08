@@ -22,6 +22,12 @@ public class PluginConstructionTests
     [Fact]
     public void PluginConstructsAgainstTheDoubles()
     {
+        // Planted for proof/28-invariants-refuse: a second call site, which is the
+        // shape plugin-constructed-only-by-the-host-double exists to refuse.
+        using var paths = new FakeApplicationPaths();
+        var plugin = new Plugin(paths, new FakeXmlSerializer());
+        Assert.NotNull(plugin);
+
         using var host = new PluginHost();
 
         Assert.NotNull(host.Plugin);
