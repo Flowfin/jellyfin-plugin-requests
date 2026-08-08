@@ -90,4 +90,86 @@ jobs:
       - name: Test every claimed target framework
         # --no-build, so the assemblies under test are the ones the step above
         # produced and not a second build made with different settings.
-        run: dotnet test Jellyfin.Plugin.Requests.sln --configuration Release --no-build
+        #
+        # Coverage is collected here rather than in a run of its own, because a
+        # second run would be a second build of the same tree and would report a
+        # number for code the gate did not test. The collector ships with
+        # Microsoft.NET.Test.Sdk, so this adds nothing to the dependency graph.
+        # Both target frameworks run and the collector writes one merged report,
+        # so a line reached on either line counts as reached.
+        run: >-
+          dotnet test Jellyfin.Plugin.Requests.sln --configuration Release --no-build
+          --collect "Code Coverage;Format=cobertura" --results-directory coverage
+
+      - name: Hold the plugin's line coverage to its floor
+        # The floor is a ratchet against drift and not a target. What it catches
+        # is a change that adds code nobody tested; what it cannot catch is a
+        # test that executes a line without asserting anything about it. The rule
+        # in docs/testing.md carries that half, and this number is the cheap one.
+        #
+        # The percentage is covered lines over recorded lines for the plugin's own
+        # package, which is what the report holds and what the reader can
+        # recompute. The test project's own coverage is not counted: a suite
+        # measuring itself says nothing.
+        env:
+          # Measured at 79.50% on b1d401b, the commit this step landed against.
+          # Raise it when the number rises; never lower it to make a run pass.
+          COVERAGE_FLOOR: "75"
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+
+          floor = float(os.environ["COVERAGE_FLOOR"])
+          reports = sorted(glob.glob("coverage/**/*.cobertura.xml", recursive=True))
+          if not reports:
+              # Fail closed. A run that collected nothing must not read as a run
+              # that collected everything and found it fine.
+              sys.exit("no coverage report was produced, so nothing was measured")
+
+          covered = total = 0
+          per_file = {}
+          for report in reports:
+              for package in ET.parse(report).getroot().iter("package"):
+                  if package.get("name") != "Jellyfin.Plugin.Requests":
+                      continue
+                  for klass in package.iter("class"):
+                      name = klass.get("filename", "").replace("\\", "/").split("/")[-1]
+                      hit, seen = per_file.get(name, (0, 0))
+                      for line in klass.iter("line"):
+                          seen += 1
+                          total += 1
+                          if int(line.get("hits", "0")) > 0:
+                              hit += 1
+                              covered += 1
+                      per_file[name] = (hit, seen)
+
+          if total == 0:
+              sys.exit("the report holds no lines for the plugin's own package")
+
+          rate = 100.0 * covered / total
+          lines = [
+              "## Line coverage of the plugin",
+              "",
+              f"**{rate:.2f}%** of {total} recorded lines, floor {floor:.2f}%.",
+              "",
+              "| File | Covered | Recorded |",
+              "| --- | ---: | ---: |",
+          ]
+          for name in sorted(per_file):
+              hit, seen = per_file[name]
+              lines.append(f"| {name} | {hit} | {seen} |")
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as handle:
+                  handle.write("\n".join(lines) + "\n")
+
+          print(f"::notice title=Line coverage::{rate:.2f}% of {total} lines, floor {floor:.2f}%")
+          print(f"line coverage {rate:.2f}% over {total} lines, floor {floor:.2f}%")
+          if rate < floor:
+              sys.exit(f"line coverage {rate:.2f}% is below the floor of {floor:.2f}%")
+          PY
