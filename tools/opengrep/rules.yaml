@@ -1,0 +1,105 @@
+# The greppable invariants of this repository, one rule per invariant.
+#
+# Some rules here are not expressible as a compiler warning and are trivially
+# expressible as a pattern. A document can only ask for them; this file is where
+# a machine refuses them. A rule is added the first time an invariant is decided,
+# not in a batch afterwards, and the comment above each rule names where the
+# decision was taken so a reader can argue with the decision rather than with the
+# pattern.
+#
+# Every rule is `generic` mode, which matches token sequences and needs no
+# language parser. That is deliberate: a C# parser that mis-parses a file turns a
+# refusal into silence, and a rule that can go quiet without anybody noticing is
+# worse than no rule.
+#
+# Every rule carries a fixture under fixtures/, and its own `paths.include` names
+# that fixture directory beside the real subject. `prove-rules-fire.sh` scans the
+# fixtures and fails unless every declared rule fires on one, so a rule that
+# stopped matching anything reds the gate instead of passing quietly. The tree
+# scan excludes the fixture directory; if that exclusion is ever dropped the tree
+# scan reds on the fixtures rather than going green.
+#
+# The clean tree is the negative half of the same proof: every rule below reports
+# nothing against the repository as it stands, so a finding is a regression and
+# never the state of the tree.
+rules:
+  # Invariant (release path): a release is published by pushing a tag, and
+  # nothing is created by hand. Decided in docs/RELEASING.md and stated again at
+  # the top of .github/workflows/publish.yaml. A GitHub release is immutable once
+  # it exists, so a hand-made release permanently burns the tag it was made for
+  # and skips every check in the gate job that the tag push runs. The read-only
+  # verbs are deliberately not refused: docs/versioning.md counts releases with
+  # `gh release list` and a count is not a mutation.
+  - id: release-created-only-by-a-tag-push
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not create, edit, delete or upload a GitHub release by hand. Publishing
+      is a tag push and nothing else, because a release is immutable and a
+      hand-made one burns the tag and skips the release metadata gate. Read-only
+      verbs such as `gh release list` and `gh release view` are allowed.
+    patterns:
+      - pattern-either:
+          - pattern: gh release create
+          - pattern: gh release edit
+          - pattern: gh release delete
+          - pattern: gh release upload
+          - pattern: gh release delete-asset
+    paths:
+      include:
+        - ".github/workflows/**"
+        - "docs/**"
+        - "scripts/**"
+        - "tools/**"
+        - "**/*.sh"
+        - "**/*.ps1"
+      exclude:
+        # This file necessarily contains the refused verbs as its own patterns.
+        - "tools/opengrep/rules.yaml"
+
+  # Invariant (model): the request record is immutable, and a move produces a new
+  # value with `with` rather than an edit in place. Decided in
+  # Jellyfin.Plugin.Requests/Model/MediaRequest.cs, which says so in the type's
+  # own documentation. A settable property lets a caller move a request behind
+  # the back of the transition table and of the append-only history, which is the
+  # one thing the immutability was chosen to make impossible. `init` is the shape
+  # that stays legal; `set` in any accessibility is the regression.
+  - id: request-model-property-is-not-settable
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      A property under Model/ may not have a setter. The request record is
+      immutable and a move produces a new value with `with`, so that no caller
+      can change a request without going through the transition table and the
+      history. Use `init` instead of `set`.
+    patterns:
+      - pattern: set;
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/Model/**/*.cs"
+        - "tools/opengrep/fixtures/model/**/*.cs"
+
+  # Invariant (suite): the plugin is constructed in exactly one place, the
+  # PluginHost double. Decided in
+  # Jellyfin.Plugin.Requests.Tests/Doubles/PluginHost.cs, which says so in its
+  # own documentation. Every host service the plugin injects is passed from that
+  # one call site, so a new constructor parameter stops the suite from building
+  # until its double exists. A second call site anywhere else is what quietly
+  # removes that property.
+  - id: plugin-constructed-only-by-the-host-double
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Construct the plugin through the PluginHost double rather than calling its
+      constructor here. One call site is what makes a new host service a build
+      failure in the suite instead of a test that silently passes a null.
+    patterns:
+      - pattern-either:
+          - pattern: new Plugin(...)
+          - pattern: new PluginUnderTest(...)
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests.Tests/**/*.cs"
+        - "tools/opengrep/fixtures/suite/**/*.cs"
+      exclude:
+        - "Jellyfin.Plugin.Requests.Tests/Doubles/PluginHost.cs"

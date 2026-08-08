@@ -43,9 +43,10 @@ This one:
 Thirteen contexts against three, and the gap is not the same as the gap in what
 runs. Most of the thirteen have a counterpart running here already and are
 simply not required, which is a repository setting rather than a file in this
-tree. What ran on `db1a28b`, the head of the change that added the hygiene job:
+tree. What ran on `55f1ad2`, the head of the change that added the invariant
+lint:
 
-    $ gh api repos/Flowfin/jellyfin-plugin-requests/commits/db1a28b/check-runs \
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/commits/55f1ad2/check-runs \
         --jq '.check_runs[].name' | sort -u
     Analyze (actions, none)
     Analyze (csharp, manual)
@@ -58,20 +59,21 @@ tree. What ran on `db1a28b`, the head of the change that added the hygiene job:
     DCO sign-off
     dependency-review
     Deterministic pull request hygiene checks
+    Enforce greppable invariants
     floor 10.11.0.0
     floor 12.0.0.0
     lines
     Reject Trojan Source Unicode
     zizmor
 
-Three of the thirteen have no counterpart running here at all: the two packaging
-contexts and the greppable invariant lint. Those are #108, #109 and #28. It was
-four until the hygiene job landed under #26. The rest run and are not required,
-and the section below is the set that says which of them should be.
+Two of the thirteen have no counterpart running here at all, and both are the
+packaging contexts, #108 and #109. It was four until the hygiene job landed under
+#26 and three until the invariant lint landed under #28. The rest run and are not
+required, and the section below is the set that says which of them should be.
 
 ## The set to require
 
-Fourteen contexts, named exactly as the checks name themselves. A required check
+Fifteen contexts, named exactly as the checks name themselves. A required check
 is matched literally: the ruleset holds a string, GitHub compares it to the name
 a check run reports, and nothing reconciles the two. So renaming a job does not
 rename a requirement, it removes one and leaves the ruleset asking for a name
@@ -88,6 +90,7 @@ name below was copied out of a run rather than out of a workflow file.
     DCO sign-off
     dependency-review
     Deterministic pull request hygiene checks
+    Enforce greppable invariants
     floor 10.11.0.0
     floor 12.0.0.0
     lines
@@ -134,7 +137,7 @@ command is right:
     call / test
     Reject Trojan Source Unicode
 
-Three of the fourteen. The set above is not applied: a ruleset is a repository
+Three of the fifteen. The set above is not applied: a ruleset is a repository
 setting rather than a file in this tree, and nothing in this change touches one.
 #30 carries the application and the demonstration that a red check refuses a
 merge.
@@ -161,7 +164,10 @@ merge.
   inside set there is owner and member, and here it also holds collaborator,
   because the value a workflow reads out of the event payload and the value the
   API returns for the same pull request disagree on this board.
-- `Enforce greppable invariants` has no counterpart running here; #28.
+- `Enforce greppable invariants` is the same name on both boards, over a
+  different rule set. A rule is added the first time an invariant on this board
+  is decided, so each set says what its own tree has decided rather than what the
+  other one has.
 - `prettier` there is `Check formatting` here, which is the same workflow under
   a job name of its own.
 - `DCO sign-off`, `dependency-review`, `Reject Trojan Source Unicode` and
@@ -185,7 +191,7 @@ produce several.
 | `fuzz.yml`                  | declined        | The untrusted input here is authenticated JSON from the server's own API rather than an anonymous credential, and round-trip tests over the persisted schema in #47 cover it.                       |
 | `manifest-freshness.yml`    | adopted, #111   | A publish that reports success and leaves the manifest untouched ships nothing installable, and nothing else would notice.                                                                          |
 | `nightly-betas.yml`         | declined        | Nothing is shipping yet and a nightly channel before a first release is a channel with nothing in it; nothing covers that risk here because there is no risk to cover yet.                          |
-| `opengrep.yml`              | adopted, #28    | Several rules on this board are patterns a compiler cannot refuse and a document can only ask for.                                                                                                  |
+| `opengrep.yml`              | adopted, landed | Some rules here are patterns a compiler cannot refuse and a document can only ask for; `invariant-lint.yaml` refuses them, and fails unless every rule fired on a fixture written to be refused.    |
 | `pr-hygiene.yml`            | adopted, landed | It reasons about the change rather than about the code, which nothing else here does; `pr-hygiene.yaml` carries the two blocking checks and the two advisory ones, and not its commit-message pair. |
 | `prettier.yml`              | adopted, landed | This plugin ships HTML, CSS and JavaScript inside the assembly and no .NET analyzer reaches any of it, and the markdown is where everything here is argued.                                         |
 | `publish-beta.yml`          | declined        | It publishes to a beta channel this repository has not decided to have, and nothing covers that risk here because no channel exists to protect; #110 is where that is decided.                      |
@@ -202,14 +208,14 @@ produce several.
 
 ## One row per workflow here with no counterpart there
 
-Ten files here map onto a file there and are placed by the table above:
-`dco.yml`, `dependency-review.yml`, `mutation.yaml`, `prettier.yml`,
-`pr-hygiene.yaml`, `publish.yaml`, `scan-codeql.yaml`, `scorecard.yml`,
-`unicode-guard.yml` and `zizmor.yml`. Three of the rows below are the rest, and
-ten plus three is what the directory holds:
+Eleven files here map onto a file there and are placed by the table above:
+`dco.yml`, `dependency-review.yml`, `invariant-lint.yaml`, `mutation.yaml`,
+`prettier.yml`, `pr-hygiene.yaml`, `publish.yaml`, `scan-codeql.yaml`,
+`scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Three of the rows below
+are the rest, and eleven plus three is what the directory holds:
 
     $ ls .github/workflows/ | wc -l
-    13
+    14
 
 Those three do have a counterpart there and are listed here anyway, because what
 they are is not what it is: `dotnet.yml` is one file there and three here, and

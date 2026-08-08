@@ -1,0 +1,79 @@
+# The greppable invariants of this repository, refused rather than written down.
+#
+# Some rules on this board are not expressible as a compiler warning and are
+# trivially expressible as a pattern. Until this workflow existed a document
+# could only ask for them. The set is tools/opengrep/rules.yaml, one rule per
+# invariant, added the first time an invariant is decided rather than in a batch
+# afterwards.
+#
+# Two steps, and both are needed. The first scans the repository and fails on any
+# finding, which is what makes a rule a gate. The second scans the fixtures and
+# fails unless every declared rule fired on one, because a rule that quietly
+# stopped matching anything is indistinguishable from a clean tree, and the first
+# step alone would report the same green either way.
+#
+# Supply chain. Opengrep publishes no action and no container image, so the exact
+# release binary is pinned by version and by SHA-256 and the download is checked
+# against it before anything runs. No `curl | bash` and no floating `latest`.
+# Bump the two together; a version moved without its checksum fails the run
+# rather than installing whatever is behind the tag now.
+name: Repo Invariant Lint
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: ["**"]
+
+# Explicit deny-all at workflow level; the job below grants only the read access
+# it needs to check the tree out.
+permissions: {}
+
+# Cancel a superseded run on the same ref so a new push or pull-request update
+# does not queue behind an obsolete check.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  invariants:
+    # The check name the branch ruleset would require. It is matched literally,
+    # so renaming this job removes a requirement instead of renaming one.
+    name: Enforce greppable invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      # Pinned Opengrep release. OPENGREP_SHA256 is the sha256sum of the
+      # opengrep_manylinux_x86 asset for exactly this tag, which is what makes
+      # the download tamper-evident.
+      OPENGREP_VERSION: "v1.25.0"
+      OPENGREP_SHA256: "9ac4aebb47ba3f7b0d8fc641ac8749cb6c2f253f616131a67d9631e00d4bea33"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes via git, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Install Opengrep, pinned and checksum-verified
+        run: |
+          set -euo pipefail
+          url="https://github.com/opengrep/opengrep/releases/download/${OPENGREP_VERSION}/opengrep_manylinux_x86"
+          # --proto '=https' --tlsv1.2 refuse any non-HTTPS transport, including
+          # on a redirect, so the download cannot be downgraded to plaintext.
+          curl -fSL --proto '=https' --tlsv1.2 --retry 3 --retry-delay 2 -o opengrep "$url"
+          echo "${OPENGREP_SHA256}  opengrep" | sha256sum -c -
+          chmod +x opengrep
+
+      - name: Refuse an invariant broken anywhere in the tree
+        # --error is what makes a finding a failed check. The rule set is a local
+        # file, so the scan reaches no network. The fixture directory is excluded
+        # here because every file in it violates a rule on purpose; if this
+        # exclusion is ever dropped the step reds on the fixtures rather than
+        # going quietly green.
+        run: ./opengrep scan --config tools/opengrep/rules.yaml --error --exclude 'tools/opengrep/fixtures' .
+
+      - name: Prove every rule still refuses something
+        run: ./tools/opengrep/prove-rules-fire.sh
