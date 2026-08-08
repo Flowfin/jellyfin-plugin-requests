@@ -112,12 +112,30 @@ jobs:
             // rather than a caught slip. The linkage is still wanted: whoever
             // handles the contribution supplies it.
             //
-            // `author_association` is the author's relationship to this
-            // repository, so a collaborator who is later added as a member stops
-            // being exempt from that moment. COLLABORATOR is deliberately not in
-            // the inside set.
+            // COLLABORATOR is in the inside set here, and the sibling board
+            // leaves it out. That is a difference measured rather than copied.
+            // `author_association` is not one value: the field a workflow reads
+            // out of the event payload and the field the REST API returns for
+            // the same pull request can disagree, and here they do. On the run
+            // that first exercised this check, the workflow read COLLABORATOR
+            // and the API answered MEMBER for the same number:
+            //
+            //   gh api repos/Flowfin/jellyfin-plugin-requests/pulls/163 --jq '.author_association'
+            //   MEMBER
+            //
+            //   ##[warning]The blocking tier was skipped because the author is
+            //   outside this repository (author_association: COLLABORATOR)
+            //
+            // The value that decides the check is the one the workflow reads,
+            // so an inside set of OWNER and MEMBER skips the blocking tier for
+            // every pull request this board actually opens, which is a check
+            // that refuses nothing while reporting success. What the wider set
+            // costs is that somebody given push access is inside the tier from
+            // that moment. That is the right reading here: the convention this
+            // tier enforces follows write access, and somebody with none is the
+            // audience the skip is for.
             const isBot = pr.user && pr.user.type === 'Bot';
-            const INSIDE_ASSOCIATIONS = ['OWNER', 'MEMBER'];
+            const INSIDE_ASSOCIATIONS = ['OWNER', 'MEMBER', 'COLLABORATOR'];
             const isOutside = !INSIDE_ASSOCIATIONS.includes(
               pr.author_association || 'NONE',
             );
