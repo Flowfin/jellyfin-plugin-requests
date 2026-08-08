@@ -43,9 +43,9 @@ This one:
 Thirteen contexts against three, and the gap is not the same as the gap in what
 runs. Most of the thirteen have a counterpart running here already and are
 simply not required, which is a repository setting rather than a file in this
-tree. What ran on the last change to land, at `1a18979`:
+tree. What ran on `db1a28b`, the head of the change that added the hygiene job:
 
-    $ gh api repos/iderex/jellyfin-plugin-requests/commits/1a18979/check-runs \
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/commits/db1a28b/check-runs \
         --jq '.check_runs[].name' | sort -u
     Analyze (actions, none)
     Analyze (csharp, manual)
@@ -57,20 +57,21 @@ tree. What ran on the last change to land, at `1a18979`:
     CodeQL
     DCO sign-off
     dependency-review
+    Deterministic pull request hygiene checks
     floor 10.11.0.0
     floor 12.0.0.0
     lines
     Reject Trojan Source Unicode
     zizmor
 
-Four of the thirteen have no counterpart running here at all: the two packaging
-contexts, the pull request hygiene checks and the greppable invariant lint.
-Those are #108, #109, #26 and #28. The rest run and are not required, and the
-section below is the set that says which of them should be.
+Three of the thirteen have no counterpart running here at all: the two packaging
+contexts and the greppable invariant lint. Those are #108, #109 and #28. It was
+four until the hygiene job landed under #26. The rest run and are not required,
+and the section below is the set that says which of them should be.
 
 ## The set to require
 
-Thirteen contexts, named exactly as the checks name themselves. A required check
+Fourteen contexts, named exactly as the checks name themselves. A required check
 is matched literally: the ruleset holds a string, GitHub compares it to the name
 a check run reports, and nothing reconciles the two. So renaming a job does not
 rename a requirement, it removes one and leaves the ruleset asking for a name
@@ -86,6 +87,7 @@ name below was copied out of a run rather than out of a workflow file.
     Check formatting
     DCO sign-off
     dependency-review
+    Deterministic pull request hygiene checks
     floor 10.11.0.0
     floor 12.0.0.0
     lines
@@ -132,7 +134,7 @@ command is right:
     call / test
     Reject Trojan Source Unicode
 
-Three of the thirteen. The set above is not applied: a ruleset is a repository
+Three of the fourteen. The set above is not applied: a ruleset is a repository
 setting rather than a file in this tree, and nothing in this change touches one.
 #30 carries the application and the demonstration that a red check refuses a
 merge.
@@ -153,7 +155,12 @@ merge.
 - `Analyze (csharp)` there is `Analyze (csharp, manual)` here, and two more
   beside it, because the build mode is part of the matrix job's name and this
   repository scans three languages rather than one.
-- `Deterministic PR-hygiene checks` has no counterpart running here; #26.
+- `Deterministic PR-hygiene checks` there is
+  `Deterministic pull request hygiene checks` here, which is the same job under a
+  name written out, and its blocking tier reaches a different audience: the
+  inside set there is owner and member, and here it also holds collaborator,
+  because the value a workflow reads out of the event payload and the value the
+  API returns for the same pull request disagree on this board.
 - `Enforce greppable invariants` has no counterpart running here; #28.
 - `prettier` there is `Check formatting` here, which is the same workflow under
   a job name of its own.
@@ -167,42 +174,42 @@ merge.
 Named by file, because two files can produce one context and one file can
 produce several.
 
-| File there                  | Here            | Reasoning                                                                                                                                                                      |
-| --------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `build.yml`                 | adopted, #108   | It is the reusable packaging leg, and packaging on a pull request is what catches a broken package before release day instead of on it.                                        |
-| `codeql.yml`                | adopted, landed | `scan-codeql.yaml` names this repository's own language set and branch triggers rather than the default that would have covered the default branch and nothing else.           |
-| `dco.yml`                   | adopted, landed | It arrived with this tree, it runs on every pull request, and the record that it refuses a commit with no sign-off is below.                                                   |
-| `dependency-review.yml`     | adopted, landed | It arrived with this tree and refuses a newly introduced dependency carrying a published advisory, which is the one supply-chain failure a diff can be judged for.             |
-| `dotnet.yml`                | adopted, landed | It carries the build, test and floor legs there; here they are `gate.yaml` and `abi-floor.yaml`, because the shared workflows know nothing about this tree's multi-targeting.  |
-| `e2e-login.yml`             | declined        | There is no authentication flow here to drive end to end, and the risk it stands for, a packaged plugin that builds but does not load, is covered by the run in `testing.md`.  |
-| `fuzz.yml`                  | declined        | The untrusted input here is authenticated JSON from the server's own API rather than an anonymous credential, and round-trip tests over the persisted schema in #47 cover it.  |
-| `manifest-freshness.yml`    | adopted, #111   | A publish that reports success and leaves the manifest untouched ships nothing installable, and nothing else would notice.                                                     |
-| `nightly-betas.yml`         | declined        | Nothing is shipping yet and a nightly channel before a first release is a channel with nothing in it; nothing covers that risk here because there is no risk to cover yet.     |
-| `opengrep.yml`              | adopted, #28    | Several rules on this board are patterns a compiler cannot refuse and a document can only ask for.                                                                             |
-| `pr-hygiene.yml`            | adopted, #26    | It reasons about the change rather than about the code, which nothing else here does.                                                                                          |
-| `prettier.yml`              | adopted, landed | This plugin ships HTML, CSS and JavaScript inside the assembly and no .NET analyzer reaches any of it, and the markdown is where everything here is argued.                    |
-| `publish-beta.yml`          | declined        | It publishes to a beta channel this repository has not decided to have, and nothing covers that risk here because no channel exists to protect; #110 is where that is decided. |
-| `publish-failure-alert.yml` | adopted, #111   | A freshness check whose failure sits unread in a run log is not a check.                                                                                                       |
-| `publish-jf12-beta.yml`     | declined        | Same beta channel, second line, and the same absence of anything to protect.                                                                                                   |
-| `publish-jf12-stable.yml`   | adopted, #110   | The 12.0 line is claimed in `build-jf12.yaml` and a claimed line with no release path is a claim nobody can install.                                                           |
-| `publish.yml`               | adopted, #110   | The 10.11 line's release path, and the `publish.yaml` here is inherited and knows nothing about two lines.                                                                     |
-| `regenerate-manifest.yml`   | adopted, #110   | The manifest is regenerated by the release path rather than edited by hand, because a hand-edited manifest drifts against what was actually published.                         |
-| `scorecard.yml`             | adopted, landed | It arrived with this tree and its push trigger named a branch this repository does not have, so until #25 it did not run on the default branch once.                           |
-| `stryker-mutation.yml`      | adopted, landed | The transition table and the authorisation checks are exactly the small branchy code where line coverage says little and a surviving mutant is a missing negative test.        |
-| `unicode-guard.yml`         | adopted, landed | It arrived with this tree, it is the one inherited guard already in the required set, and the record that it refuses a bidirectional control character is below.               |
-| `wiki-lint.yml`             | declined        | There is no wiki here and the documentation lives in the tree, where the ordinary gate already reaches it.                                                                     |
-| `zizmor.yml`                | adopted, landed | It arrived with this tree, its push trigger named a branch this repository does not have, and it was red on the tree as it stood until the inherited callers were pinned.      |
+| File there                  | Here            | Reasoning                                                                                                                                                                                           |
+| --------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build.yml`                 | adopted, #108   | It is the reusable packaging leg, and packaging on a pull request is what catches a broken package before release day instead of on it.                                                             |
+| `codeql.yml`                | adopted, landed | `scan-codeql.yaml` names this repository's own language set and branch triggers rather than the default that would have covered the default branch and nothing else.                                |
+| `dco.yml`                   | adopted, landed | It arrived with this tree, it runs on every pull request, and the record that it refuses a commit with no sign-off is below.                                                                        |
+| `dependency-review.yml`     | adopted, landed | It arrived with this tree and refuses a newly introduced dependency carrying a published advisory, which is the one supply-chain failure a diff can be judged for.                                  |
+| `dotnet.yml`                | adopted, landed | It carries the build, test and floor legs there; here they are `gate.yaml` and `abi-floor.yaml`, because the shared workflows know nothing about this tree's multi-targeting.                       |
+| `e2e-login.yml`             | declined        | There is no authentication flow here to drive end to end, and the risk it stands for, a packaged plugin that builds but does not load, is covered by the run in `testing.md`.                       |
+| `fuzz.yml`                  | declined        | The untrusted input here is authenticated JSON from the server's own API rather than an anonymous credential, and round-trip tests over the persisted schema in #47 cover it.                       |
+| `manifest-freshness.yml`    | adopted, #111   | A publish that reports success and leaves the manifest untouched ships nothing installable, and nothing else would notice.                                                                          |
+| `nightly-betas.yml`         | declined        | Nothing is shipping yet and a nightly channel before a first release is a channel with nothing in it; nothing covers that risk here because there is no risk to cover yet.                          |
+| `opengrep.yml`              | adopted, #28    | Several rules on this board are patterns a compiler cannot refuse and a document can only ask for.                                                                                                  |
+| `pr-hygiene.yml`            | adopted, landed | It reasons about the change rather than about the code, which nothing else here does; `pr-hygiene.yaml` carries the two blocking checks and the two advisory ones, and not its commit-message pair. |
+| `prettier.yml`              | adopted, landed | This plugin ships HTML, CSS and JavaScript inside the assembly and no .NET analyzer reaches any of it, and the markdown is where everything here is argued.                                         |
+| `publish-beta.yml`          | declined        | It publishes to a beta channel this repository has not decided to have, and nothing covers that risk here because no channel exists to protect; #110 is where that is decided.                      |
+| `publish-failure-alert.yml` | adopted, #111   | A freshness check whose failure sits unread in a run log is not a check.                                                                                                                            |
+| `publish-jf12-beta.yml`     | declined        | Same beta channel, second line, and the same absence of anything to protect.                                                                                                                        |
+| `publish-jf12-stable.yml`   | adopted, #110   | The 12.0 line is claimed in `build-jf12.yaml` and a claimed line with no release path is a claim nobody can install.                                                                                |
+| `publish.yml`               | adopted, #110   | The 10.11 line's release path, and the `publish.yaml` here is inherited and knows nothing about two lines.                                                                                          |
+| `regenerate-manifest.yml`   | adopted, #110   | The manifest is regenerated by the release path rather than edited by hand, because a hand-edited manifest drifts against what was actually published.                                              |
+| `scorecard.yml`             | adopted, landed | It arrived with this tree and its push trigger named a branch this repository does not have, so until #25 it did not run on the default branch once.                                                |
+| `stryker-mutation.yml`      | adopted, landed | The transition table and the authorisation checks are exactly the small branchy code where line coverage says little and a surviving mutant is a missing negative test.                             |
+| `unicode-guard.yml`         | adopted, landed | It arrived with this tree, it is the one inherited guard already in the required set, and the record that it refuses a bidirectional control character is below.                                    |
+| `wiki-lint.yml`             | declined        | There is no wiki here and the documentation lives in the tree, where the ordinary gate already reaches it.                                                                                          |
+| `zizmor.yml`                | adopted, landed | It arrived with this tree, its push trigger named a branch this repository does not have, and it was red on the tree as it stood until the inherited callers were pinned.                           |
 
 ## One row per workflow here with no counterpart there
 
-Nine files here map onto a file there and are placed by the table above:
+Ten files here map onto a file there and are placed by the table above:
 `dco.yml`, `dependency-review.yml`, `mutation.yaml`, `prettier.yml`,
-`publish.yaml`, `scan-codeql.yaml`, `scorecard.yml`, `unicode-guard.yml` and
-`zizmor.yml`. Three of the rows below are the rest, and nine plus three is what
-the directory holds:
+`pr-hygiene.yaml`, `publish.yaml`, `scan-codeql.yaml`, `scorecard.yml`,
+`unicode-guard.yml` and `zizmor.yml`. Three of the rows below are the rest, and
+ten plus three is what the directory holds:
 
     $ ls .github/workflows/ | wc -l
-    12
+    13
 
 Those three do have a counterpart there and are listed here anyway, because what
 they are is not what it is: `dotnet.yml` is one file there and three here, and
