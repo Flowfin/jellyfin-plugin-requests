@@ -1,0 +1,271 @@
+# Deterministic pull request hygiene checks.
+#
+# Every other check on this board reasons about the code: the build, the tests,
+# the ABI floors, the analyzers, the formatter, the code scan, the workflow
+# audit. This one reasons about the change itself, which is a class none of them
+# reach. Whether a pull request says which issue it belongs to, whether a version
+# bump also records what it changed for somebody who has the plugin installed,
+# and whether a change to the plugin moved a test are facts about the pull
+# request rather than about any file in it.
+#
+# It is a first-party workflow with one `github-script` step rather than an
+# external review service. A service that reasons about a change is a third party
+# reading every diff before a maintainer does, and the same rules are a few
+# dozen lines of JavaScript against the pull request API. Nothing here is
+# checked out: every input is read from the pull request metadata through the
+# API, so there is no untrusted working tree, and no untrusted value is ever
+# interpolated into a shell command.
+#
+# The checks are tiered by confidence, because a check that fires on a
+# reasonable change teaches people to route around it.
+#
+#   FAIL, and holds the merge once the ruleset requires this job:
+#     * the pull request body carries an issue reference
+#     * a version bump in either packaging file also touches CHANGELOG.md
+#
+#   WARN, annotation only, never red:
+#     * the diff is large
+#     * the plugin changed and the test project did not
+#
+# The two WARN checks are in that tier on purpose. A rename, a documentation
+# move or a comment pass legitimately exceeds any line cap and legitimately
+# touches no test, and a merge blocked for either teaches people to split a
+# change badly, which is the opposite of what a size check is for.
+#
+# The FAIL tier is skipped for two audiences, for two different reasons, and
+# both skips are written at the check rather than only here. A skipped run says
+# so in its own annotations, so a run that checked less than the whole set
+# cannot be read as one that checked it and found nothing.
+#
+# Two checks the sibling board runs are deliberately not adopted here, and the
+# reasons are at checks 1b and 1c below where a reader looking for them will be.
+#
+# The job name is `Deterministic pull request hygiene checks`. A ruleset matches
+# a required check by name, literally, so renaming this job removes a
+# requirement rather than renaming one. What is actually required is a
+# repository setting rather than a line in this file, and is printed rather than
+# restated here:
+#
+#   gh api repos/Flowfin/jellyfin-plugin-requests/rules/branches/master \
+#     --jq '.[] | select(.type=="required_status_checks")
+#           | .parameters.required_status_checks[].context'
+name: '🧾 PR hygiene'
+
+on:
+  pull_request:
+    # Every branch, not only pull requests aimed at master, for the same reason
+    # the merge gate names every branch: a release branch would otherwise take
+    # changes this never looked at.
+    #
+    # `edited` is here so that adding the issue reference to the body re-runs
+    # the check. Without it the only way to clear check 1 is an empty push.
+    branches: ['**']
+    types: [opened, edited, synchronize, reopened]
+
+# Explicit deny-all at workflow level; the job below grants only what it reads.
+permissions: {}
+
+# Cancel a superseded run on the same pull request. This reads metadata and
+# writes nothing, so an obsolete run is safe to drop.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hygiene:
+    name: Deterministic pull request hygiene checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # The changed-file list and the patches behind it, and the pull request
+      # body, its author and its labels. Nothing here writes anything back.
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Run the hygiene checks
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const failures = [];
+            const warnings = [];
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+            const changed = files.map((f) => f.filename);
+
+            // --- Who the FAIL tier is for --------------------------------------
+            // An automated dependency update opens a pull request with no issue
+            // behind it, because there is no issue: the update is the whole
+            // change and the tool has nothing to link. Failing it would mean a
+            // permanently red check on every such pull request, which is the
+            // check that gets switched off rather than satisfied.
+            //
+            // Somebody arriving from outside this repository is a separate case
+            // with a separate reason. The issue convention is this board's, they
+            // have no way to know the numbers before they file, and often no
+            // issue exists yet, so failing their contribution on it is a ritual
+            // rather than a caught slip. The linkage is still wanted: whoever
+            // handles the contribution supplies it.
+            //
+            // `author_association` is the author's relationship to this
+            // repository, so a collaborator who is later added as a member stops
+            // being exempt from that moment. COLLABORATOR is deliberately not in
+            // the inside set.
+            const isBot = pr.user && pr.user.type === 'Bot';
+            const INSIDE_ASSOCIATIONS = ['OWNER', 'MEMBER'];
+            const isOutside = !INSIDE_ASSOCIATIONS.includes(
+              pr.author_association || 'NONE',
+            );
+            const failTierApplies = !isBot && !isOutside;
+
+            // Both skips are written at the check. A run that skipped the
+            // blocking tier says which checks it did not make and why, so it
+            // cannot be read as a run that made them and found nothing.
+            if (isBot) {
+              warnings.push(
+                'The blocking tier was skipped because this pull request was ' +
+                  `opened by a bot (user.type: ${pr.user.type}). The two checks ` +
+                  'not made are the issue reference in the body and the ' +
+                  'changelog entry behind a version bump. An automated ' +
+                  'dependency update has no issue to link, so the reference is ' +
+                  'not owed here; a version bump from one would still owe a ' +
+                  'changelog entry and is not checked, which is the cost of the ' +
+                  'skip and is stated rather than hidden.',
+              );
+            } else if (isOutside) {
+              warnings.push(
+                'The blocking tier was skipped because the author is outside ' +
+                  `this repository (author_association: ${pr.author_association || 'NONE'}). ` +
+                  'The two checks not made are the issue reference in the body ' +
+                  'and the changelog entry behind a version bump. The issue ' +
+                  'linkage is still wanted: whoever handles this contribution ' +
+                  'supplies the reference, and files the issue where none ' +
+                  'exists yet. Read this as "not their obligation", never as ' +
+                  '"linkage does not matter here".',
+              );
+            }
+
+            // --- Check 1: the body names an issue (FAIL) -----------------------
+            // Every change on this board starts as an issue, and the pull
+            // request is where that link is readable. A bare `#12`, a keyword
+            // form such as `Closes #12`, or a full issue URL all satisfy it.
+            // Lenient on purpose: a genuinely linked change must never be
+            // refused on phrasing.
+            const body = pr.body || '';
+            const hasIssueRef =
+              /(^|[^\w])#\d+\b/.test(body) ||
+              /github\.com\/[^/\s]+\/[^/\s]+\/issues\/\d+/i.test(body);
+            if (failTierApplies && !hasIssueRef) {
+              failures.push(
+                'The body carries no issue reference. Name the issue this ' +
+                  'change belongs to, for example `Closes #12` or `Part of #12`.',
+              );
+            }
+
+            // --- Check 1b: not adopted, the bracketed commit subject -----------
+            // The sibling board fails a commit whose subject carries no `[#N]`.
+            // That is a commit message convention rather than a fact about the
+            // pull request, and it is not this board's convention: the reference
+            // is written in the message body, as `Closes #45` or `Part of #1`,
+            // and the subject gains the pull request number when the merge
+            // squashes it. Adopting the bracketed form would refuse every commit
+            // already on the mainline, which is a change to how this board
+            // writes commits rather than a check on a change, and #26 asks for
+            // neither.
+
+            // --- Check 1c: not adopted, the commit message character set -------
+            // The sibling board holds every commit message to an explicit
+            // repertoire, which is what refuses a bidirectional control or a
+            // homoglyph in text that can only be repaired by rewriting history.
+            // `Reject Trojan Source Unicode` here reads tracked files and never
+            // git metadata, so that gap is real on this board and nothing below
+            // closes it. It is named here rather than left silent, and it is not
+            // part of what #26 asks for.
+
+            // --- Check 2: a version bump owes a changelog entry (FAIL) ---------
+            // Two packaging files carry a version, one per claimed server line,
+            // and either of them moving is a release change. The version field
+            // is not touched by anything else, so this stays silent on every
+            // pull request that is not one.
+            const PACKAGING_FILES = ['build.yaml', 'build-jf12.yaml'];
+            const bumped = files
+              .filter((f) => PACKAGING_FILES.includes(f.filename))
+              .filter((f) => f.patch && /^\+\s*version:/m.test(f.patch))
+              .map((f) => f.filename);
+            if (
+              failTierApplies &&
+              bumped.length > 0 &&
+              !changed.includes('CHANGELOG.md')
+            ) {
+              failures.push(
+                `\`version:\` changed in ${bumped.join(' and ')} but CHANGELOG.md ` +
+                  'was not touched. A version somebody can see in their plugin ' +
+                  'list with nothing saying what it changed is a number without ' +
+                  'a reason.',
+              );
+            }
+
+            // --- Check 3: the diff is large (WARN) -----------------------------
+            // Advisory and never red. Generated and lock files are left out so
+            // the count is of what a person wrote and a person has to read.
+            const isGenerated = (name) =>
+              name.endsWith('packages.lock.json') ||
+              name.endsWith('.min.js') ||
+              name.endsWith('.min.css');
+            const churn = files
+              .filter((f) => !isGenerated(f.filename))
+              .reduce((sum, f) => sum + f.additions + f.deletions, 0);
+            const WARN_AT = 400;
+            if (churn >= WARN_AT) {
+              warnings.push(
+                `This pull request changes ${churn} lines, excluding generated ` +
+                  `and lock files. Review quality falls off past about ${WARN_AT} ` +
+                  'lines, so this one is worth a closer look. It is not a limit ' +
+                  'and nothing here refuses it.',
+              );
+            }
+
+            // --- Check 4: the plugin moved and no test did (WARN) --------------
+            // Advisory. A comment pass, a documentation change inside a source
+            // file or a pure refactor legitimately moves no test, and failing
+            // those is the false positive that makes a check worthless.
+            const codeChanged = changed.some(
+              (n) => n.startsWith('Jellyfin.Plugin.Requests/') && n.endsWith('.cs'),
+            );
+            const testsChanged = changed.some((n) =>
+              n.startsWith('Jellyfin.Plugin.Requests.Tests/'),
+            );
+            if (codeChanged && !testsChanged) {
+              warnings.push(
+                'A .cs file under Jellyfin.Plugin.Requests/ changed and nothing ' +
+                  'under Jellyfin.Plugin.Requests.Tests/ did. Either the change ' +
+                  'is genuinely untestable, which is worth saying in the body, ' +
+                  'or a test is missing.',
+              );
+            }
+
+            // --- Report --------------------------------------------------------
+            for (const w of warnings) {
+              core.warning(w);
+            }
+            const summary = core.summary.addHeading('Pull request hygiene', 2);
+            if (failures.length === 0 && warnings.length === 0) {
+              summary.addRaw('Every check passed and nothing was skipped.');
+            } else {
+              if (failures.length) {
+                summary.addHeading('Refused', 3).addList(failures);
+              }
+              if (warnings.length) {
+                summary.addHeading('Advisory, nothing is refused', 3).addList(warnings);
+              }
+            }
+            await summary.write();
+
+            if (failures.length) {
+              core.setFailed(failures.join(' | '));
+            }
