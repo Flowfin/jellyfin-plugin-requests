@@ -29,6 +29,18 @@ if [ -z "$declared" ]; then
     exit 1
 fi
 
+# A reported finding names its rule as the config path joined by dots and then
+# the id, `tools.opengrep.<id>`, so the two sides are compared with that prefix
+# stripped. Stripping it means taking everything after the last dot, which is
+# only the id while no id contains one. Refuse a dotted id rather than let this
+# quietly compare the wrong halves.
+dotted=$(printf '%s\n' "$declared" | grep '\.' || true)
+if [ -n "$dotted" ]; then
+    echo "rule ids may not contain a dot, because that is what separates an id from its config path:" >&2
+    printf '%s\n' "$dotted" >&2
+    exit 1
+fi
+
 # Findings are not an error here, they are the point, so the scan runs without
 # --error and its exit status is only used to explain a missing report.
 set +e
@@ -48,7 +60,7 @@ if [ "$scan_errors" != "0" ]; then
     exit 1
 fi
 
-fired=$(jq -r '.results[].check_id' "$findings" | sort -u)
+fired=$(jq -r '.results[].check_id' "$findings" | sed 's/^.*\.//' | sort -u)
 
 echo "== rules declared in $rules"
 echo "$declared"
