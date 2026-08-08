@@ -1,5 +1,105 @@
 # Testing
 
+## The headless rule
+
+Every test in this suite runs with no display, with no elevated privileges, and without writing to
+any store the machine shares between programs. The suite is `dotnet test` on a checkout and nothing
+else: no browser, no server, no container, no socket to anywhere outside the process, no
+certificate installed, no service registered, no port below 1024.
+
+The reason is what a rule like this costs when it is absent. A suite that needs one more thing than
+the machine has is a suite somebody skips, and a skipped suite says the same thing as a green one.
+The second reason is narrower and matters more on a shared machine: a test that raises an elevation
+or consent prompt interrupts whoever is sitting at it, and a test that writes a certificate into a
+trust store changes what every other program on that machine believes, long after the run ends.
+
+### Deciding whether a proposed test is allowed
+
+A test is refused where running it needs any of the following. The list is the rule; nothing below
+it adds a condition.
+
+- A display, or a browser downloaded per machine to stand in for one.
+- An elevation or consent prompt, in any form: an installer, a service, a scheduled task, a
+  privileged port, a driver, or a write to a machine trust store.
+- A real network peer. A socket to another process on the same machine is one; an in-process
+  handler reached through a client's handler pipeline is not.
+- A running Jellyfin server, a container engine, or any other thing that has to be installed before
+  the suite can be run at all.
+- Real wall-clock waiting. `Thread.Sleep` and `Task.Delay` in a test are how an ordering problem
+  gets hidden rather than tested, and #34 replaces both by injecting the clock.
+
+Everything else is allowed, and a test that needs none of these needs no permission from this
+document.
+
+A refused test is not dropped. Each one below names what replaces it, and a proposal that fits a
+refusal is answered with that replacement rather than with a no.
+
+Nothing refuses any of this. The rule is written here and read by a person; no check reads a test
+for a display, a prompt or a socket, and a test breaking every line above builds and passes exactly
+like one that does not. #115 is where that gap is held.
+
+### The refusals, and what replaces each
+
+**A browser-driven test of the administrator page.** Refused: it needs a display, or a headless
+browser downloaded onto every machine that runs the suite, which is the second condition above as
+well as the first.
+
+What replaces it is two things, because the page is two things. The endpoints the page calls are
+tested directly, as ordinary in-process tests against the controller, and they are where the
+behaviour lives: #50 lays the controller out, #52, #54 and #56 are the calls the queue makes and
+the shapes it gets back, and #61 is acting on one request from the page. The page itself is held by
+the formatting gate, `Check formatting`, which reads the embedded HTML, CSS and JavaScript and
+refuses a file it would rewrite. That is a formatter and not a validator: it says the page parses
+and is written one way, and it says nothing about whether the markup is correct or the page usable.
+#64 is where the page is held to the rest of this tree's rules.
+
+**Installing the plugin into a real server, as part of the ordinary suite.** Refused: it needs a
+server and a container engine on the machine, which is the fourth condition.
+
+What replaces it is the recorded first-load procedure, `scripts/verify-plugin-loads.sh`, run
+deliberately rather than on every change. It is #20, it is closed, and the runs it produced are in
+the section below together with the mismatch that was fed to it to show it can fail. What that
+costs is stated there too: nothing on a merge route runs it.
+
+**A real HTTPS call to an external request service.** Refused: a real endpoint needs a socket, and
+a test endpoint needs its certificate trusted, which means writing to a machine trust store. That
+is the third condition and the second one at once.
+
+What replaces it is an in-process HTTP double, so the client under test is exercised through its
+own handler pipeline and no socket is opened. It is #35. Until it exists there is no outbound call
+to test: #80 defines the backend interface with a null implementation behind it, and #87 is the
+proof that this plugin is complete with no backend at all.
+
+Every replacement named above exists, either as something already in the tree or as an issue on
+this board:
+
+    for n in 20 35 50 52 54 56 61 64 115; do gh issue view $n --json number,state,title --jq '"\(.number)  \(.state)  \(.title)"'; done
+    20  CLOSED  Prove the built plugin loads on a server of each claimed line
+    35  OPEN  Provide an in-process HTTP double for the outbound calls
+    50  OPEN  Lay out the controller, the route prefix and the version rule
+    52  OPEN  Create a request over the API
+    54  OPEN  Act on a request over the API
+    56  OPEN  Fix the error shape and the status codes
+    61  OPEN  Act on one request from the page
+    64  OPEN  Hold the page to the same rules as the rest of the tree
+    115  OPEN  Make the headless rule refusable rather than written down
+
+    git ls-files scripts/
+    scripts/verify-plugin-loads.sh
+
+`Check formatting` is the name the check reports rather than the name of its file, read off a run
+rather than off the workflow:
+
+    gh api repos/Flowfin/jellyfin-plugin-requests/commits/dc228a5/check-runs --jq '.check_runs[].name' | sort -u | grep formatting
+    Check formatting
+
+### What this list is not
+
+It is not a list of everything that will ever be refused. It holds the three refusals the plan
+makes visible today, and the conditions above are what decide the next one. A test refused for a
+condition not yet met by any proposal gets its own entry here when the proposal arrives, together
+with what replaces it.
+
 ## Does the plugin load on a real server
 
 A plugin that builds is not a plugin that loads. An ABI mismatch, an embedded resource path that
