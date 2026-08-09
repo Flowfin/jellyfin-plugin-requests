@@ -75,6 +75,10 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
             new DateTimeOffset(2026, 8, 8, 9, 0, 0, TimeSpan.Zero),
             RequestCaller.Administrator(approvedBy));
 
+        // A second person waiting for the same thing, so the list that carries them has something
+        // in it to lose on the way to the file and back.
+        full = RequestLifecycle.Join(full, new Guid("5f0c8a26-3d17-4b94-8e05-9a1b7c2d6e38"));
+
         var bare = ARequest(2);
 
         var writing = NewStore(directory);
@@ -86,11 +90,18 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
         var readBare = await reading.GetAsync(bare.Id, CancellationToken.None).ConfigureAwait(true);
 
         Assert.NotNull(readFull);
+        // Every collection on the record is put back before the comparison, for the reason in the
+        // summary: they are declared as interfaces, so the generated equality compares each list or
+        // map itself and never what is in it. Each one is then compared for its contents below or,
+        // where it is empty on this request, by the field set test in MediaRequestTests refusing a
+        // collection that arrived without a line here.
         Assert.Equal(
             full with
             {
                 ProviderIds = readFull.Value.Request.ProviderIds,
-                History = readFull.Value.Request.History
+                History = readFull.Value.Request.History,
+                Seasons = readFull.Value.Request.Seasons,
+                JoinedByUserIds = readFull.Value.Request.JoinedByUserIds
             },
             readFull.Value.Request);
         Assert.Equal(
@@ -101,6 +112,9 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
         // said and not which list it is in. The approval above is the one entry there is to lose.
         Assert.Equal(full.History, readFull.Value.Request.History);
         Assert.Single(readFull.Value.Request.History);
+
+        Assert.Equal(full.JoinedByUserIds, readFull.Value.Request.JoinedByUserIds);
+        Assert.Single(readFull.Value.Request.JoinedByUserIds);
 
         Assert.NotNull(readBare);
         Assert.Null(readBare.Value.Request.DisplayYear);

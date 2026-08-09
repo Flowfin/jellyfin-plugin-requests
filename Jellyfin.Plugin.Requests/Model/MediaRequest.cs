@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace Jellyfin.Plugin.Requests.Model;
 
@@ -48,6 +49,7 @@ public sealed record MediaRequest
 
     private readonly string? _requesterNote;
     private readonly string? _declineNote;
+    private readonly IReadOnlyList<int> _seasons = [];
 
     /// <summary>
     /// Gets this request's own identifier, which is not the identifier of anything it refers to.
@@ -99,6 +101,46 @@ public sealed record MediaRequest
     /// </para>
     /// </summary>
     public IReadOnlyDictionary<string, string> ProviderIds { get; init; } = ReadOnlyDictionary<string, string>.Empty;
+
+    /// <summary>
+    /// Gets the seasons asked for, in order and without repeats. Empty means the whole series, and
+    /// on a film it means nothing at all and is the only value allowed there.
+    /// <para>
+    /// It is part of what was asked for rather than a detail of it, so it is part of what makes two
+    /// requests the same request in <see cref="RequestIdentity"/>. A request for one season and a
+    /// request for the programme are different asks, and a queue that treated them as one would
+    /// leave somebody waiting for seasons nobody ever approved.
+    /// </para>
+    /// <para>
+    /// Empty meaning the whole series is the one convention here worth remembering. The alternative,
+    /// listing every season a show has, means the request is wrong the day another one airs, and
+    /// this plugin has no metadata source to ask how many there are, decided in #92.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Where a season is repeated, or is not a number a season can have.
+    /// </exception>
+    public IReadOnlyList<int> Seasons
+    {
+        get => _seasons;
+        init => _seasons = SeasonSet(value);
+    }
+
+    /// <summary>
+    /// Gets everyone who asked for this after it existed, oldest first. Empty on a request only one
+    /// person has asked for, which is most of them.
+    /// <para>
+    /// Two people asking for one film is one request, decided in #38, and this is where the second
+    /// person is recorded. Without it the second ask is either a duplicate row an operator decides
+    /// twice or a person who is silently not told when the answer arrives.
+    /// </para>
+    /// <para>
+    /// It never holds <see cref="RequestedByUserId"/>, and it never holds the same person twice.
+    /// Asking again for something you have already asked for is not a second fact about the request,
+    /// and a count of this list is a count of people rather than of clicks.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<Guid> JoinedByUserIds { get; init; } = [];
 
     /// <summary>
     /// Gets where the request stands. Defaults to <see cref="RequestState.Open"/>, because a
@@ -208,6 +250,56 @@ public sealed record MediaRequest
     /// operator asking why a request still says absent needs to know whether anything checked.
     /// </summary>
     public DateTimeOffset? AvailabilityCheckedAt { get; init; }
+
+    /// <summary>
+    /// Whether this person is one of the people waiting for this request, whether they asked first
+    /// or joined an existing one. Both surfaces have to answer "is this yours" the same way, and a
+    /// caller working it out for themselves is a caller that will check one of the two lists.
+    /// </summary>
+    /// <param name="userId">The Jellyfin user being asked about.</param>
+    /// <returns><see langword="true"/> where that person asked for this.</returns>
+    public bool WasAskedForBy(Guid userId)
+        => RequestedByUserId == userId || JoinedByUserIds.Contains(userId);
+
+    /// <summary>
+    /// Refuses a season list that is not a set of seasons. A repeat is a caller's mistake being
+    /// stored as a fact, and a zero or a negative number is not a season any client has, so both
+    /// are refused rather than tidied: a list quietly cleaned up is one the caller never learns was
+    /// wrong.
+    /// <para>
+    /// The order is the caller's own and is kept. Sorting here would make two requests that name the
+    /// same seasons in different orders read as different asks in a history, and the comparison in
+    /// <see cref="RequestIdentity"/> does not depend on the order anyway.
+    /// </para>
+    /// </summary>
+    /// <param name="seasons">The seasons as they arrived.</param>
+    /// <returns>The same seasons.</returns>
+    private static IReadOnlyList<int> SeasonSet(IReadOnlyList<int>? seasons)
+    {
+        if (seasons is null || seasons.Count == 0)
+        {
+            return [];
+        }
+
+        // Any rather than FirstOrDefault, because the value this refuses includes zero and a
+        // sentinel that is also a refused value says "nothing was wrong" for exactly one of them.
+        if (seasons.Any(season => season < 1))
+        {
+            throw new ArgumentException(
+                FormattableString.Invariant(
+                    $"A season number has to be 1 or more, and {seasons.First(season => season < 1)} is not."),
+                nameof(seasons));
+        }
+
+        if (seasons.Distinct().Count() != seasons.Count)
+        {
+            throw new ArgumentException(
+                "A season is named twice. The seasons asked for are a set, and a repeat is a caller's mistake rather than a request for it twice.",
+                nameof(seasons));
+        }
+
+        return [.. seasons];
+    }
 
     /// <summary>
     /// Refuses a note that is too long and flattens an empty one to nothing. Internal because

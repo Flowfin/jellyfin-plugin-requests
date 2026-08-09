@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Jellyfin.Plugin.Requests.Model;
 using Xunit;
@@ -216,7 +217,8 @@ public class RequestHistoryTests
             RequestedAt = asked,
             StateChangedAt = asked,
             Kind = RequestedItemKind.Movie,
-            DisplayTitle = "Sorcerer"
+            DisplayTitle = "Sorcerer",
+            ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "11631" }
         };
     }
 }

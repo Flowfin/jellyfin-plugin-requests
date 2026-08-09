@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Jellyfin.Plugin.Requests.Model;
 using Xunit;
 
@@ -296,7 +297,8 @@ public class RequestNotesTests
             RequestedAt = asked,
             StateChangedAt = asked,
             Kind = RequestedItemKind.Movie,
-            DisplayTitle = "The Conversation"
+            DisplayTitle = "The Conversation",
+            ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "592" }
         };
     }
 }

@@ -363,7 +363,8 @@ public class RequestLifecycleTests
             RequestedAt = asked,
             StateChangedAt = asked,
             Kind = RequestedItemKind.Series,
-            DisplayTitle = "Tinker Tailor Soldier Spy"
+            DisplayTitle = "Tinker Tailor Soldier Spy",
+            ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tvdb"] = "76648" }
         };
     }
 }
