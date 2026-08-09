@@ -94,6 +94,36 @@ reads the built assembly rather than the source text: every controller type in t
 from `RequestsControllerBase` and declares no route of its own. A controller written in a file the
 rule's path list does not reach would pass the lint and fail there.
 
+## Asking for something
+
+    POST MediaRequests/v1/Requests
+
+The body carries the kind, the title, the release year where there is one, the external identifiers
+that name the thing, the seasons where it is a series, and a note. **It carries no requester and
+there is no field for one.** Who asked is the authenticated caller, read from the server's own answer
+to who is calling, so filing a request as somebody else is not something this endpoint declines to
+do: it is something the shape has no way to express.
+
+Asking for something already in the queue joins it rather than making a second one, and the answer
+says which happened. `Created` is a new request, `Joined` is somebody else's request the caller is now
+waiting for too, and `AlreadyWaiting` is the caller's own, which writes nothing. A new request
+answers `201`, and both of the others answer `200`, because nothing was created.
+
+There is no `Location` header on the `201`. Nothing reads one request back yet, so the header would
+point at something that answers `404`, and a header that lies is worse than one that is absent.
+Adding it when that endpoint exists is not a breaking change under the rule above.
+
+What may be joined is a question about state rather than about identity, and it is answered here
+rather than in the identity comparison: only a request that is still open or approved. A declined
+request is an answer somebody gave, and joining it would make a new asker inherit a refusal they
+never saw; a fulfilled one is finished; a failed one has been given up on. In each of those a new ask
+is a new request, which is also what puts it back in front of an operator.
+
+A body that cannot become a request is refused with `400` and a shape naming the field that is wrong,
+so a client can put the message beside the box somebody typed in rather than having to read English
+to work out which one. That shape is the smallest thing that carries it and is expected to be
+replaced by whatever #56 decides.
+
 ## What is not decided here
 
 - Which policy each endpoint carries, and what a user may see of somebody else's request, is #51.
