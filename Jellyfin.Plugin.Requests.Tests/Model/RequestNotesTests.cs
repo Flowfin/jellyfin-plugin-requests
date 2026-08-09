@@ -29,6 +29,12 @@ public class RequestNotesTests
     private static readonly Guid AnOperator = new("c5b1a739-4e82-4d16-9f70-3a2b6c8d4e51");
 
     /// <summary>
+    /// That operator as a caller. Every decision below is a decision, so every one of them is made
+    /// by an administrator; who may make which move is <c>RequestAuthorityTests</c>.
+    /// </summary>
+    private static readonly RequestCaller ByTheOperator = RequestCaller.Administrator(AnOperator);
+
+    /// <summary>
     /// A fresh request has neither note and no reason. The failure this stands for is a default of
     /// empty string, which reads on a page as a note somebody wrote and left blank.
     /// </summary>
@@ -53,7 +59,7 @@ public class RequestNotesTests
             DeclineReason.NoRoomForIt,
             "The disk is at ninety-five percent until the archive move finishes.",
             At(14),
-            AnOperator);
+            ByTheOperator);
 
         Assert.Equal(RequestState.Declined, declined.State);
         Assert.Equal(DeclineReason.NoRoomForIt, declined.DeclineReason);
@@ -73,7 +79,7 @@ public class RequestNotesTests
     public void ADeclineWithNoReasonCannotBeMadeThroughMove()
     {
         var refusal = Assert.Throws<ArgumentException>(
-            () => RequestLifecycle.Move(ARequest(), RequestState.Declined, At(14), AnOperator));
+            () => RequestLifecycle.Move(ARequest(), RequestState.Declined, At(14), ByTheOperator));
 
         Assert.Equal("to", refusal.ParamName, StringComparer.Ordinal);
         Assert.Contains("Decline", refusal.Message, StringComparison.Ordinal);
@@ -91,7 +97,7 @@ public class RequestNotesTests
     public void AReasonOffTheListNeedsTheTextThatSaysWhy(string? note)
     {
         var refusal = Assert.Throws<ArgumentException>(
-            () => RequestLifecycle.Decline(ARequest(), DeclineReason.Other, note, At(14), AnOperator));
+            () => RequestLifecycle.Decline(ARequest(), DeclineReason.Other, note, At(14), ByTheOperator));
 
         Assert.Equal("note", refusal.ParamName, StringComparer.Ordinal);
     }
@@ -108,7 +114,7 @@ public class RequestNotesTests
             DeclineReason.Other,
             "The rights holder asked us to take it down.",
             At(14),
-            AnOperator);
+            ByTheOperator);
 
         Assert.Equal(DeclineReason.Other, declined.DeclineReason);
         Assert.Equal(
@@ -130,9 +136,9 @@ public class RequestNotesTests
             DeclineReason.NoRoomForIt,
             "The disk is full.",
             At(14),
-            AnOperator);
+            ByTheOperator);
 
-        var approved = RequestLifecycle.Move(declined, RequestState.Approved, At(15), AnOperator);
+        var approved = RequestLifecycle.Move(declined, RequestState.Approved, At(15), ByTheOperator);
 
         Assert.Equal(RequestState.Approved, approved.State);
         Assert.Null(approved.DeclineReason);
@@ -148,8 +154,8 @@ public class RequestNotesTests
     {
         var request = ARequest() with { RequesterNote = "The 1974 one, not the remake." };
 
-        var declined = RequestLifecycle.Decline(request, DeclineReason.CannotBeObtained, null, At(14), AnOperator);
-        var approved = RequestLifecycle.Move(declined, RequestState.Approved, At(15), AnOperator);
+        var declined = RequestLifecycle.Decline(request, DeclineReason.CannotBeObtained, null, At(14), ByTheOperator);
+        var approved = RequestLifecycle.Move(declined, RequestState.Approved, At(15), ByTheOperator);
 
         Assert.Equal("The 1974 one, not the remake.", approved.RequesterNote, StringComparer.Ordinal);
     }
@@ -210,7 +216,7 @@ public class RequestNotesTests
                 DeclineReason.Other,
                 new string('x', MediaRequest.NoteMaximumLength + 1),
                 At(14),
-                AnOperator));
+                ByTheOperator));
 
         Assert.Equal(RequestState.Open, request.State);
         Assert.Null(request.DeclineReason);
@@ -255,7 +261,7 @@ public class RequestNotesTests
             DeclineReason.Other,
             LooksLikeMarkup,
             At(14),
-            AnOperator);
+            ByTheOperator);
 
         Assert.Equal(LooksLikeMarkup, declined.RequesterNote, StringComparer.Ordinal);
         Assert.Equal(LooksLikeMarkup, declined.DeclineNote, StringComparer.Ordinal);
