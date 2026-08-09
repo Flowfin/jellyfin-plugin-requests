@@ -48,6 +48,27 @@ public sealed class RequestsController : RequestsControllerBase
     private const string AuthenticatedUserPolicy = "DefaultAuthorization";
 
     /// <summary>
+    /// The server's policy for a call that has to come from an administrator, named as a literal for
+    /// the same reason as the one above. It is what the server's own dashboard endpoints carry, so an
+    /// endpoint under it is reachable by exactly the people who can already administer the server.
+    /// </summary>
+    private const string AdministratorPolicy = "RequiresElevation";
+
+    /// <summary>
+    /// How many rows a page holds when the caller does not say. Fifty is a screen of a queue and a
+    /// small answer for a client that only wanted to know whether there is anything at all.
+    /// </summary>
+    public const int DefaultPageSize = 50;
+
+    /// <summary>
+    /// The largest page any caller may ask for. A page size is what stands between a queue with
+    /// three years of history and an answer nobody can render, and a caller asking for more is
+    /// refused rather than quietly given fewer: a client that asked for a thousand, got two hundred
+    /// and was not told has just decided it has seen everything.
+    /// </summary>
+    public const int MaximumPageSize = 200;
+
+    /// <summary>
     /// How many times a join is attempted before giving up. A join is a read followed by a write
     /// against the revision that was read, so two people joining one request in the same moment
     /// means one of them is refused and re-decides. Three is enough for that and small enough that
@@ -152,6 +173,275 @@ public sealed class RequestsController : RequestsControllerBase
             ? StatusCode(StatusCodes.Status201Created, answer)
             : Ok(answer);
     }
+
+    /// <summary>
+    /// The caller's own requests: the ones they asked for and the ones they joined.
+    /// <para>
+    /// <b>Nobody else's request can come back from here, whatever is asked for.</b> The narrowing is
+    /// the read rather than a filter over a wider one: the store is asked for this person's requests
+    /// through its own lookup, and the filter, the order and the page are applied to what that
+    /// returns. There is no parameter that widens it, because there is nothing wider to widen to.
+    /// </para>
+    /// <para>
+    /// The rows carry no identifier of any person. A request the caller joined was asked for by
+    /// somebody else, so the stored record would name them and everybody else waiting alongside;
+    /// <see cref="MyRequest"/> is what this returns instead.
+    /// </para>
+    /// </summary>
+    /// <param name="state">The states to show, or none of them for every state.</param>
+    /// <param name="kind">The kinds to show, or none of them for every kind.</param>
+    /// <param name="order">What the rows are ordered by.</param>
+    /// <param name="descending">Whether that order runs the other way.</param>
+    /// <param name="skip">How many matches to step over before the page starts.</param>
+    /// <param name="take">How many rows the page holds at most.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>The page, and how many of the caller's requests matched.</returns>
+    [HttpGet("Requests")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<RequestsPage<MyRequest>>> MineAsync(
+        [FromQuery] RequestState[]? state = null,
+        [FromQuery] RequestedItemKind[]? kind = null,
+        [FromQuery] RequestQueryOrder order = RequestQueryOrder.RequestedAt,
+        [FromQuery] bool descending = false,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = DefaultPageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Asked(state, kind, order, skip, take, descending, out var query, out var refusal))
+        {
+            return BadRequest(refusal);
+        }
+
+        var caller = await _callers.UserIdAsync(HttpContext).ConfigureAwait(false);
+
+        if (caller is not Guid reader)
+        {
+            // Authenticated and naming nobody, which is what an API key looks like from here. There
+            // is no "own" for such a caller, and answering with an empty page would say there are
+            // none rather than that the question does not apply.
+            return BadRequest(new RequestRefused
+            {
+                Field = "caller",
+                Reason = "This call is authenticated but names no user, so there is nobody whose requests these would be."
+            });
+        }
+
+        var theirs = await _store.FindForUserAsync(reader, cancellationToken).ConfigureAwait(false);
+        var page = query.PageOf(theirs);
+
+        return Ok(new RequestsPage<MyRequest>
+        {
+            Requests = [.. page.Requests.Select(stored => Mine(stored.Request, reader))],
+            MatchCount = page.MatchCount,
+            Skip = query.Skip,
+            Take = query.Take
+        });
+    }
+
+    /// <summary>
+    /// The whole queue, for an administrator deciding on it.
+    /// <para>
+    /// The elevation is the endpoint's own and is on top of the controller's policy. It is what makes
+    /// this the one place the whole queue is readable, and it is why the endpoint below it can be
+    /// written without a filter that decides who may see what: a caller who is not an administrator
+    /// never reaches this action at all, and the other one has nothing wider than one person's own
+    /// requests to return.
+    /// </para>
+    /// <para>
+    /// What the server does with that policy is the server's, and no test on this board exercises it:
+    /// the headless rule in <c>docs/testing.md</c> refuses a running Jellyfin, so what the suite holds
+    /// is that the attribute is on the action and that the other endpoint cannot be widened.
+    /// </para>
+    /// </summary>
+    /// <param name="state">The states to show, or none of them for every state.</param>
+    /// <param name="kind">The kinds to show, or none of them for every kind.</param>
+    /// <param name="order">What the rows are ordered by.</param>
+    /// <param name="descending">Whether that order runs the other way.</param>
+    /// <param name="skip">How many matches to step over before the page starts.</param>
+    /// <param name="take">How many rows the page holds at most.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>The page, and how many requests matched.</returns>
+    [HttpGet("Requests/Queue")]
+    [Authorize(Policy = AdministratorPolicy)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<RequestsPage<QueuedRequest>>> QueueAsync(
+        [FromQuery] RequestState[]? state = null,
+        [FromQuery] RequestedItemKind[]? kind = null,
+        [FromQuery] RequestQueryOrder order = RequestQueryOrder.RequestedAt,
+        [FromQuery] bool descending = false,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = DefaultPageSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Asked(state, kind, order, skip, take, descending, out var query, out var refusal))
+        {
+            return BadRequest(refusal);
+        }
+
+        var page = await _store.PageAsync(query, cancellationToken).ConfigureAwait(false);
+
+        return Ok(new RequestsPage<QueuedRequest>
+        {
+            Requests = [.. page.Requests.Select(Queued)],
+            MatchCount = page.MatchCount,
+            Skip = query.Skip,
+            Take = query.Take
+        });
+    }
+
+    /// <summary>
+    /// The query a call asked for, or the field that made it refusable.
+    /// <para>
+    /// Every enumeration is checked against what it declares. A value outside it arrives as a number
+    /// the binder is happy to cast, so a state of 99 would otherwise reach the filter and match
+    /// nothing, and the caller would read an empty queue as an empty queue.
+    /// </para>
+    /// </summary>
+    /// <param name="states">The states asked for.</param>
+    /// <param name="kinds">The kinds asked for.</param>
+    /// <param name="order">The order asked for.</param>
+    /// <param name="skip">The offset asked for.</param>
+    /// <param name="take">The page size asked for.</param>
+    /// <param name="descending">Whether the order runs the other way.</param>
+    /// <param name="query">The query, where the call is answerable.</param>
+    /// <param name="refusal">The field and the reason, where it is not.</param>
+    /// <returns><see langword="true"/> where the call is answerable.</returns>
+    private static bool Asked(
+        RequestState[]? states,
+        RequestedItemKind[]? kinds,
+        RequestQueryOrder order,
+        int skip,
+        int take,
+        bool descending,
+        out RequestQuery query,
+        out RequestRefused refusal)
+    {
+        query = null!;
+
+        if (states is not null && Array.Exists(states, asked => !Enum.IsDefined(asked)))
+        {
+            refusal = Refused("state", "That is not a state a request can be in.");
+            return false;
+        }
+
+        if (kinds is not null && Array.Exists(kinds, asked => !Enum.IsDefined(asked)))
+        {
+            refusal = Refused("kind", "That is not a kind of thing that can be asked for.");
+            return false;
+        }
+
+        if (!Enum.IsDefined(order))
+        {
+            refusal = Refused("order", "That is not something these requests can be ordered by.");
+            return false;
+        }
+
+        if (skip < 0)
+        {
+            refusal = Refused("skip", "A page cannot start before the beginning.");
+            return false;
+        }
+
+        if (take < 0)
+        {
+            refusal = Refused("take", "A page cannot hold fewer than no rows.");
+            return false;
+        }
+
+        if (take > MaximumPageSize)
+        {
+            refusal = Refused(
+                "take",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "A page holds at most {0} rows. This is refused rather than answered with fewer, because a caller given fewer than it asked for and not told has no way to know there is more.",
+                    MaximumPageSize));
+            return false;
+        }
+
+        query = new RequestQuery
+        {
+            States = states ?? [],
+            Kinds = kinds ?? [],
+            Order = order,
+            Descending = descending,
+            Skip = skip,
+            Take = take
+        };
+
+        refusal = null!;
+        return true;
+    }
+
+    /// <summary>
+    /// A refusal naming the query parameter that is wrong.
+    /// </summary>
+    /// <param name="field">The parameter, spelled as the caller wrote it.</param>
+    /// <param name="reason">What is wrong with it.</param>
+    /// <returns>The refusal.</returns>
+    private static RequestRefused Refused(string field, string reason)
+        => new RequestRefused { Field = field, Reason = reason };
+
+    /// <summary>
+    /// One request as the person waiting for it sees it.
+    /// </summary>
+    /// <param name="request">The stored request.</param>
+    /// <param name="reader">Who is reading it.</param>
+    /// <returns>The row.</returns>
+    private static MyRequest Mine(MediaRequest request, Guid reader)
+    {
+        var asked = request.RequestedByUserId == reader;
+
+        return new MyRequest
+        {
+            Id = request.Id,
+            Kind = request.Kind,
+            DisplayTitle = request.DisplayTitle,
+            DisplayYear = request.DisplayYear,
+            Seasons = request.Seasons,
+            State = request.State,
+            RequestedAt = request.RequestedAt,
+            StateChangedAt = request.StateChangedAt,
+            AskedByYou = asked,
+
+            // Only where the caller wrote it. On a request they joined, the note is the first
+            // person's writing and this shape does not carry another person's words.
+            YourNote = asked ? request.RequesterNote : null,
+            DeclineReason = request.DeclineReason,
+            DeclineNote = request.DeclineNote,
+            Availability = request.Availability
+        };
+    }
+
+    /// <summary>
+    /// One request as an administrator reading the queue sees it.
+    /// </summary>
+    /// <param name="stored">The request and the revision the store has it at.</param>
+    /// <returns>The row.</returns>
+    private static QueuedRequest Queued(StoredRequest stored)
+        => new QueuedRequest
+        {
+            Id = stored.Request.Id,
+            Revision = stored.Revision,
+            RequestedByUserId = stored.Request.RequestedByUserId,
+            JoinedByUserIds = stored.Request.JoinedByUserIds,
+            Kind = stored.Request.Kind,
+            DisplayTitle = stored.Request.DisplayTitle,
+            DisplayYear = stored.Request.DisplayYear,
+            ProviderIds = stored.Request.ProviderIds,
+            Seasons = stored.Request.Seasons,
+            State = stored.Request.State,
+            RequestedAt = stored.Request.RequestedAt,
+            StateChangedAt = stored.Request.StateChangedAt,
+            StateChangedByUserId = stored.Request.StateChangedByUserId,
+            RequesterNote = stored.Request.RequesterNote,
+            DeclineReason = stored.Request.DeclineReason,
+            DeclineNote = stored.Request.DeclineNote,
+            Availability = stored.Request.Availability,
+            AvailabilityCheckedAt = stored.Request.AvailabilityCheckedAt
+        };
 
     /// <summary>
     /// Whether a request already in the queue is one a new ask may join.

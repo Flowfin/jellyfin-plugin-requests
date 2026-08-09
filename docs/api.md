@@ -124,9 +124,66 @@ so a client can put the message beside the box somebody typed in rather than hav
 to work out which one. That shape is the smallest thing that carries it and is expected to be
 replaced by whatever #56 decides.
 
+## Reading your own requests
+
+    GET MediaRequests/v1/Requests
+
+Everything the caller is waiting for: the requests they asked for and the ones they joined.
+
+**Nothing else can come back from it, whatever is asked for.** The narrowing is the read rather than
+a filter over a wider one. The store is asked for this person's requests through its own lookup, and
+the filter, the order and the page are applied to what that returns, so there is no parameter that
+widens it and nothing wider for one to widen to.
+
+The rows carry no identifier of any person, the caller included. A request somebody else asked for
+and the caller joined would otherwise name the first asker and everybody else waiting alongside them,
+and a count of how many people are waiting is the same disclosure made smaller, so there is none of
+that either. `AskedByYou` says whether the caller asked first, which is a fact about the caller. A
+note is the writing of whoever asked, so it comes back only on a request the caller asked for
+themselves.
+
+The history is not in the answer. Every entry names the administrator who made the move, and a list a
+user reads is not an audit trail.
+
+## Reading the queue
+
+    GET MediaRequests/v1/Requests/Queue
+
+Every request on the server, for an administrator deciding on them. It carries the server's elevation
+policy on top of the controller's, so it is reachable by the people who can already administer the
+server and by nobody else.
+
+Each row carries the revision the store has the request at, because the next thing an operator does
+is move it and the store refuses a write made against a revision that has moved underneath it.
+
+What a queue must show for a decision to be possible is #59, so this is what the queue can show
+rather than a settled answer to what it should.
+
+## The parameters both reads take
+
+| Parameter    | Meaning                                            | Default       |
+| ------------ | -------------------------------------------------- | ------------- |
+| `state`      | Which states to show. Repeatable. None means all.  | all           |
+| `kind`       | Which kinds to show. Repeatable. None means all.   | all           |
+| `order`      | `RequestedAt`, `StateChangedAt` or `DisplayTitle`. | `RequestedAt` |
+| `descending` | Whether that order runs the other way.             | `false`       |
+| `skip`       | How many matches to step over.                     | `0`           |
+| `take`       | How many rows the page holds at most.              | `50`          |
+
+The answer carries the rows, how many matched the filter before the page was taken, and the slice
+that was asked for. The count is what a pager is drawn from: a page and a count taken from two reads
+can disagree, and a surface saying "1 to 50 of 49" is one an operator stops trusting for the rest of
+the numbers on the screen.
+
+`take` is capped at 200 and a larger one is **refused** rather than answered with fewer. A caller that
+asked for a thousand, was given two hundred and was not told has just decided it has seen everything.
+
+A value outside an enumeration is refused with the parameter named. Such a value binds as a number
+and would otherwise match nothing, and an empty page reads exactly like an empty queue.
+
 ## What is not decided here
 
 - Which policy each endpoint carries, and what a user may see of somebody else's request, is #51.
 - The shape of an error and which status code each failure gets is #56.
-- What each endpoint does is #52, #53, #54 and #55.
+- What each endpoint does is #52, #54 and #55.
 - Whether these endpoints appear in the server's published API documentation is #57.

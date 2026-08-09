@@ -117,4 +117,82 @@ public sealed record RequestQuery
 
         return _kinds.Count == 0 || _kinds.Contains(request.Kind);
     }
+
+    /// <summary>
+    /// This query answered against a set of requests: the filter, the order and the page, and the
+    /// count of everything that matched before the page was taken.
+    /// <para>
+    /// It is here for the reason <see cref="Matches"/> is. A store answers this over everything it
+    /// holds; the user surface answers it over one person's own requests, which the store hands back
+    /// through its own lookup rather than by walking the queue. Both are the same question over a
+    /// different set, and a second implementation of the ordering is a second place the tiebreak can
+    /// be dropped from.
+    /// </para>
+    /// <para>
+    /// One walk of the candidates, and the count and the page come out of the same walk, so a pager
+    /// cannot disagree with the rows above it.
+    /// </para>
+    /// </summary>
+    /// <param name="candidates">The requests this query is answered over.</param>
+    /// <returns>The page, and how many matched.</returns>
+    /// <exception cref="ArgumentNullException">Where the candidates are missing.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Where <see cref="Order"/> is a value nothing here has a comparison for. It is refused rather
+    /// than served by whichever arm happened to be written last, because a queue quietly ordered by
+    /// something else is worse than one that says it cannot answer.
+    /// </exception>
+    public RequestPage PageOf(IEnumerable<StoredRequest> candidates)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+
+        var matched = candidates.Where(stored => Matches(stored.Request)).ToArray();
+
+        var page = Ordered(matched)
+            .Skip(Skip)
+            .Take(Take)
+            .ToArray();
+
+        return new RequestPage(page, matched.Length);
+    }
+
+    /// <summary>
+    /// The matches in the order this query asked for.
+    /// <para>
+    /// The identifier is the last key of every order, so requests that compare equal under the
+    /// chosen one still have exactly one position. Without it their order is whatever order the set
+    /// is enumerated in, and a set held by a store is rebuilt on every write: a request created
+    /// between two page turns can reorder rows that have nothing to do with it, so a reader turning
+    /// to the next page sees one of them again and never sees another.
+    /// </para>
+    /// <para>
+    /// Descending reverses the identifier as well as the chosen key, so the descending order is
+    /// exactly the ascending one read backwards. A tiebreak left ascending under a reversed primary
+    /// key is a third order, and two requests made in the same tick would sit in one order going
+    /// down the queue and the other going up it.
+    /// </para>
+    /// <para>
+    /// The title is compared as text somebody reads rather than as bytes, so an accented title
+    /// sorts beside its unaccented neighbour instead of after every unaccented title there is. That
+    /// is the one order here where the byte comparison and the reading one differ, and the reading
+    /// one is what a person scanning a column expects.
+    /// </para>
+    /// </summary>
+    /// <param name="matched">What survived the filter.</param>
+    /// <returns>The matches, ordered.</returns>
+    private IOrderedEnumerable<StoredRequest> Ordered(IEnumerable<StoredRequest> matched)
+        => Order switch
+        {
+            RequestQueryOrder.RequestedAt => Descending
+                ? matched.OrderByDescending(stored => stored.Request.RequestedAt).ThenByDescending(stored => stored.Request.Id)
+                : matched.OrderBy(stored => stored.Request.RequestedAt).ThenBy(stored => stored.Request.Id),
+            RequestQueryOrder.StateChangedAt => Descending
+                ? matched.OrderByDescending(stored => stored.Request.StateChangedAt).ThenByDescending(stored => stored.Request.Id)
+                : matched.OrderBy(stored => stored.Request.StateChangedAt).ThenBy(stored => stored.Request.Id),
+            RequestQueryOrder.DisplayTitle => Descending
+                ? matched.OrderByDescending(stored => stored.Request.DisplayTitle, StringComparer.InvariantCulture).ThenByDescending(stored => stored.Request.Id)
+                : matched.OrderBy(stored => stored.Request.DisplayTitle, StringComparer.InvariantCulture).ThenBy(stored => stored.Request.Id),
+
+            _ => throw new InvalidOperationException(FormattableString.Invariant(
+                $"There is no comparison for the order {Order}, so this query cannot say what its page holds."))
+        };
 }
