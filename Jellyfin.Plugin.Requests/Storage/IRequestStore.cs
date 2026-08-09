@@ -28,7 +28,9 @@ namespace Jellyfin.Plugin.Requests.Storage;
 /// that reads the whole store while writes are running may see request A as of one moment and
 /// request B as of another. Reading never blocks a writer and never blocks another reader. A
 /// snapshot is stale the moment it is taken, which is exactly why a write carries the revision it
-/// was read at.
+/// was read at. <see cref="PageAsync"/> is the one read that promises more: its page and its count
+/// come from one snapshot, because the two are read side by side on a screen and a disagreement
+/// between them is visible to the person reading it.
 /// </para>
 /// <para>
 /// <b>Two callers moving the same request.</b> Not last writer wins. Every write names the revision
@@ -72,14 +74,79 @@ public interface IRequestStore
     /// <summary>
     /// Reads every request the store holds.
     /// <para>
-    /// This is the whole-store read the contract above is stated over, and it is not the query
-    /// surface the administrator and user pages need. Filtering, sorting and paging are their own
-    /// work and are not on this interface yet.
+    /// This is the whole-store read the contract above is stated over, and it is not what a surface
+    /// should call. The three reads the surfaces actually make are below, and each is named because
+    /// a store built for three questions is a different store from one that answers all three by
+    /// walking everything. What each costs is in <c>docs/storage.md</c>.
     /// </para>
     /// </summary>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>Every request, each with the revision the store holds it at, in no defined order.</returns>
     Task<IReadOnlyList<StoredRequest>> GetAllAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every request one person is waiting for, whether they asked first or joined an existing one.
+    /// <para>
+    /// The two lists are one question. A store answering only <see cref="MediaRequest.RequestedByUserId"/>
+    /// would show a person nothing for the request they joined, which is the request they are most
+    /// likely to be looking for.
+    /// </para>
+    /// </summary>
+    /// <param name="userId">The Jellyfin user being asked about.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>
+    /// Their requests, each at the revision the store holds it at, in no defined order. Empty where
+    /// they have asked for nothing, which is an answer rather than an error.
+    /// </returns>
+    Task<IReadOnlyList<StoredRequest>> FindForUserAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every request naming one external identifier, which is the question a fulfilment sweep asks
+    /// once per library item.
+    /// <para>
+    /// It answers identity and never policy. Which states a match may move, and whether a series
+    /// with some of its seasons counts, are the model's answers in <see cref="RequestIdentity"/> and
+    /// <see cref="LibraryAvailability"/>; a store deciding either would put half of the fulfilment
+    /// rule somewhere nobody looks for it. What comes back is at most a handful of requests, so the
+    /// caller filtering them costs nothing.
+    /// </para>
+    /// <para>
+    /// The kind is part of the question because a film and a series can carry the same number under
+    /// the same provider and be two different works, which is the rule <see cref="RequestIdentity"/>
+    /// is written to. Provider names match without case and values match exactly, for the reasons
+    /// stated there.
+    /// </para>
+    /// </summary>
+    /// <param name="kind">What sort of thing the identifier names.</param>
+    /// <param name="provider">The provider's name, matched without case.</param>
+    /// <param name="value">The identifier under that provider, matched exactly.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>
+    /// The requests carrying that identifier, each at the revision the store holds it at, in no
+    /// defined order. Empty where nothing has been asked for under it.
+    /// </returns>
+    /// <exception cref="ArgumentException">Where the provider name or the value is empty.</exception>
+    Task<IReadOnlyList<StoredRequest>> FindByProviderIdentifierAsync(
+        RequestedItemKind kind,
+        string provider,
+        string value,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One page of the queue an operator reads, filtered, ordered and counted from a single
+    /// snapshot.
+    /// <para>
+    /// The count comes back with the page because a pager rendered from a second read can disagree
+    /// with the rows above it. What is filterable and what the order is are
+    /// <see cref="RequestQuery"/>'s, and the order is total: requests equal under the chosen key are
+    /// ordered by their own identifier, so walking the pages sees every match exactly once.
+    /// </para>
+    /// </summary>
+    /// <param name="query">Which requests, in what order, and which slice of them.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>The page and how many requests the filter matched.</returns>
+    /// <exception cref="ArgumentNullException">Where the query is missing.</exception>
+    Task<RequestPage> PageAsync(RequestQuery query, CancellationToken cancellationToken);
 
     /// <summary>
     /// Puts a request the store does not already hold into it.

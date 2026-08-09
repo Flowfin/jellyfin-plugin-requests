@@ -235,6 +235,271 @@ public abstract class RequestStoreContract
     }
 
     /// <summary>
+    /// One person's requests are the ones they asked for and the ones they joined, and a store that
+    /// answered only the first would show somebody nothing for the request they are most likely to
+    /// be looking for. Somebody else's request is not theirs, which is the other half and the one a
+    /// store returning everything would still pass without.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task OneUsersRequestsAreTheOnesTheyAskedForAndTheOnesTheyJoined()
+    {
+        var store = NewStore();
+        var asker = Guid.NewGuid();
+        var joiner = Guid.NewGuid();
+        var stranger = Guid.NewGuid();
+
+        var theirs = await store.AddAsync(
+            ARequest() with { RequestedByUserId = asker },
+            CancellationToken.None).ConfigureAwait(true);
+        var joined = await store.AddAsync(
+            ARequest() with { RequestedByUserId = stranger, JoinedByUserIds = [joiner, asker] },
+            CancellationToken.None).ConfigureAwait(true);
+        await store.AddAsync(
+            ARequest() with { RequestedByUserId = stranger },
+            CancellationToken.None).ConfigureAwait(true);
+
+        var forAsker = await store.FindForUserAsync(asker, CancellationToken.None).ConfigureAwait(true);
+        var forJoiner = await store.FindForUserAsync(joiner, CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Equal(2, forAsker.Count);
+        Assert.Contains(theirs, forAsker);
+        Assert.Contains(joined, forAsker);
+        Assert.Equal(new[] { joined }, forJoiner);
+    }
+
+    /// <summary>
+    /// Somebody who has asked for nothing gets an empty answer rather than a failure. Every user on
+    /// the server reaches this call the first time they open the page, so the ordinary case must not
+    /// be an exception a surface has to catch.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task SomebodyWhoHasAskedForNothingGetsAnEmptyAnswer()
+    {
+        var store = NewStore();
+        await store.AddAsync(ARequest(), CancellationToken.None).ConfigureAwait(true);
+
+        var theirs = await store.FindForUserAsync(Guid.NewGuid(), CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Empty(theirs);
+    }
+
+    /// <summary>
+    /// The identifier lookup answers the comparison <see cref="RequestIdentity"/> makes: the
+    /// provider name without case, because two callers spell one provider two ways and neither is
+    /// wrong.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AnIdentifierIsFoundHoweverTheProviderNameIsSpelled()
+    {
+        var store = NewStore();
+        var carrying = await store.AddAsync(
+            ARequest() with { ProviderIds = new Dictionary<string, string> { ["Tmdb"] = "603" } },
+            CancellationToken.None).ConfigureAwait(true);
+        await store.AddAsync(
+            ARequest() with { ProviderIds = new Dictionary<string, string> { ["Tmdb"] = "604" } },
+            CancellationToken.None).ConfigureAwait(true);
+
+        var found = await store.FindByProviderIdentifierAsync(
+            RequestedItemKind.Movie,
+            "tmdb",
+            "603",
+            CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Equal(new[] { carrying }, found);
+    }
+
+    /// <summary>
+    /// The other half of the same comparison, and the half a store written with one case-insensitive
+    /// dictionary would fail. The value is somebody else's identifier, so two that differ are two
+    /// things, and the kind is part of the identity because a film and a series can carry the same
+    /// number under one provider.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AnIdentifierOfAnotherKindOrAnotherValueIsAnotherThing()
+    {
+        var store = NewStore();
+        await store.AddAsync(
+            ARequest() with
+            {
+                Kind = RequestedItemKind.Series,
+                ProviderIds = new Dictionary<string, string> { ["Tvdb"] = "tt42" }
+            },
+            CancellationToken.None).ConfigureAwait(true);
+
+        var wrongKind = await store.FindByProviderIdentifierAsync(
+            RequestedItemKind.Movie,
+            "Tvdb",
+            "tt42",
+            CancellationToken.None).ConfigureAwait(true);
+        var wrongCase = await store.FindByProviderIdentifierAsync(
+            RequestedItemKind.Series,
+            "Tvdb",
+            "TT42",
+            CancellationToken.None).ConfigureAwait(true);
+        var rightBoth = await store.FindByProviderIdentifierAsync(
+            RequestedItemKind.Series,
+            "Tvdb",
+            "tt42",
+            CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Empty(wrongKind);
+        Assert.Empty(wrongCase);
+        Assert.Single(rightBoth);
+    }
+
+    /// <summary>
+    /// A query naming no state and no kind is a queue nobody has narrowed, and it matches
+    /// everything. The opposite reading, that an empty list matches nothing, is the mistake a filter
+    /// written as a membership test without an emptiness test makes, and it turns an unfiltered
+    /// queue into an empty page.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AQueryNamingNoFilterMatchesEverything()
+    {
+        var store = NewStore();
+        await store.AddAsync(ARequest(), CancellationToken.None).ConfigureAwait(true);
+        await store.AddAsync(
+            ARequest() with { Kind = RequestedItemKind.Series, State = RequestState.Approved },
+            CancellationToken.None).ConfigureAwait(true);
+
+        var page = await store.PageAsync(new RequestQuery { Take = 10 }, CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Equal(2, page.MatchCount);
+        Assert.Equal(2, page.Requests.Count);
+    }
+
+    /// <summary>
+    /// Both filters have to hold, and the count is over the filter rather than over the store. A
+    /// store applying either filter alone would return the wrong rows; one counting the whole store
+    /// would return the right rows under a pager that says there are more.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task EveryNamedFilterHasToHoldAndTheCountIsOverThem()
+    {
+        var store = NewStore();
+        var wanted = await store.AddAsync(
+            ARequest() with { Kind = RequestedItemKind.Series, State = RequestState.Approved },
+            CancellationToken.None).ConfigureAwait(true);
+        await store.AddAsync(
+            ARequest() with { Kind = RequestedItemKind.Movie, State = RequestState.Approved },
+            CancellationToken.None).ConfigureAwait(true);
+        await store.AddAsync(
+            ARequest() with { Kind = RequestedItemKind.Series, State = RequestState.Open },
+            CancellationToken.None).ConfigureAwait(true);
+
+        var page = await store.PageAsync(
+            new RequestQuery
+            {
+                States = [RequestState.Approved],
+                Kinds = [RequestedItemKind.Series],
+                Take = 10
+            },
+            CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Equal(1, page.MatchCount);
+        Assert.Equal(new[] { wanted }, page.Requests);
+    }
+
+    /// <summary>
+    /// The count is how many matched and not how many the page carries. It is what a pager is drawn
+    /// from, and a store answering the page length would tell an operator on the first page of six
+    /// that there is one page.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task ThePageSaysHowManyMatchedRatherThanHowManyItCarries()
+    {
+        var store = NewStore();
+
+        for (var made = 0; made < 6; made++)
+        {
+            await store.AddAsync(ARequest(), CancellationToken.None).ConfigureAwait(true);
+        }
+
+        var page = await store.PageAsync(new RequestQuery { Take = 2 }, CancellationToken.None).ConfigureAwait(true);
+        var counted = await store.PageAsync(new RequestQuery { Take = 0 }, CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Equal(6, page.MatchCount);
+        Assert.Equal(2, page.Requests.Count);
+        Assert.Equal(6, counted.MatchCount);
+        Assert.Empty(counted.Requests);
+    }
+
+    /// <summary>
+    /// Walking the pages sees every match exactly once, over requests that were all made in the same
+    /// moment so nothing but the tiebreak separates them.
+    /// <para>
+    /// What this stands for is the page arithmetic: a boundary off by one shows a request twice or
+    /// skips it, and neither throws. It is not the proof that the order is total. Removing the
+    /// tiebreak from the store leaves this leg green, because the sort behind it is stable and the
+    /// set it reads is enumerated the same way each time; what goes red then is
+    /// <see cref="DescendingIsTheAscendingOrderReadBackwards"/>, which is where that proof is.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task WalkingThePagesSeesEveryMatchExactlyOnce()
+    {
+        var store = NewStore();
+        var added = new List<Guid>();
+
+        for (var made = 0; made < 7; made++)
+        {
+            var stored = await store.AddAsync(ARequest(), CancellationToken.None).ConfigureAwait(true);
+            added.Add(stored.Request.Id);
+        }
+
+        var walked = new List<Guid>();
+
+        for (var skip = 0; skip < 7; skip += 2)
+        {
+            var page = await store.PageAsync(
+                new RequestQuery { Skip = skip, Take = 2 },
+                CancellationToken.None).ConfigureAwait(true);
+
+            walked.AddRange(page.Requests.Select(stored => stored.Request.Id));
+        }
+
+        Assert.Equal(added.Order(), walked.Order());
+        Assert.Equal(7, walked.Distinct().Count());
+    }
+
+    /// <summary>
+    /// Descending is the ascending order read backwards, tiebreak included. A store that reversed
+    /// the chosen key and left the tiebreak alone would answer a third order, and two requests made
+    /// in the same tick would sit one way going down the queue and the other going up it.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task DescendingIsTheAscendingOrderReadBackwards()
+    {
+        var store = NewStore();
+        var asked = new DateTimeOffset(2026, 8, 8, 8, 0, 0, TimeSpan.Zero);
+
+        for (var made = 0; made < 5; made++)
+        {
+            // Two of the five share a moment, so the tiebreak is what decides their order and the
+            // reversal has something to get wrong.
+            await store.AddAsync(
+                ARequest() with { RequestedAt = asked.AddMinutes(made / 2) },
+                CancellationToken.None).ConfigureAwait(true);
+        }
+
+        var up = await store.PageAsync(new RequestQuery { Take = 5 }, CancellationToken.None).ConfigureAwait(true);
+        var down = await store.PageAsync(
+            new RequestQuery { Take = 5, Descending = true },
+            CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Equal(up.Requests.Reverse(), down.Requests);
+    }
+
+    /// <summary>
     /// Many callers write against one revision at the same moment. Exactly one is accepted, every
     /// other is refused, and the store ends one revision on rather than <see cref="Writers"/> of
     /// them.

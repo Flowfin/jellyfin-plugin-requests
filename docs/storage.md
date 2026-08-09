@@ -55,8 +55,77 @@ What is not decided here, and where it is:
 
 - What happens to a write interrupted halfway is #46.
 - The on-disk shape, its version, and the rules for changing it are #47.
-- Filtering, sorting and paging for the surfaces are #48.
 - How long a finished request is kept is #49, and the number itself is decision 5 on #113.
+
+## The three questions the store is asked
+
+There are three, and naming them is the point: a store built for three questions is a different store
+from one that answers all of them by walking everything it holds.
+
+**One person's own requests.** The user surface asks it, once per page view, for every person on the
+server. Answered by a lookup keyed on the user, holding the requests they asked for and the ones they
+joined, because a surface that showed only the first would show somebody nothing for the request they
+are most likely to be looking for.
+
+**One external identifier.** Fulfilment detection asks it once per library item, which is where a
+walk becomes ten thousand walks. Answered by a lookup keyed on the kind, the provider name and the
+value, compared the way `RequestIdentity` compares them: the name without case, the value exactly.
+The lookup answers identity and never policy. Which states a match may move, and whether a series
+with some of its seasons counts, stay in the model, and what comes back is at most a handful of
+requests so a caller filtering them costs nothing.
+
+**A page of the queue.** The administrator surface asks it, filtered by state and kind, ordered by
+one of three columns, and paged. This one is a walk of the whole set and is meant to be: a filter and
+an order chosen at the call cannot be served by a lookup built before the call. The count of matches
+comes back with the page, from the same walk, so a pager cannot disagree with the rows above it.
+
+Both lookups are built beside the set each time the set is replaced, which costs one pass over it per
+write. That is the same order as serialising the set, which the write has just done, so a write does
+not change shape for having them. Keeping them up to date incrementally instead would mean editing
+the held set in place, which is the thing the whole store is built not to do.
+
+The order every page is taken in ends with the request's own identifier, so requests that compare
+equal under the chosen column still hold one position. Without that, their order is the order the set
+happens to be enumerated in, and the set is rebuilt on every write: one request created between two
+page turns can reorder rows that have nothing to do with it.
+
+## What those three cost at ten thousand records
+
+The bounds are in the suite rather than here, in `FileRequestStoreQueryCostTests`, so a change that
+breaks one fails rather than being noticed by somebody with a large queue. Each leg measures the
+workload the path carries rather than one call of it, because one call answered by walking ten
+thousand records takes under a millisecond and a bound over one call would pass whatever shape sat
+underneath it.
+
+The numbers below were read by setting each bound to zero, so the assertion fails and prints what it
+measured, and running the leg on an ordinary desktop:
+
+    dotnet test Jellyfin.Plugin.Requests.sln --configuration Release --no-build -f net9.0 \
+        --filter "FullyQualifiedName~FileRequestStoreQueryCostTests"
+    a hundred filtered and ordered pages over 10000 records took 153 ms, past the bound of 0 ms.
+    one identifier lookup for each of ten thousand records over 10000 records took 10 ms, past the bound of 0 ms.
+    ten thousand user lookups over 10000 records took 5 ms, past the bound of 0 ms.
+
+The third column is the same command over a tree with the two lookups replaced by a walk of the set,
+which is the change each bound exists to refuse:
+
+| Path                    | Workload measured           | As it ships | With the lookup replaced by a walk | Bound in the suite |
+| ----------------------- | --------------------------- | ----------: | ---------------------------------: | -----------------: |
+| One person's requests   | 10,000 lookups              |        5 ms |                           2,610 ms |             400 ms |
+| One external identifier | 10,000 lookups              |       10 ms |                           3,070 ms |             600 ms |
+| A page of the queue     | 100 filtered, ordered pages |      153 ms |                              98 ms |           8,000 ms |
+
+The second column of numbers is how the first two bounds were placed. Each sits far above the run it
+passes and far below the failure it exists for, so a machine several times slower than this one still
+passes and a store that lost a lookup still fails.
+
+The third row is the one to read carefully. Turning the two lookups into walks left it where it was,
+so that bound does not separate a walk from a lookup and nothing here claims it does. What it catches
+is a page that stops being one walk: a read that goes back to the file per call, or a count taken by
+a second pass over the set.
+
+None of the three bounds is a benchmark, and none of them catches a path that is merely slower than
+it could be.
 
 ## It adds no package reference
 
