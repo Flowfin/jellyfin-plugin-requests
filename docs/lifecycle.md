@@ -13,8 +13,12 @@ against that table and fails if either side changes without the other.
 `Approved` means an operator said yes. It does not mean the server has the media, and the gap
 between the two is the ordinary case rather than an edge one.
 
-`Declined` means an operator said no. A reason is required, which was decided on #113 and is built
-in #41.
+`Declined` means an operator said no. A reason is required, decided on #113.
+`RequestLifecycle.Decline` is the only way into this state and it takes one, so a decline with no
+reason cannot be made. The short list is `DeclineReason`, and anything it does not cover is `Other`,
+which requires the free text beside it, so the escape hatch cannot be used to give no reason at all.
+Leaving `Declined` clears the reason, because a reason standing on an approved request is a sentence
+that is no longer true.
 
 `Fulfilled` means the thing that was asked for is in the library and the person who asked can watch
 it.
@@ -98,12 +102,12 @@ asked for and got an answer. A library that no longer holds the media is an obse
 
 ## What is not enforced
 
-`RequestLifecycle.Move` is the one place in the plugin that changes a state, and it refuses a move
-this table refuses. Nothing stops a caller writing `with { State = ... }` on the record instead: the
-record is immutable, and immutability makes a move produce a new value rather than making it go
-through here. There are no callers yet, so the property holds today by there being nothing to hold
-it against. The invariant lint in #28 is where a rule refusing that shape would live, and this
-paragraph is what it does not yet do.
+`RequestLifecycle.Move` and `RequestLifecycle.Decline` are the two places in the plugin that change
+a state, and both refuse a move this table refuses. Nothing stops a caller writing
+`with { State = ... }` on the record instead: the record is immutable, and immutability makes a move
+produce a new value rather than making it go through here. There are no callers yet, so the property
+holds today by there being nothing to hold it against. The invariant lint in #28 is where a rule
+refusing that shape would live, and this paragraph is what it does not yet do.
 
 The history of the moves a request has made is #43, and it is not built here. `StateChangedAt` and
 `StateChangedByUserId` on the record are the current move only, and a request that has been approved

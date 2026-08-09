@@ -6,7 +6,7 @@ using System.Linq;
 namespace Jellyfin.Plugin.Requests.Model;
 
 /// <summary>
-/// The moves a request may make, as a table, and the one place a move is made.
+/// The moves a request may make, as a table, and the two methods that make one.
 /// <para>
 /// It is a table rather than a chain of conditionals because the same question gets asked by the
 /// API, by the administrator page, by the bridge and by whatever detects fulfilment, and four
@@ -76,12 +76,12 @@ public static class RequestLifecycle
     }
 
     /// <summary>
-    /// Moves a request, or refuses to.
+    /// Moves a request into any state except <see cref="RequestState.Declined"/>, or refuses to.
     /// <para>
-    /// This is the only place in the plugin that changes a request's state. The record is immutable
-    /// and a caller could still write <c>with { State = ... }</c>, so this being the one place is
-    /// held by review and by the callers that exist rather than by anything that refuses the
-    /// alternative; that gap is named in <c>docs/lifecycle.md</c>.
+    /// This and <see cref="Decline"/> are the only places in the plugin that change a request's
+    /// state. The record is immutable and a caller could still write <c>with { State = ... }</c>, so
+    /// that being true is held by review and by the callers that exist rather than by anything that
+    /// refuses the alternative; that gap is named in <c>docs/lifecycle.md</c>.
     /// </para>
     /// </summary>
     /// <param name="request">The request to move.</param>
@@ -96,6 +96,10 @@ public static class RequestLifecycle
     /// <returns>A new request in the new state.</returns>
     /// <exception cref="ArgumentNullException">Where no request was given.</exception>
     /// <exception cref="IllegalRequestTransitionException">Where the table refuses the move.</exception>
+    /// <exception cref="ArgumentException">
+    /// Where the state asked for is <see cref="RequestState.Declined"/>, which needs a reason and so
+    /// has a door of its own.
+    /// </exception>
     public static MediaRequest Move(
         MediaRequest request,
         RequestState to,
@@ -104,6 +108,77 @@ public static class RequestLifecycle
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (to == RequestState.Declined)
+        {
+            throw new ArgumentException(
+                "A decline carries a reason, so it is made with Decline rather than with Move. A decline with no reason reads as arbitrary to the person who asked, decided on #113.",
+                nameof(to));
+        }
+
+        return Moved(request, to, at, movedByUserId) with
+        {
+            // A reason describes the decline it was given for. Carried onto a request that is no
+            // longer declined it is a sentence that is no longer true, and the surfaces would show
+            // it beside a state it contradicts. What the request used to say is #43.
+            DeclineReason = null,
+            DeclineNote = null
+        };
+    }
+
+    /// <summary>
+    /// Declines a request, with the reason a decline is required to carry.
+    /// <para>
+    /// It is a method of its own rather than a parameter on <see cref="Move"/> because the reason is
+    /// mandatory for exactly one destination. A nullable parameter that is required for one value of
+    /// another parameter is a rule a caller reads in prose; two doors is a rule the compiler carries.
+    /// </para>
+    /// </summary>
+    /// <param name="request">The request to decline.</param>
+    /// <param name="reason">Why it is being declined.</param>
+    /// <param name="note">
+    /// What the operator wants to say about it. Required beside <see cref="DeclineReason.Other"/>,
+    /// which says nothing on its own, and optional beside every other reason.
+    /// </param>
+    /// <param name="at">
+    /// When the decline happened, from the injected clock rather than the machine's.
+    /// </param>
+    /// <param name="declinedByUserId">The Jellyfin user who declined it.</param>
+    /// <returns>A new request, declined, carrying the reason.</returns>
+    /// <exception cref="ArgumentNullException">Where no request was given.</exception>
+    /// <exception cref="IllegalRequestTransitionException">Where the table refuses the move.</exception>
+    /// <exception cref="ArgumentException">
+    /// Where the reason is <see cref="DeclineReason.Other"/> and no note says what happened.
+    /// </exception>
+    /// <exception cref="RequestTextTooLongException">Where the note is too long.</exception>
+    public static MediaRequest Decline(
+        MediaRequest request,
+        DeclineReason reason,
+        string? note,
+        DateTimeOffset at,
+        Guid? declinedByUserId)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (reason == DeclineReason.Other && string.IsNullOrWhiteSpace(note))
+        {
+            throw new ArgumentException(
+                "A decline for a reason not on the list has to say what the reason was. Other with nothing beside it is a decline with no reason, which is the thing a required reason exists to prevent.",
+                nameof(note));
+        }
+
+        return Moved(request, RequestState.Declined, at, declinedByUserId) with
+        {
+            DeclineReason = reason,
+            DeclineNote = note
+        };
+    }
+
+    private static MediaRequest Moved(
+        MediaRequest request,
+        RequestState to,
+        DateTimeOffset at,
+        Guid? movedByUserId)
+    {
         var cell = Cell(request.State, to);
 
         if (!cell.IsLegal)
