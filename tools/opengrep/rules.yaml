@@ -314,3 +314,41 @@ rules:
         - "tools/opengrep/fixtures/history/**/*.cs"
       exclude:
         - "Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs"
+
+  # Invariant (api, #50): every endpoint this plugin serves sits under the
+  # versioned prefix, and the prefix is declared in exactly one place. Decided in
+  # docs/api.md, whose version rule is worth nothing if an endpoint can sit
+  # outside the segment the rule is about: a caller pinned to v1 would reach a
+  # route that has no version at all and would break on a change the rule said
+  # was safe.
+  #
+  # Two spellings get out of the prefix and both are refused. A second `[Route]`
+  # attribute anywhere replaces the inherited one for that controller.
+  # `[HttpGet("/...")]`, with a leading slash, is the quieter of the two: the
+  # template looks like a relative path with a typo, and ASP.NET treats it as an
+  # absolute route that discards the controller's prefix entirely.
+  #
+  # RequestsControllerBase is the one place excluded, because it is the file that
+  # declares the prefix this rule exists to hold everything else to.
+  - id: every-endpoint-sits-under-the-versioned-prefix
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not declare a route here. Every endpoint inherits the versioned prefix
+      from RequestsControllerBase, and a route attribute of its own, or a method
+      template beginning with a slash, puts an endpoint outside the version the
+      compatibility rule in docs/api.md is written about (#50).
+    patterns:
+      - pattern-either:
+          - pattern: '[Route(...)]'
+          - pattern: '[HttpGet("/...")]'
+          - pattern: '[HttpPost("/...")]'
+          - pattern: '[HttpPut("/...")]'
+          - pattern: '[HttpPatch("/...")]'
+          - pattern: '[HttpDelete("/...")]'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.cs"
+        - "tools/opengrep/fixtures/route/**/*.cs"
+      exclude:
+        - "Jellyfin.Plugin.Requests/Api/RequestsControllerBase.cs"

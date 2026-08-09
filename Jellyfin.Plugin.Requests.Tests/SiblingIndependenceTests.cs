@@ -38,6 +38,14 @@ public class SiblingIndependenceTests
         "MediaBrowser.Common",
         "MediaBrowser.Controller",
         "MediaBrowser.Model",
+
+        // The API this plugin serves is mounted on the server's own, so its controllers are the
+        // server's web framework's controllers. This is the assembly holding `ControllerBase`, the
+        // routing attributes and the result types, and it is part of the framework the server runs
+        // on rather than a package this plugin carries: the package excludes the runtime assets, so
+        // nothing of it is in the install. Serving an API without it would mean a second web stack
+        // inside a plugin.
+        "Microsoft.AspNetCore.Mvc.Core",
         "Microsoft.Extensions.DependencyInjection.Abstractions",
         "System.Collections",
         "System.Linq",
