@@ -206,16 +206,10 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
 
         var held = await HeldAsync(cancellationToken).ConfigureAwait(false);
 
-        // One walk of the set, and everything below is over what survived it. The count and the
-        // page are taken from this one list, which is how the two cannot disagree.
-        var matched = held.Held.Values.Where(stored => query.Matches(stored.Request)).ToArray();
-
-        var page = Ordered(matched, query)
-            .Skip(query.Skip)
-            .Take(query.Take)
-            .ToArray();
-
-        return new RequestPage(page, matched.Length);
+        // One walk of the set, and the count and the page come out of it together. The filter and
+        // the order are the query's own, so this store and the surface that pages one person's own
+        // requests answer under one rule rather than under two that agree today.
+        return query.PageOf(held.Held.Values);
     }
 
     /// <inheritdoc />
@@ -496,51 +490,6 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
             ? new RequestStoreLoadException(filePath, detail)
             : new RequestStoreLoadException(filePath, detail, reason);
     }
-
-    /// <summary>
-    /// Puts the matches in the order the query asked for.
-    /// <para>
-    /// The identifier is the last key of every order, so requests that compare equal under the
-    /// chosen one still have exactly one position. Without it their order is whatever order the set
-    /// is enumerated in, and the set is a dictionary that is rebuilt on every write: a request
-    /// created between two page turns can reorder rows that have nothing to do with it, so an
-    /// operator turning to the next page sees one of them again and never sees another.
-    /// </para>
-    /// <para>
-    /// Descending reverses the identifier as well as the chosen key, so the descending order is
-    /// exactly the ascending one read backwards. A tiebreak left ascending under a reversed primary
-    /// key is a third order, and two requests made in the same tick would sit in one order going
-    /// down the queue and the other going up it.
-    /// </para>
-    /// <para>
-    /// The title is compared as text somebody reads rather than as bytes, so an accented title
-    /// sorts beside its unaccented neighbour instead of after every unaccented title there is. That
-    /// is the one order here where the byte comparison and the reading one differ, and the reading
-    /// one is what a person scanning a column expects.
-    /// </para>
-    /// </summary>
-    /// <param name="matched">What survived the filter.</param>
-    /// <param name="query">The order asked for.</param>
-    /// <returns>The matches, ordered.</returns>
-    private static IOrderedEnumerable<StoredRequest> Ordered(IEnumerable<StoredRequest> matched, RequestQuery query)
-        => query.Order switch
-        {
-            RequestQueryOrder.RequestedAt => query.Descending
-                ? matched.OrderByDescending(stored => stored.Request.RequestedAt).ThenByDescending(stored => stored.Request.Id)
-                : matched.OrderBy(stored => stored.Request.RequestedAt).ThenBy(stored => stored.Request.Id),
-            RequestQueryOrder.StateChangedAt => query.Descending
-                ? matched.OrderByDescending(stored => stored.Request.StateChangedAt).ThenByDescending(stored => stored.Request.Id)
-                : matched.OrderBy(stored => stored.Request.StateChangedAt).ThenBy(stored => stored.Request.Id),
-            RequestQueryOrder.DisplayTitle => query.Descending
-                ? matched.OrderByDescending(stored => stored.Request.DisplayTitle, StringComparer.InvariantCulture).ThenByDescending(stored => stored.Request.Id)
-                : matched.OrderBy(stored => stored.Request.DisplayTitle, StringComparer.InvariantCulture).ThenBy(stored => stored.Request.Id),
-
-            // An order this store has no comparison for is refused rather than served by whichever
-            // arm happened to be written last. A value added to the enumeration is a value that
-            // reaches here, and being told so is cheaper than a queue quietly ordered by something
-            // else.
-            _ => throw new ArgumentOutOfRangeException(nameof(query), query.Order, "This store has no comparison for that order.")
-        };
 
     /// <summary>
     /// The set, reading the file on the first call that needs it. A caller that finds it already

@@ -89,25 +89,11 @@ internal sealed class InMemoryRequestStore : IRequestStore
 
         lock (_gate)
         {
-            var matched = _held.Values.Where(stored => query.Matches(stored.Request)).ToArray();
-
-            var ordered = query.Order switch
-            {
-                RequestQueryOrder.RequestedAt => matched.OrderBy(stored => stored.Request.RequestedAt).ThenBy(stored => stored.Request.Id),
-                RequestQueryOrder.StateChangedAt => matched.OrderBy(stored => stored.Request.StateChangedAt).ThenBy(stored => stored.Request.Id),
-                RequestQueryOrder.DisplayTitle => matched.OrderBy(stored => stored.Request.DisplayTitle, StringComparer.InvariantCulture).ThenBy(stored => stored.Request.Id),
-                _ => throw new ArgumentOutOfRangeException(nameof(query), query.Order, "This store has no comparison for that order.")
-            };
-
-            // The descending case is the ascending one reversed rather than a second set of arms.
-            // Two spellings of one order are two places a tiebreak can be dropped from, and the
-            // tiebreak is what makes paging see every match exactly once.
-            var page = (query.Descending ? ordered.Reverse() : ordered)
-                .Skip(query.Skip)
-                .Take(query.Take)
-                .ToArray();
-
-            return Task.FromResult(new RequestPage(page, matched.Length));
+            // The filter, the order and the page are the query's own, which is what makes this
+            // double answer the same question as the store that ships rather than a second reading
+            // of it. A double with an ordering of its own is a double that can agree with the
+            // contract suite and disagree with the store it stands in for.
+            return Task.FromResult(query.PageOf(_held.Values));
         }
     }
 
