@@ -308,7 +308,8 @@ public class RequestAuthorityTests
             RequestedAt = asked,
             StateChangedAt = asked,
             Kind = RequestedItemKind.Movie,
-            DisplayTitle = "Wages of Fear"
+            DisplayTitle = "Wages of Fear",
+            ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "269" }
         };
     }
 }

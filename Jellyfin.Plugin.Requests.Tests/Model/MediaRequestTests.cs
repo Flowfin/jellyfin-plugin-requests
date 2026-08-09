@@ -30,11 +30,13 @@ public class MediaRequestTests
         "DisplayYear",
         "History",
         "Id",
+        "JoinedByUserIds",
         "Kind",
         "ProviderIds",
         "RequestedAt",
         "RequestedByUserId",
         "RequesterNote",
+        "Seasons",
         "State",
         "StateChangedAt",
         "StateChangedByUserId"
@@ -189,12 +191,16 @@ public class MediaRequestTests
             return true;
         }
 
-        // The two collections on the record, and only in the shapes they are declared in. A
-        // read-only map of string to string carries no behaviour a caller could reach through, and
-        // a read-only list of history entries carries only entries whose own fields are checked by
-        // TheHistoryEntryIsAPlainValueToo below. Neither gives a reader anything to resolve a title
-        // through, which is the property this test is about.
+        // The four collections on the record, and only in the shapes they are declared in. A
+        // read-only map of string to string carries no behaviour a caller could reach through; the
+        // seasons and the people who joined are read-only lists of numbers and identifiers, which
+        // are plain values by the lines above; and a read-only list of history entries carries only
+        // entries whose own fields are checked by TheHistoryEntryIsAPlainValueToo below. None of
+        // them gives a reader anything to resolve a title through, which is the property this test
+        // is about.
         return underlying == typeof(IReadOnlyDictionary<string, string>)
+            || underlying == typeof(IReadOnlyList<int>)
+            || underlying == typeof(IReadOnlyList<Guid>)
             || underlying == typeof(IReadOnlyList<RequestHistoryEntry>);
     }
 

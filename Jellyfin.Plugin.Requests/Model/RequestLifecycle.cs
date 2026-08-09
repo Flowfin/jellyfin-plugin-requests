@@ -56,6 +56,14 @@ namespace Jellyfin.Plugin.Requests.Model;
 /// #42 is where that is detected instead.
 /// </para>
 /// <para>
+/// <b>A request with no provider identifier may only be declined.</b> It is a title somebody typed,
+/// it has no identity, and nothing downstream can act on it: no fulfilment check can match it and
+/// nothing can be submitted for it. Approving one would be an operator saying yes to something that
+/// then sits still forever. A decline needs no identifier and stays available, so such a request
+/// still has an ending, and putting identifiers on it opens every other move. This is #38's answer
+/// to what happens to a request that names nothing.
+/// </para>
+/// <para>
 /// No cell admits the requester alone. Asking is not a move: approving one's own request is the
 /// case this check exists for, a decline is the operator's answer rather than the asker's, and a
 /// user withdrawing has no state to move to because <c>Cancelled</c> was refused on #113. An
@@ -199,6 +207,48 @@ public static class RequestLifecycle
     }
 
     /// <summary>
+    /// Records that somebody else has asked for the same thing, on the request they are joining.
+    /// <para>
+    /// This is what happens instead of a second row when <see cref="RequestIdentity.Compare"/>
+    /// answers <see cref="RequestMatch.Same"/>. It is not a state change: nothing was decided, the
+    /// request is where it was, and the history is a record of decisions rather than of interest, so
+    /// nothing is appended to it.
+    /// </para>
+    /// <para>
+    /// Asking again for something you have already asked for changes nothing and is not an error.
+    /// A client that retries, a person who clicks twice and two tabs open on one page all arrive
+    /// here, and refusing them would make the surfaces carry a rule about it each.
+    /// </para>
+    /// </summary>
+    /// <param name="request">The request being joined.</param>
+    /// <param name="userId">The Jellyfin user who has now asked for the same thing.</param>
+    /// <returns>
+    /// The request with that person recorded on it, or the request unchanged where they were already
+    /// waiting for it.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Where no request was given.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Where the request has been decided. Joining a declined or fulfilled request would leave
+    /// somebody waiting for an answer that was given before they asked, and what they should get is
+    /// a request of their own.
+    /// </exception>
+    public static MediaRequest Join(MediaRequest request, Guid userId)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.State is not (RequestState.Open or RequestState.Approved))
+        {
+            throw new InvalidOperationException(
+                FormattableString.Invariant(
+                    $"A request that is {request.State} cannot be joined. Only an open or an approved request is still waiting for something, and joining one that is not would hand somebody an answer that was given before they asked."));
+        }
+
+        return request.WasAskedForBy(userId)
+            ? request
+            : request with { JoinedByUserIds = [.. request.JoinedByUserIds, userId] };
+    }
+
+    /// <summary>
     /// The one place a request changes state, and therefore the one place the history grows and the
     /// one place a caller's authority is checked. Both public methods above go through here, so
     /// "every transition appends exactly one entry" and "every transition asks who is making it" are
@@ -235,6 +285,14 @@ public static class RequestLifecycle
         if ((cell.Permitted & by.RolesOn(request)) == RequestActor.None)
         {
             throw new RequestMoveNotPermittedException(cell.From, cell.To, cell.Permitted);
+        }
+
+        // Authority before this one, and that order is deliberate too. Whether a request carries an
+        // identifier is a fact about the request, and a caller who may not touch it should not learn
+        // that fact by attempting a move.
+        if (request.ProviderIds.Count == 0 && to != RequestState.Declined)
+        {
+            throw new RequestNotIdentifiedException(to);
         }
 
         var entry = new RequestHistoryEntry

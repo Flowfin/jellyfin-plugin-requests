@@ -87,7 +87,11 @@ public sealed record RequestCaller
 
         // The plugin carries no user, so it can never match a requester, and the comparison below
         // does not have to special-case it: no identifier equals a request's requester by accident.
-        return UserId is Guid caller && caller == request.RequestedByUserId
+        //
+        // Somebody who joined an existing request is a requester on it too, which is what makes
+        // "one request, several people waiting" a real answer rather than a queue trick: the second
+        // person can see it on their own page under the same rule as the first.
+        return UserId is Guid caller && request.WasAskedForBy(caller)
             ? _authority | RequestActor.Requester
             : _authority;
     }
