@@ -181,9 +181,44 @@ asked for a thousand, was given two hundred and was not told has just decided it
 A value outside an enumeration is refused with the parameter named. Such a value binds as a number
 and would otherwise match nothing, and an empty page reads exactly like an empty queue.
 
+## Who may reach what
+
+Every endpoint carries a policy of its own, and the controller carries one as the floor under all of
+them. An endpoint with no policy of its own is reachable under whatever its class happens to declare
+on the day it is added, and a class attribute is edited by somebody who is not reading the endpoint.
+
+| Endpoint             | Policy                 | Who that is          |
+| -------------------- | ---------------------- | -------------------- |
+| `POST Requests`      | `DefaultAuthorization` | any signed-in person |
+| `GET Requests`       | `DefaultAuthorization` | any signed-in person |
+| `GET Requests/Queue` | `RequiresElevation`    | an administrator     |
+
+**Nothing here is anonymous.** A request has to be attributable to somebody to exist at all, and a
+queue is a list of who asked for what, so there is no answer this plugin gives that is safe to hand a
+caller the server has not authenticated.
+
+The policies are the server's own, named as literals because the constants that hold them live in the
+server's web assembly and a plugin does not reference it. The string is the contract either way.
+
+What holds this. `EndpointPolicyTests` reads the built assembly and refuses an endpoint whose policy
+is not the one written down for it, an endpoint carrying no policy of its own, and an anonymous one.
+The invariant lint refuses the two source shapes that take a policy away: `no-anonymous-endpoint` and
+`authorize-names-a-policy`, the second of which is about a bare `[Authorize]`, which reads as though
+it decided something and admits every signed-in person on the server.
+
+What none of that holds is the server turning a caller away, which is the server's own evaluation of
+the policy and needs a running one. `docs/testing.md` carries that as a refused test with what
+replaces it.
+
+The rule underneath the table is narrower than the table. **A user sees their own requests in full
+and learns nothing at all about anybody else's**, which is what `GET Requests` returns and why its
+rows carry no identifier of any person. Whether a user may ever be told that a title has already been
+asked for, which is a weaker disclosure than a row and still a disclosure, is open between #51 and
+#71 and is deliberately not taken here: nothing this plugin serves aggregates across people today.
+
 ## What is not decided here
 
-- Which policy each endpoint carries, and what a user may see of somebody else's request, is #51.
+- Whether a user may ever be told that a title has already been asked for is open between #51 and #71.
 - The shape of an error and which status code each failure gets is #56.
 - What each endpoint does is #52, #54 and #55.
 - Whether these endpoints appear in the server's published API documentation is #57.

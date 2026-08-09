@@ -416,13 +416,14 @@ public sealed class ListRequestsTests
     }
 
     /// <summary>
-    /// The queue endpoint carries the elevation policy and the other one does not, read off the
-    /// built assembly.
+    /// The queue endpoint carries the elevation policy and the endpoint a user reaches carries the
+    /// signed-in one, read off the built assembly.
     /// <para>
     /// This is the whole of what the suite says about who may reach the queue. The server evaluates
     /// the policy and there is no server here, which the headless rule in <c>docs/testing.md</c>
-    /// settles; the attribute being present is the part that can be refused from in process, and it
-    /// is the part that goes missing when somebody adds an endpoint.
+    /// settles and whose refusal list names this with its replacement. That every endpoint carries a
+    /// policy of its own at all is <see cref="EndpointPolicyTests"/>; this leg is that these two
+    /// carry the two different ones, which is what makes the queue the elevated read.
     /// </para>
     /// </summary>
     [Fact]
@@ -438,10 +439,12 @@ public sealed class ListRequestsTests
             ["RequiresElevation"],
             queue.GetCustomAttributes<AuthorizeAttribute>(inherit: false).Select(attribute => attribute.Policy));
 
-        Assert.Equal([], mine.GetCustomAttributes<AuthorizeAttribute>(inherit: false).Select(attribute => attribute.Policy));
+        Assert.Equal(
+            ["DefaultAuthorization"],
+            mine.GetCustomAttributes<AuthorizeAttribute>(inherit: false).Select(attribute => attribute.Policy));
 
-        // The controller's own policy is what the endpoint without one inherits, so the absence
-        // above is an authenticated user rather than an open door.
+        // The controller's own policy is the floor under both, so an endpoint that ever lost its own
+        // attribute would still need a signed-in caller rather than being open.
         Assert.Equal(
             ["DefaultAuthorization"],
             typeof(RequestsController).GetCustomAttributes<AuthorizeAttribute>(inherit: false).Select(attribute => attribute.Policy));

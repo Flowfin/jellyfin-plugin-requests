@@ -31,10 +31,17 @@ namespace Jellyfin.Plugin.Requests.Api;
 /// rather than identity and is answered below.
 /// </para>
 /// <para>
-/// The policy is the floor rather than the decision. Every endpoint carries an explicit policy and
-/// which one each carries is #51; what is here is an authenticated user, because a request has to be
-/// attributable to somebody to exist at all and an endpoint reachable without a session could not
-/// name a requester.
+/// <b>Every endpoint carries its own policy, and the one on the controller is the floor.</b> An
+/// endpoint that carried none would be reachable by whatever the class happens to declare on the day
+/// it is added, and a class attribute is edited by somebody who is not reading the endpoint. Which
+/// policy each one carries, and what a caller may see under it, is <c>docs/api.md</c>; that the
+/// attribute is there at all is refused by <c>EndpointPolicyTests</c> over the built assembly and by
+/// two rules in the invariant lint over the source.
+/// </para>
+/// <para>
+/// Two policies are used here and no endpoint is anonymous. Creating a request and reading one's own
+/// need an authenticated user, because a request has to be attributable to somebody to exist at all
+/// and a caller with no session has no "own". Reading the whole queue needs an administrator.
 /// </para>
 /// </summary>
 [Authorize(Policy = AuthenticatedUserPolicy)]
@@ -112,6 +119,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// here is the smallest thing that names the field that was wrong.
     /// </returns>
     [HttpPost("Requests")]
+    [Authorize(Policy = AuthenticatedUserPolicy)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -197,6 +205,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// <param name="cancellationToken">Cancels the call.</param>
     /// <returns>The page, and how many of the caller's requests matched.</returns>
     [HttpGet("Requests")]
+    [Authorize(Policy = AuthenticatedUserPolicy)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<RequestsPage<MyRequest>>> MineAsync(
