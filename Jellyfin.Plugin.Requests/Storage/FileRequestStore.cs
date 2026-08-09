@@ -49,6 +49,13 @@ namespace Jellyfin.Plugin.Requests.Storage;
 /// replaced only after the disk has taken the same set, so what the plugin reports and what survives
 /// a restart cannot disagree.
 /// </para>
+/// <para>
+/// <b>The three reads the surfaces make are not walks of the set.</b> One person's requests and one
+/// external identifier are answered out of two lookups built beside the set each time it is
+/// replaced, so neither grows with how much the store holds. The queue page is a walk, because a
+/// filter and an order chosen at the call cannot be served by a lookup built before it. What each
+/// costs, at what size, and the run behind those numbers are in <c>docs/storage.md</c>.
+/// </para>
 /// </summary>
 public sealed class FileRequestStore : IRequestStore, IDisposable
 {
@@ -79,10 +86,11 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     private readonly SemaphoreSlim _writes = new SemaphoreSlim(1, 1);
 
     /// <summary>
-    /// What the store holds, or null before the first call has read the file. Replaced whole and
-    /// never edited, which is what lets a reader take it without waiting for anything.
+    /// What the store holds and the two lookups over it, or null before the first call has read the
+    /// file. Replaced whole and never edited, which is what lets a reader take it without waiting
+    /// for anything.
     /// </summary>
-    private Dictionary<Guid, StoredRequest>? _held;
+    private Snapshot? _held;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FileRequestStore"/> class.
@@ -116,7 +124,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
         cancellationToken.ThrowIfCancellationRequested();
 
         var held = await HeldAsync(cancellationToken).ConfigureAwait(false);
-        return held.TryGetValue(id, out var stored) ? stored : null;
+        return held.Held.TryGetValue(id, out var stored) ? stored : null;
     }
 
     /// <inheritdoc />
@@ -125,7 +133,57 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
         cancellationToken.ThrowIfCancellationRequested();
 
         var held = await HeldAsync(cancellationToken).ConfigureAwait(false);
-        return held.Values.ToArray();
+        return held.Held.Values.ToArray();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<StoredRequest>> FindForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var held = await HeldAsync(cancellationToken).ConfigureAwait(false);
+
+        // The stored array is handed back rather than copied. It was built when the snapshot was
+        // built and nothing ever writes into it, so a caller holding it holds a value the same way
+        // a caller holding a request does.
+        return held.ByUser.TryGetValue(userId, out var theirs) ? theirs : [];
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<StoredRequest>> FindByProviderIdentifierAsync(
+        RequestedItemKind kind,
+        string provider,
+        string value,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var held = await HeldAsync(cancellationToken).ConfigureAwait(false);
+        var key = new ProviderKey(kind, provider, value);
+
+        return held.ByProviderIdentifier.TryGetValue(key, out var carrying) ? carrying : [];
+    }
+
+    /// <inheritdoc />
+    public async Task<RequestPage> PageAsync(RequestQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var held = await HeldAsync(cancellationToken).ConfigureAwait(false);
+
+        // One walk of the set, and everything below is over what survived it. The count and the
+        // page are taken from this one list, which is how the two cannot disagree.
+        var matched = held.Held.Values.Where(stored => query.Matches(stored.Request)).ToArray();
+
+        var page = Ordered(matched, query)
+            .Skip(query.Skip)
+            .Take(query.Take)
+            .ToArray();
+
+        return new RequestPage(page, matched.Length);
     }
 
     /// <inheritdoc />
@@ -140,16 +198,16 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
         {
             var held = LoadedWhileHoldingTheWriteLock();
 
-            if (held.ContainsKey(request.Id))
+            if (held.Held.ContainsKey(request.Id))
             {
                 throw new DuplicateRequestException(request.Id);
             }
 
             var stored = new StoredRequest(request, 1);
-            var next = new Dictionary<Guid, StoredRequest>(held) { [request.Id] = stored };
+            var next = new Dictionary<Guid, StoredRequest>(held.Held) { [request.Id] = stored };
 
             await PersistAsync(next, cancellationToken).ConfigureAwait(false);
-            Volatile.Write(ref _held, next);
+            Volatile.Write(ref _held, new Snapshot(next));
             return stored;
         }
         finally
@@ -169,7 +227,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
         try
         {
             var held = LoadedWhileHoldingTheWriteLock();
-            var current = held.TryGetValue(request.Id, out var stored) ? stored : (StoredRequest?)null;
+            var current = held.Held.TryGetValue(request.Id, out var stored) ? stored : (StoredRequest?)null;
 
             if (current is null || current.Value.Revision != expectedRevision)
             {
@@ -177,10 +235,10 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
             }
 
             var written = new StoredRequest(request, expectedRevision + 1);
-            var next = new Dictionary<Guid, StoredRequest>(held) { [request.Id] = written };
+            var next = new Dictionary<Guid, StoredRequest>(held.Held) { [request.Id] = written };
 
             await PersistAsync(next, cancellationToken).ConfigureAwait(false);
-            Volatile.Write(ref _held, next);
+            Volatile.Write(ref _held, new Snapshot(next));
             return written;
         }
         finally
@@ -200,7 +258,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
         {
             var held = LoadedWhileHoldingTheWriteLock();
 
-            if (!held.TryGetValue(id, out var stored))
+            if (!held.Held.TryGetValue(id, out var stored))
             {
                 return false;
             }
@@ -210,11 +268,11 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
                 throw new RequestConcurrencyException(id, expectedRevision, stored);
             }
 
-            var next = new Dictionary<Guid, StoredRequest>(held);
+            var next = new Dictionary<Guid, StoredRequest>(held.Held);
             next.Remove(id);
 
             await PersistAsync(next, cancellationToken).ConfigureAwait(false);
-            Volatile.Write(ref _held, next);
+            Volatile.Write(ref _held, new Snapshot(next));
             return true;
         }
         finally
@@ -285,13 +343,58 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     }
 
     /// <summary>
+    /// Puts the matches in the order the query asked for.
+    /// <para>
+    /// The identifier is the last key of every order, so requests that compare equal under the
+    /// chosen one still have exactly one position. Without it their order is whatever order the set
+    /// is enumerated in, and the set is a dictionary that is rebuilt on every write: a request
+    /// created between two page turns can reorder rows that have nothing to do with it, so an
+    /// operator turning to the next page sees one of them again and never sees another.
+    /// </para>
+    /// <para>
+    /// Descending reverses the identifier as well as the chosen key, so the descending order is
+    /// exactly the ascending one read backwards. A tiebreak left ascending under a reversed primary
+    /// key is a third order, and two requests made in the same tick would sit in one order going
+    /// down the queue and the other going up it.
+    /// </para>
+    /// <para>
+    /// The title is compared as text somebody reads rather than as bytes, so an accented title
+    /// sorts beside its unaccented neighbour instead of after every unaccented title there is. That
+    /// is the one order here where the byte comparison and the reading one differ, and the reading
+    /// one is what a person scanning a column expects.
+    /// </para>
+    /// </summary>
+    /// <param name="matched">What survived the filter.</param>
+    /// <param name="query">The order asked for.</param>
+    /// <returns>The matches, ordered.</returns>
+    private static IOrderedEnumerable<StoredRequest> Ordered(IEnumerable<StoredRequest> matched, RequestQuery query)
+        => query.Order switch
+        {
+            RequestQueryOrder.RequestedAt => query.Descending
+                ? matched.OrderByDescending(stored => stored.Request.RequestedAt).ThenByDescending(stored => stored.Request.Id)
+                : matched.OrderBy(stored => stored.Request.RequestedAt).ThenBy(stored => stored.Request.Id),
+            RequestQueryOrder.StateChangedAt => query.Descending
+                ? matched.OrderByDescending(stored => stored.Request.StateChangedAt).ThenByDescending(stored => stored.Request.Id)
+                : matched.OrderBy(stored => stored.Request.StateChangedAt).ThenBy(stored => stored.Request.Id),
+            RequestQueryOrder.DisplayTitle => query.Descending
+                ? matched.OrderByDescending(stored => stored.Request.DisplayTitle, StringComparer.InvariantCulture).ThenByDescending(stored => stored.Request.Id)
+                : matched.OrderBy(stored => stored.Request.DisplayTitle, StringComparer.InvariantCulture).ThenBy(stored => stored.Request.Id),
+
+            // An order this store has no comparison for is refused rather than served by whichever
+            // arm happened to be written last. A value added to the enumeration is a value that
+            // reaches here, and being told so is cheaper than a queue quietly ordered by something
+            // else.
+            _ => throw new ArgumentOutOfRangeException(nameof(query), query.Order, "This store has no comparison for that order.")
+        };
+
+    /// <summary>
     /// The set, reading the file on the first call that needs it. A caller that finds it already
     /// read takes it without waiting for anything, which is what
     /// <see cref="IRequestStore.GetAsync"/> promises.
     /// </summary>
     /// <param name="cancellationToken">Cancels the wait for the first read.</param>
     /// <returns>What the store holds.</returns>
-    private async Task<Dictionary<Guid, StoredRequest>> HeldAsync(CancellationToken cancellationToken)
+    private async Task<Snapshot> HeldAsync(CancellationToken cancellationToken)
     {
         var held = Volatile.Read(ref _held);
 
@@ -318,7 +421,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     /// stops a write deciding against a set that was read before another write replaced it.
     /// </summary>
     /// <returns>What the store holds.</returns>
-    private Dictionary<Guid, StoredRequest> LoadedWhileHoldingTheWriteLock()
+    private Snapshot LoadedWhileHoldingTheWriteLock()
     {
         var held = _held;
 
@@ -327,7 +430,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
             return held;
         }
 
-        held = Read(_filePath);
+        held = new Snapshot(Read(_filePath));
         Volatile.Write(ref _held, held);
         return held;
     }
@@ -372,5 +475,142 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
         }
 
         File.Move(_pendingFilePath, _filePath, overwrite: true);
+    }
+
+    /// <summary>
+    /// One external identifier under one kind, as the identifier lookup is keyed by it. The kind is
+    /// part of the key because a film and a series can carry the same number under the same
+    /// provider and be two different works, which is the rule
+    /// <see cref="RequestIdentity"/> is written to.
+    /// </summary>
+    /// <param name="Kind">What sort of thing the identifier names.</param>
+    /// <param name="Provider">The provider's name.</param>
+    /// <param name="Value">The identifier under that provider.</param>
+    private readonly record struct ProviderKey(RequestedItemKind Kind, string Provider, string Value);
+
+    /// <summary>
+    /// What the store holds, and the two lookups the surfaces read it through.
+    /// <para>
+    /// Both lookups are built once, here, out of the set that is about to be published, and neither
+    /// is edited afterwards. That is what makes them safe to hand out: a reader that took this
+    /// snapshot holds a value nothing will change under it, which is the same promise the set
+    /// itself carries.
+    /// </para>
+    /// <para>
+    /// Building them costs one pass over the set on every write. That is the same order as
+    /// serialising the set, which the write has just done, so a write does not change shape for
+    /// having two lookups to rebuild. Keeping them up to date incrementally instead would mean an
+    /// edit in place, and an edit in place is what the snapshot exists to avoid.
+    /// </para>
+    /// </summary>
+    private sealed class Snapshot
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Snapshot"/> class over a set that is about
+        /// to be published.
+        /// </summary>
+        /// <param name="held">The set. It may not be written to after this call.</param>
+        public Snapshot(Dictionary<Guid, StoredRequest> held)
+        {
+            Held = held;
+
+            var byUser = new Dictionary<Guid, List<StoredRequest>>();
+            var byProviderIdentifier = new Dictionary<ProviderKey, List<StoredRequest>>(ProviderKeyComparer.Instance);
+
+            foreach (var stored in held.Values)
+            {
+                // Distinct, and the person who asked appended to the people who joined rather than
+                // assumed to be absent from them. The record says the two lists never overlap and
+                // nothing in the type refuses one that does, so a request that carried a person
+                // twice would otherwise put it in their list twice.
+                foreach (var user in stored.Request.JoinedByUserIds.Append(stored.Request.RequestedByUserId).Distinct())
+                {
+                    Under(byUser, user).Add(stored);
+                }
+
+                // Distinct under the same comparison the lookup uses, because a request may carry
+                // `Tmdb` and `tmdb` as two entries of its own map and they are one identifier here.
+                foreach (var identifier in stored.Request.ProviderIds
+                    .Select(entry => new ProviderKey(stored.Request.Kind, entry.Key, entry.Value))
+                    .Distinct(ProviderKeyComparer.Instance))
+                {
+                    Under(byProviderIdentifier, identifier).Add(stored);
+                }
+            }
+
+            ByUser = byUser.ToDictionary(entry => entry.Key, entry => entry.Value.ToArray());
+            ByProviderIdentifier = byProviderIdentifier.ToDictionary(
+                entry => entry.Key,
+                entry => entry.Value.ToArray(),
+                ProviderKeyComparer.Instance);
+        }
+
+        /// <summary>
+        /// Gets every request, by its own identifier.
+        /// </summary>
+        public Dictionary<Guid, StoredRequest> Held { get; }
+
+        /// <summary>
+        /// Gets the requests each person is waiting for, whether they asked first or joined.
+        /// </summary>
+        public Dictionary<Guid, StoredRequest[]> ByUser { get; }
+
+        /// <summary>
+        /// Gets the requests carrying each external identifier.
+        /// </summary>
+        public Dictionary<ProviderKey, StoredRequest[]> ByProviderIdentifier { get; }
+
+        /// <summary>
+        /// The list under a key, made if it is the first one.
+        /// </summary>
+        /// <typeparam name="TKey">What the lookup is keyed by.</typeparam>
+        /// <param name="lookup">The lookup being built.</param>
+        /// <param name="key">The key.</param>
+        /// <returns>The list to add to.</returns>
+        private static List<StoredRequest> Under<TKey>(Dictionary<TKey, List<StoredRequest>> lookup, TKey key)
+            where TKey : notnull
+        {
+            if (!lookup.TryGetValue(key, out var under))
+            {
+                under = [];
+                lookup[key] = under;
+            }
+
+            return under;
+        }
+    }
+
+    /// <summary>
+    /// How two external identifiers are compared, which is the comparison
+    /// <see cref="RequestIdentity"/> makes and not the one a dictionary makes by default.
+    /// <para>
+    /// The provider name matches without case, because the same provider is spelled <c>Tmdb</c> and
+    /// <c>tmdb</c> by different callers and neither is wrong. The value matches exactly, because it
+    /// is somebody else's identifier and this plugin does not get to decide that two of them that
+    /// differ are the same. A store comparing either differently from
+    /// <see cref="RequestIdentity"/> would let a fulfilment sweep and a duplicate check disagree
+    /// about whether two things are one thing.
+    /// </para>
+    /// </summary>
+    private sealed class ProviderKeyComparer : IEqualityComparer<ProviderKey>
+    {
+        /// <summary>
+        /// Gets the one instance. It holds nothing, so a second would be a second object with the
+        /// same answers.
+        /// </summary>
+        public static ProviderKeyComparer Instance { get; } = new ProviderKeyComparer();
+
+        /// <inheritdoc />
+        public bool Equals(ProviderKey x, ProviderKey y)
+            => x.Kind == y.Kind
+                && string.Equals(x.Provider, y.Provider, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(x.Value, y.Value, StringComparison.Ordinal);
+
+        /// <inheritdoc />
+        public int GetHashCode(ProviderKey obj)
+            => HashCode.Combine(
+                obj.Kind,
+                StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Provider),
+                StringComparer.Ordinal.GetHashCode(obj.Value));
     }
 }
