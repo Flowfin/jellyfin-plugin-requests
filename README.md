@@ -39,6 +39,10 @@ it ran against and what it does not cover are in
 [docs/testing.md](docs/testing.md). What has not been tried is the packaged
 install path an operator would use, which is a later milestone.
 
+What is supported, what is only expected to work, and what a downgrade does to
+the requests a server already holds are in
+[docs/compatibility.md](docs/compatibility.md).
+
 ## Building
 
 ```

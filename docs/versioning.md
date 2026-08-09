@@ -97,11 +97,12 @@ compares the version in a manifest entry against the installed one and offers
 the higher of the two is a claim taken from how the catalogue is used, not from
 a run recorded here, and the run that would settle it belongs with #110.
 
-Two of the promises above also need code that does not exist yet. A stored
-request that an older version cannot read is refused by the version marker in
-the store, which is #47 and is not built, and configuration carried between
-plugin versions is #97. Until those land, a `MAJOR` bump is a sentence in a
-changelog and nothing refuses a downgrade that eats data.
+One of the promises above is now refused by something rather than only written
+here. A stored file whose version this plugin does not know is refused by the
+store, which leaves the bytes as they are and says so in the log; that landed
+with #47 and what it does in both directions is in `docs/compatibility.md`. The
+other half is not built: configuration carried between plugin versions is #97,
+so a `MAJOR` bump still promises about settings what nothing refuses.
 
 ## The changelog
 
