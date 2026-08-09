@@ -28,6 +28,22 @@ public sealed record RequestTransition
     public required bool IsLegal { get; init; }
 
     /// <summary>
+    /// Gets the callers who may make this move. A move is permitted where this set and the set the
+    /// caller holds on the request, from <see cref="RequestCaller.RolesOn"/>, share a value.
+    /// <para>
+    /// Whether a move is legal and who may make it are two questions, and both are answered here so
+    /// that a calling surface cannot answer the second on its own. A refused cell admits
+    /// <see cref="RequestActor.None"/>, so an illegal move and a move nobody may make are the same
+    /// row rather than two rules that can disagree.
+    /// </para>
+    /// <para>
+    /// It is required rather than defaulted, so a cell added to the table has to say who may make
+    /// it. A default would be a permission somebody chose by not writing anything.
+    /// </para>
+    /// </summary>
+    public required RequestActor Permitted { get; init; }
+
+    /// <summary>
     /// Gets the reason this cell reads the way it does, in one sentence. This is printed in
     /// <c>docs/lifecycle.md</c> and is the text a person reads when a move they expected to work
     /// was refused, so it says why rather than restating the verdict.

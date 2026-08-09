@@ -37,6 +37,32 @@ namespace Jellyfin.Plugin.Requests.Model;
 /// rather than a decision being undone, which is what <see cref="LibraryAvailability"/> and
 /// <see cref="MediaRequest.AvailabilityCheckedAt"/> are for.
 /// </para>
+/// <para>
+/// <b>Who may make a move is the second half of every cell.</b> A move is legal or illegal by the
+/// table and separately permitted or not permitted to the caller, and both are checked here rather
+/// than at whatever is calling, so that a surface added later cannot forget the second one. The
+/// caller says what it is, in <see cref="RequestCaller"/>; the cell says what it admits, in
+/// <see cref="RequestTransition.Permitted"/>; the move is permitted where the two sets share a
+/// value. A refused cell admits nobody, so the two checks never disagree about a move the table
+/// already refuses.
+/// </para>
+/// <para>
+/// One line decides every cell's permitted set: <b>a decision is an administrator's and an
+/// observation is the plugin's</b>. Approving, declining, taking either back and sending something
+/// onward again are answers a person gives, and they are the six cells an administrator may make.
+/// Arriving in the library and failing to arrive are things that happened whether or not anybody
+/// looked, and they are the four cells the plugin may make. A person marking a request fulfilled
+/// would be making the state say something about the library that the library does not say, and
+/// #42 is where that is detected instead.
+/// </para>
+/// <para>
+/// No cell admits the requester alone. Asking is not a move: approving one's own request is the
+/// case this check exists for, a decline is the operator's answer rather than the asker's, and a
+/// user withdrawing has no state to move to because <c>Cancelled</c> was refused on #113. An
+/// administrator who asked for something themselves holds both roles on it and may still decide it,
+/// and whether that should be so is a configuration question left to M12 that is answered at the
+/// caller rather than in this table.
+/// </para>
 /// </summary>
 public static class RequestLifecycle
 {
@@ -89,13 +115,16 @@ public static class RequestLifecycle
     /// <param name="at">
     /// When the move happened, from the injected clock rather than the machine's.
     /// </param>
-    /// <param name="movedByUserId">
-    /// The Jellyfin user who moved it, or <see langword="null"/> where the plugin moved it on its
-    /// own after looking at the library.
+    /// <param name="by">
+    /// Who is making the move, and with what authority. <see cref="RequestCaller.Plugin"/> is the
+    /// one that records no person, for a move made on something the plugin observed.
     /// </param>
     /// <returns>A new request in the new state.</returns>
-    /// <exception cref="ArgumentNullException">Where no request was given.</exception>
+    /// <exception cref="ArgumentNullException">Where no request or no caller was given.</exception>
     /// <exception cref="IllegalRequestTransitionException">Where the table refuses the move.</exception>
+    /// <exception cref="RequestMoveNotPermittedException">
+    /// Where the table allows the move and does not admit this caller for it.
+    /// </exception>
     /// <exception cref="ArgumentException">
     /// Where the state asked for is <see cref="RequestState.Declined"/>, which needs a reason and so
     /// has a door of its own.
@@ -104,7 +133,7 @@ public static class RequestLifecycle
         MediaRequest request,
         RequestState to,
         DateTimeOffset at,
-        Guid? movedByUserId)
+        RequestCaller by)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -119,7 +148,7 @@ public static class RequestLifecycle
         // declined it is a sentence that is no longer true, and the surfaces would show it beside a
         // state it contradicts. The entry that carried it stays in the history, so taking a decline
         // back loses the current reason and not the record of it.
-        return Moved(request, to, at, movedByUserId, reason: null, note: null);
+        return Moved(request, to, at, by, reason: null, note: null);
     }
 
     /// <summary>
@@ -139,10 +168,13 @@ public static class RequestLifecycle
     /// <param name="at">
     /// When the decline happened, from the injected clock rather than the machine's.
     /// </param>
-    /// <param name="declinedByUserId">The Jellyfin user who declined it.</param>
+    /// <param name="by">Who is declining it, and with what authority.</param>
     /// <returns>A new request, declined, carrying the reason.</returns>
-    /// <exception cref="ArgumentNullException">Where no request was given.</exception>
+    /// <exception cref="ArgumentNullException">Where no request or no caller was given.</exception>
     /// <exception cref="IllegalRequestTransitionException">Where the table refuses the move.</exception>
+    /// <exception cref="RequestMoveNotPermittedException">
+    /// Where the table allows the decline and does not admit this caller for it.
+    /// </exception>
     /// <exception cref="ArgumentException">
     /// Where the reason is <see cref="DeclineReason.Other"/> and no note says what happened.
     /// </exception>
@@ -152,7 +184,7 @@ public static class RequestLifecycle
         DeclineReason reason,
         string? note,
         DateTimeOffset at,
-        Guid? declinedByUserId)
+        RequestCaller by)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -163,18 +195,19 @@ public static class RequestLifecycle
                 nameof(note));
         }
 
-        return Moved(request, RequestState.Declined, at, declinedByUserId, reason, note);
+        return Moved(request, RequestState.Declined, at, by, reason, note);
     }
 
     /// <summary>
-    /// The one place a request changes state, and therefore the one place the history grows. Both
-    /// public methods above go through here, so "every transition appends exactly one entry" is a
-    /// property of the code's shape rather than a thing two call sites have to remember.
+    /// The one place a request changes state, and therefore the one place the history grows and the
+    /// one place a caller's authority is checked. Both public methods above go through here, so
+    /// "every transition appends exactly one entry" and "every transition asks who is making it" are
+    /// properties of the code's shape rather than things two call sites have to remember.
     /// </summary>
     /// <param name="request">The request to move.</param>
     /// <param name="to">The state to move it into.</param>
     /// <param name="at">When the move happened.</param>
-    /// <param name="movedByUserId">Who moved it, or nothing where the plugin did.</param>
+    /// <param name="by">Who is making the move, and with what authority.</param>
     /// <param name="reason">The decline reason, where this is a decline.</param>
     /// <param name="note">The text written beside the reason.</param>
     /// <returns>A new request in the new state, one entry longer.</returns>
@@ -182,15 +215,26 @@ public static class RequestLifecycle
         MediaRequest request,
         RequestState to,
         DateTimeOffset at,
-        Guid? movedByUserId,
+        RequestCaller by,
         DeclineReason? reason,
         string? note)
     {
+        ArgumentNullException.ThrowIfNull(by);
+
         var cell = Cell(request.State, to);
 
+        // Legality first, and the order is deliberate. A move the table refuses is refused to
+        // everybody, so answering it with "not you" would be wrong for every caller including the
+        // one who tried; and neither refusal names anything about the request, so nothing is
+        // disclosed by either order.
         if (!cell.IsLegal)
         {
             throw new IllegalRequestTransitionException(cell.From, cell.To, cell.Why);
+        }
+
+        if ((cell.Permitted & by.RolesOn(request)) == RequestActor.None)
+        {
+            throw new RequestMoveNotPermittedException(cell.From, cell.To, cell.Permitted);
         }
 
         var entry = new RequestHistoryEntry
@@ -198,7 +242,7 @@ public static class RequestLifecycle
             From = cell.From,
             To = cell.To,
             At = at,
-            ByUserId = movedByUserId,
+            ByUserId = by.UserId,
             Reason = reason,
             Note = note
         };
@@ -207,7 +251,7 @@ public static class RequestLifecycle
         {
             State = to,
             StateChangedAt = at,
-            StateChangedByUserId = movedByUserId,
+            StateChangedByUserId = by.UserId,
             DeclineReason = reason,
             DeclineNote = note,
 
@@ -229,14 +273,22 @@ public static class RequestLifecycle
         const string NothingWasSent =
             "Nothing was ever sent onward, so there is nothing that could have failed.";
 
+        // The two permitted sets the whole table is built out of, named rather than repeated, so
+        // that a cell reads as one of the two kinds of move rather than as its own arrangement. A
+        // cell needing a third set is a cell that has stopped being either a decision or an
+        // observation, and giving it a name here is the moment to say what it is instead.
+        const RequestActor Decision = RequestActor.Administrator;
+        const RequestActor Observation = RequestActor.Plugin;
+
         var table = new List<RequestTransition>
         {
             Refused(RequestState.Open, RequestState.Open, NotAMove),
-            Legal(RequestState.Open, RequestState.Approved, "An operator says yes."),
-            Legal(RequestState.Open, RequestState.Declined, "An operator says no."),
+            Legal(RequestState.Open, RequestState.Approved, Decision, "An operator says yes."),
+            Legal(RequestState.Open, RequestState.Declined, Decision, "An operator says no."),
             Legal(
                 RequestState.Open,
                 RequestState.Fulfilled,
+                Observation,
                 "The library already holds what was asked for, so there is nothing left for anybody to decide."),
             Refused(RequestState.Open, RequestState.Failed, NothingWasSent),
 
@@ -245,17 +297,24 @@ public static class RequestLifecycle
             Legal(
                 RequestState.Approved,
                 RequestState.Declined,
+                Decision,
                 "An operator takes an approval back, and the reason says why. This is the repair for an approval given by mistake."),
-            Legal(RequestState.Approved, RequestState.Fulfilled, "It arrived and the person who asked can watch it."),
+            Legal(
+                RequestState.Approved,
+                RequestState.Fulfilled,
+                Observation,
+                "It arrived and the person who asked can watch it."),
             Legal(
                 RequestState.Approved,
                 RequestState.Failed,
+                Observation,
                 "It was sent onward and did not arrive, so it stops looking like an operator forgot about it."),
 
             Refused(RequestState.Declined, RequestState.Open, NoUndeciding),
             Legal(
                 RequestState.Declined,
                 RequestState.Approved,
+                Decision,
                 "An operator changes their mind. One request carrying both moves beats asking the person who was refused to ask again."),
             Refused(RequestState.Declined, RequestState.Declined, NotAMove),
             Refused(
@@ -271,14 +330,16 @@ public static class RequestLifecycle
             Refused(RequestState.Fulfilled, RequestState.Failed, FulfilledIsTheEnd),
 
             Refused(RequestState.Failed, RequestState.Open, NoUndeciding),
-            Legal(RequestState.Failed, RequestState.Approved, "An operator sends it onward again."),
+            Legal(RequestState.Failed, RequestState.Approved, Decision, "An operator sends it onward again."),
             Legal(
                 RequestState.Failed,
                 RequestState.Declined,
+                Decision,
                 "An operator gives up on it, and the reason says why. Without this a failure has no ending."),
             Legal(
                 RequestState.Failed,
                 RequestState.Fulfilled,
+                Observation,
                 "It arrived after all, by this route or by somebody putting it in the library by hand."),
             Refused(RequestState.Failed, RequestState.Failed, NotAMove)
         };
@@ -286,9 +347,18 @@ public static class RequestLifecycle
         return new ReadOnlyCollection<RequestTransition>(table);
     }
 
-    private static RequestTransition Legal(RequestState from, RequestState to, string why)
-        => new() { From = from, To = to, IsLegal = true, Why = why };
+    private static RequestTransition Legal(RequestState from, RequestState to, RequestActor permitted, string why)
+        => new() { From = from, To = to, IsLegal = true, Permitted = permitted, Why = why };
 
+    /// <summary>
+    /// A cell nobody may make. The permitted set is <see cref="RequestActor.None"/> rather than a
+    /// parameter, because "this move is refused" and "some caller may still make it" cannot both be
+    /// true, and a helper that let them be written together is the disagreement waiting to happen.
+    /// </summary>
+    /// <param name="from">The state being moved out of.</param>
+    /// <param name="to">The state being moved into.</param>
+    /// <param name="why">The reason this pair is refused.</param>
+    /// <returns>The refused cell.</returns>
     private static RequestTransition Refused(RequestState from, RequestState to, string why)
-        => new() { From = from, To = to, IsLegal = false, Why = why };
+        => new() { From = from, To = to, IsLegal = false, Permitted = RequestActor.None, Why = why };
 }

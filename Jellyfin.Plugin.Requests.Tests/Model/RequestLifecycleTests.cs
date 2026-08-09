@@ -120,7 +120,11 @@ public class RequestLifecycleTests
         var movedAt = new DateTimeOffset(2026, 8, 9, 11, 30, 0, TimeSpan.Zero);
         var operatorId = new Guid("2d8f4b16-3a5c-4d97-8e21-7c6b5a4f3e29");
 
-        var moved = RequestLifecycle.Move(request, RequestState.Approved, movedAt, operatorId);
+        var moved = RequestLifecycle.Move(
+            request,
+            RequestState.Approved,
+            movedAt,
+            RequestCaller.Administrator(operatorId));
 
         Assert.Equal(RequestState.Approved, moved.State);
         Assert.Equal(movedAt, moved.StateChangedAt);
@@ -156,7 +160,7 @@ public class RequestLifecycleTests
             request,
             RequestState.Fulfilled,
             new DateTimeOffset(2026, 8, 9, 12, 0, 0, TimeSpan.Zero),
-            movedByUserId: null);
+            RequestCaller.Plugin);
 
         Assert.Equal(RequestState.Fulfilled, moved.State);
         Assert.Null(moved.StateChangedByUserId);
@@ -278,6 +282,12 @@ public class RequestLifecycleTests
     /// Makes a move through whichever of the two methods takes it. A decline needs a reason and so
     /// has a door of its own, and a test walking the whole table has to knock on the right one or it
     /// measures the wrong refusal.
+    /// <para>
+    /// The caller is the plugin, and which caller it is does not change what this measures: a
+    /// refused cell is refused before anybody's authority is looked at, which is
+    /// <c>ALegalMoveIsStillRefusedToACallerTheCellDoesNotAdmit</c>'s neighbour in
+    /// <c>RequestAuthorityTests</c>.
+    /// </para>
     /// </summary>
     /// <param name="request">The request to move.</param>
     /// <param name="to">The state to move it into.</param>
@@ -285,8 +295,8 @@ public class RequestLifecycleTests
     /// <returns>The moved request.</returns>
     private static MediaRequest MoveThroughTheRightDoor(MediaRequest request, RequestState to, DateTimeOffset at)
         => to == RequestState.Declined
-            ? RequestLifecycle.Decline(request, DeclineReason.NotWanted, note: null, at, declinedByUserId: null)
-            : RequestLifecycle.Move(request, to, at, movedByUserId: null);
+            ? RequestLifecycle.Decline(request, DeclineReason.NotWanted, note: null, at, RequestCaller.Plugin)
+            : RequestLifecycle.Move(request, to, at, RequestCaller.Plugin);
 
     private static string Verdict(RequestTransition cell) => cell.IsLegal ? "allowed" : "refused";
 
