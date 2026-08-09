@@ -30,30 +30,84 @@ serialising them by hand is what keeps the release order readable.
 ## What the run produces
 
 The workflow builds the plugin from the tagged commit, creates the GitHub release
-for the tag, and attaches four files:
+for the tag, and attaches five files:
 
 - the plugin archive
 - the packaging metadata written beside it, `<archive>.zip.meta.json`
+- the bill of materials, `<archive>.cdx.json`
 - one `.md5` file, the checksum of the archive
 - one `.sha256` file for the same archive
 
 The `.md5` is the value a Jellyfin catalog serves as the plugin checksum. There is
 exactly one per release so that no generator can pair a checksum with the wrong
-file. Both the archive and the metadata are checked for existence by name before the
-release job runs, so a release with three of the four files is not a state this route
-can reach.
+file. The archive, the metadata and the bill of materials are each checked for
+existence by name before the release job runs, so a release with four of the five
+files is not a state this route can reach.
 
 The run also signs a build provenance statement for the archive, in a separate job
-that downloads the archive and runs no build tooling. A downloaded archive can be
-checked against it:
+that downloads the archive and runs no build tooling.
+
+Nothing here writes a plugin catalog. A GitHub release is the whole output. If this
+repository previously published through the Jellyfin meta plugins workflow, that path
+is gone and no catalog is fed until a manifest generator is added.
+
+## The bill of materials
+
+`scripts/bill-of-materials.sh` writes it, in the build job, before anything is
+published. It is a CycloneDX document listing every file the archive carries with the
+SHA-256 of the bytes that get written on install, and it is derived from the archive
+rather than from the project.
+
+Two things it does not carry, both on purpose. It reads no version out of a DLL,
+because that needs a .NET toolchain and the version a catalog serves is already in
+the archive's own `meta.json`. It is not the compile-time dependency graph either:
+`packages.lock.json` at the source commit is that graph, and a package in it appears
+in the bill of materials only if the build copied it into the archive. For
+`0.1.0.0` the archive holds two files and nothing third-party ships, so the list is
+two entries long. That is a fact about the package rather than a gap in the script.
+
+## Checking a release
+
+Both checks are for somebody who downloaded the archive and wants to know what they
+have, and neither needs anything from this repository beyond the script.
+
+Where the archive came from:
 
 ```
 gh attestation verify <archive>.zip --repo <owner>/<repository>
 ```
 
-Nothing here writes a plugin catalog. A GitHub release is the whole output. If this
-repository previously published through the Jellyfin meta plugins workflow, that path
-is gone and no catalog is fed until a manifest generator is added.
+What is inside it. The document is reproducible, so regenerating it from the download
+and comparing is the check. There is no timestamp and no serial number in it, and the
+components are sorted, so two runs over the same archive produce the same bytes:
+
+```
+SOURCE_REPOSITORY=<owner>/<repository> \
+SOURCE_COMMIT=<the commit in the shipped document> \
+PACKAGE_VERSION=<version> \
+  scripts/bill-of-materials.sh <archive>.zip regenerated.cdx.json
+diff regenerated.cdx.json <archive>.cdx.json
+```
+
+A recorded run of the first command against `0.1.0.0-stable`, which is the release
+that exists at the time of writing:
+
+```
+gh release download 0.1.0.0-stable --repo Flowfin/jellyfin-plugin-requests \
+  --pattern 'requests_0.1.0.0.zip'
+gh attestation verify requests_0.1.0.0.zip --repo Flowfin/jellyfin-plugin-requests
+echo "exit=$?"
+exit=0
+```
+
+The command prints its result only to a terminal, so a run whose output is captured
+to a file or a pipe shows the exit status and nothing else. Reading the statement
+itself rather than the verdict takes `--format json`. Pointed at a repository that did
+not build the archive it exits 1 with an HTTP 404, which is the failing direction of
+the same command.
+
+`0.1.0.0-stable` was built before the bill of materials existed and carries no
+`.cdx.json`, so the second check has nothing to run against until the next release.
 
 ## What fails the run
 
@@ -72,7 +126,10 @@ is gone and no catalog is fed until a manifest generator is added.
   cannot restore against a reviewed dependency graph. Create one with
   `dotnet restore <project> -p:RestorePackagesWithLockFile=true` and commit it.
 - The version stamped into the assembly is not the version in `build.yaml`.
-- The build produced no archive, or more than one, or no packaging metadata.
+- The build produced no archive, or more than one, or no packaging metadata, or no
+  bill of materials.
+- The archive cannot be read, or carries no files at all, so nothing can describe
+  what ships in it.
 - A release already exists for the tag.
 
 All of these fail before anything is published.

@@ -24,13 +24,17 @@ public class MediaRequestTests
     [
         "Availability",
         "AvailabilityCheckedAt",
+        "DeclineNote",
+        "DeclineReason",
         "DisplayTitle",
         "DisplayYear",
+        "History",
         "Id",
         "Kind",
         "ProviderIds",
         "RequestedAt",
         "RequestedByUserId",
+        "RequesterNote",
         "State",
         "StateChangedAt",
         "StateChangedByUserId"
@@ -185,9 +189,34 @@ public class MediaRequestTests
             return true;
         }
 
-        // The one collection on the record, and only in the shape it is declared in: a read-only
-        // map of string to string carries no behaviour a caller could reach through.
-        return underlying == typeof(IReadOnlyDictionary<string, string>);
+        // The two collections on the record, and only in the shapes they are declared in. A
+        // read-only map of string to string carries no behaviour a caller could reach through, and
+        // a read-only list of history entries carries only entries whose own fields are checked by
+        // TheHistoryEntryIsAPlainValueToo below. Neither gives a reader anything to resolve a title
+        // through, which is the property this test is about.
+        return underlying == typeof(IReadOnlyDictionary<string, string>)
+            || underlying == typeof(IReadOnlyList<RequestHistoryEntry>);
+    }
+
+    /// <summary>
+    /// The history entry is held to the same rule as the record that carries it. Without this, the
+    /// widening above would have let a field of any type at all onto the record by way of an entry,
+    /// which is the hole a reader of the widened line would not see.
+    /// </summary>
+    [Fact]
+    public void TheHistoryEntryIsAPlainValueToo()
+    {
+        var offending = typeof(RequestHistoryEntry)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => !IsAPlainValue(property.PropertyType))
+            .Select(property => string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} is {1}",
+                property.Name,
+                property.PropertyType.Name))
+            .ToArray();
+
+        Assert.Empty(offending);
     }
 
     private static string[] PublicFieldNames()

@@ -47,6 +47,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The lifecycle document, next to the suite, so the transition table printed for a reader is
+         compared against the table the code reads rather than against a copy of it in a test. -->
+    <None Include="../docs/lifecycle.md" Link="docs/lifecycle.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The project, not a built assembly: a stale copy in a bin directory would pass a suite that
          is testing last week's plugin. -->
     <ProjectReference Include="..\Jellyfin.Plugin.Requests\Jellyfin.Plugin.Requests.csproj" />

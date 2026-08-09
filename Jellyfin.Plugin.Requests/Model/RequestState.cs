@@ -6,15 +6,18 @@ namespace Jellyfin.Plugin.Requests.Model;
 /// are separate because an approved request that has not arrived yet is the ordinary case rather
 /// than an edge one.
 /// <para>
-/// Which moves between these values are legal is a table rather than a set of conditionals, and it
-/// is #39. Whether four values are enough, or whether a cancelled or failed value is also needed,
-/// is decision 3 on #113; adding one is an entry here and a row there.
+/// Which moves between these values are legal is <see cref="RequestLifecycle.Table"/>, which is
+/// data rather than a set of conditionals. Adding a value here is an entry there, and the table has
+/// a cell for every pair whether it is legal or not, so a new value cannot be added without saying
+/// what may reach it and what it may reach.
 /// </para>
 /// </summary>
 public enum RequestState
 {
     /// <summary>
-    /// Asked for, and nothing has been decided. The state a request is created in.
+    /// Asked for, and nothing has been decided. The state a request is created in, and the only
+    /// state nothing moves back to: undecided is a fact about a request nobody has looked at, and
+    /// once somebody has looked, the honest record of that is the decision they made.
     /// </summary>
     Open = 0,
 
@@ -24,12 +27,21 @@ public enum RequestState
     Approved = 1,
 
     /// <summary>
-    /// An operator said no. The reason, where there is one, is #41.
+    /// An operator said no. The reason is #41 and is required, decided on #113.
     /// </summary>
     Declined = 2,
 
     /// <summary>
     /// The thing that was asked for is in the library and the person who asked can watch it.
     /// </summary>
-    Fulfilled = 3
+    Fulfilled = 3,
+
+    /// <summary>
+    /// Approved, sent onward, and it did not arrive. This exists because the alternative is a
+    /// request that sits in <see cref="Approved"/> forever looking like an operator forgot, when
+    /// what happened is that the thing doing the fetching gave up. Added on the decision recorded
+    /// on #113; a cancelled value was considered there and refused, because a user withdrawing is
+    /// a second road to "finished" that carries nothing an operator acts on differently.
+    /// </summary>
+    Failed = 4
 }
