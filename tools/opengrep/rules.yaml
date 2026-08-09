@@ -352,3 +352,47 @@ rules:
         - "tools/opengrep/fixtures/route/**/*.cs"
       exclude:
         - "Jellyfin.Plugin.Requests/Api/RequestsControllerBase.cs"
+
+  # Invariant (api, #51): nothing this plugin serves is reachable without a
+  # session. Decided in docs/api.md, which sets out which policy each endpoint
+  # carries and why none of them is anonymous. A request has to be attributable
+  # to somebody to exist at all, and a queue is a list of who asked for what, so
+  # there is no endpoint here whose answer is safe to give a caller the server
+  # has not authenticated. `[AllowAnonymous]` is the one attribute that turns
+  # every policy above it off, including the controller's, and it is what
+  # somebody writes while testing an endpoint by hand.
+  - id: no-anonymous-endpoint
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not make an endpoint anonymous. Every endpoint this plugin serves
+      carries a policy and none of them is reachable without a session (#51);
+      AllowAnonymous turns off the controller's policy as well as the method's.
+    patterns:
+      - pattern: '[AllowAnonymous]'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.cs"
+        - "tools/opengrep/fixtures/policy/**/*.cs"
+
+  # Invariant (api, #51): a policy is named rather than left to the default.
+  # Decided in docs/api.md. A bare `[Authorize]` reads as though it decided
+  # something and decides almost nothing: it admits every signed-in person, which
+  # on a family server is the whole household, and it says nothing about which of
+  # them may read a queue. The named policies are the server's own, so an
+  # endpoint under one is reachable by exactly the people the server already
+  # says may do that thing. The attribute with a policy is a longer token
+  # sequence and is not matched by this.
+  - id: authorize-names-a-policy
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Name the policy. A bare [Authorize] admits every signed-in caller and says
+      nothing about which of them may reach this endpoint (#51). Write
+      [Authorize(Policy = ...)] with one of the server's named policies.
+    patterns:
+      - pattern: '[Authorize]'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.cs"
+        - "tools/opengrep/fixtures/policy/**/*.cs"

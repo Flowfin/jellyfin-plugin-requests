@@ -87,14 +87,30 @@ own handler pipeline and no socket is opened. It is #35. Until it exists there i
 to test: #80 defines the backend interface with a null implementation behind it, and #87 is the
 proof that this plugin is complete with no backend at all.
 
+**A call refused by the server's authorisation policy.** Refused: the policy is evaluated by the
+server, so a test that a signed-in caller who is not an administrator is turned away from the queue
+endpoint needs a running Jellyfin holding a session for that person. That is the fourth condition,
+and it is the same refusal as installing into a real server above rather than a new kind of one.
+
+What replaces it is two things, on two sides of the endpoint. `EndpointPolicyTests` reads the built
+assembly and refuses an endpoint whose policy is not the one written down for it, an endpoint with
+no policy of its own, and an anonymous one; `no-anonymous-endpoint` and `authorize-names-a-policy`
+refuse the two source shapes that take a policy away. That is the half about which policy an
+endpoint is under. The other half is that the endpoint a caller without elevation can reach has
+nothing wider than that caller's own requests to return, which `ListRequestsTests` asks under every
+combination of filter, order and page. Neither is the server turning somebody away, and neither
+claims to be: what they leave open is that the server evaluates `RequiresElevation` the way its own
+endpoints are evaluated under it. That is #51.
+
 Every replacement named above exists, either as something already in the tree or as an issue on
 this board:
 
-    for n in 20 35 50 52 54 56 61 64 115; do gh issue view $n --json number,state,title --jq '"\(.number)  \(.state)  \(.title)"'; done
+    for n in 20 35 50 51 52 54 56 61 64 115; do gh issue view $n --json number,state,title --jq '"\(.number)  \(.state)  \(.title)"'; done
     20  CLOSED  Prove the built plugin loads on a server of each claimed line
     35  OPEN  Provide an in-process HTTP double for the outbound calls
-    50  OPEN  Lay out the controller, the route prefix and the version rule
-    52  OPEN  Create a request over the API
+    50  CLOSED  Lay out the controller, the route prefix and the version rule
+    51  OPEN  Decide the authorisation policy for every endpoint
+    52  CLOSED  Create a request over the API
     54  OPEN  Act on a request over the API
     56  OPEN  Fix the error shape and the status codes
     61  OPEN  Act on one request from the page
@@ -112,8 +128,8 @@ rather than off the workflow:
 
 ### What this list is not
 
-It is not a list of everything that will ever be refused. It holds the three refusals the plan
-makes visible today, and the conditions above are what decide the next one. A test refused for a
+It is not a list of everything that will ever be refused. It holds the refusals the plan makes
+visible today, and the conditions above are what decide the next one. A test refused for a
 condition not yet met by any proposal gets its own entry here when the proposal arrives, together
 with what replaces it.
 
