@@ -320,12 +320,17 @@ public sealed class FileRequestStoreQueryCostTests : IDisposable
         var directory = TestRunDirectory.CreateSubdirectory();
         _directories.Add(directory);
 
-        var persisted = Requests().Select(request => new { Revision = 1L, Request = request }).ToArray();
+        var persisted = new
+        {
+            Version = FileRequestStore.OnDiskVersion,
+            Requests = Requests().Select(request => new { Revision = 1L, Request = request }).ToArray()
+        };
+
         await File.WriteAllTextAsync(
             Path.Combine(directory, FileRequestStore.FileName),
             JsonSerializer.Serialize(persisted)).ConfigureAwait(true);
 
-        var store = new FileRequestStore(directory);
+        var store = new FileRequestStore(directory, new RecordingLogger());
         _stores.Add(store);
 
         // The first read is what parses the file, so it is made here and not inside a measured

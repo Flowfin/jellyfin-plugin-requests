@@ -10,8 +10,9 @@ namespace Jellyfin.Plugin.Requests.Storage;
 /// change to the public type is not automatically a change to the bytes on somebody's disk.
 /// </para>
 /// <para>
-/// This is the whole of the on-disk shape as #46 needed it, and no more. Giving it a version field
-/// and stating what may be changed about it without stranding an existing install is #47.
+/// One of these is an entry of <see cref="PersistedDocument"/>, which is the whole of the on-disk
+/// shape and carries the version. What may change in this record inside one version, and what needs
+/// a new one, is in <c>docs/storage.md</c>.
 /// </para>
 /// </summary>
 internal sealed record PersistedRequest

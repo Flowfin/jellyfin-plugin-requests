@@ -6,6 +6,7 @@ using Jellyfin.Plugin.Requests.Time;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Requests;
 
@@ -41,10 +42,14 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // store, which is after the host has constructed the plugin, so the instance is there by
         // then; where it is not, that is a host that never loaded this plugin and the failure says
         // so instead of writing requests into a path built out of nothing.
-        serviceCollection.AddSingleton<IRequestStore>(_ => new FileRequestStore(
+        //
+        // The logger is the server's, taken from the container rather than made here, so a refusal
+        // to open the file lands in the log the operator is already reading.
+        serviceCollection.AddSingleton<IRequestStore>(provider => new FileRequestStore(
             (Plugin.Instance ?? throw new InvalidOperationException(
                 "The request store was asked for before this plugin was loaded, so there is no data directory to keep requests in."))
-            .DataFolderPath));
+            .DataFolderPath,
+            provider.GetRequiredService<ILogger<FileRequestStore>>()));
 
         // Who is calling, asked of the server rather than decided here. Registered so an endpoint
         // takes the seam and never the server's context directly, which is what keeps an endpoint

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Model;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Requests.Storage;
 
@@ -41,7 +42,17 @@ namespace Jellyfin.Plugin.Requests.Storage;
 /// requests, the store refuses to open with <see cref="RequestStoreLoadException"/> rather than
 /// returning the part of it that did parse. A short read that looks like a successful one is how a
 /// queue silently loses records and then has the loss written back over the file that still held
-/// them.
+/// them. Every such refusal is written to the log before it is thrown, because the caller that sees
+/// the exception is a request somebody made and the operator who can act on it is reading the
+/// server's log.
+/// </para>
+/// <para>
+/// <b>The file says which shape it is in.</b> Every document carries <see cref="OnDiskVersion"/>.
+/// A version this plugin does not know is refused and nothing is written, so a server downgraded to
+/// an older plugin leaves the newer file alone rather than reading it as if the fields it has never
+/// heard of were absent. An older version is migrated forward as it is read, and the file itself is
+/// left as it was until some later write replaces it whole. What may change inside a version and
+/// what needs a new one is in <c>docs/storage.md</c>.
 /// </para>
 /// <para>
 /// <b>Reads do not wait for writes.</b> The set is held in memory as one value that is replaced
@@ -70,6 +81,20 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     /// </summary>
     public const string PendingFileName = "requests.json.writing";
 
+    /// <summary>
+    /// The shape this plugin writes, and the highest it can read. It goes up when a change to the
+    /// bytes would be read wrongly by the version before it, which is the rule stated in
+    /// <c>docs/storage.md</c> rather than restated here.
+    /// </summary>
+    public const int OnDiskVersion = 1;
+
+    /// <summary>
+    /// The shape written before there was a version field: a bare array of entries, with no
+    /// document around it. It is not a number any file carries; it is the number this store gives
+    /// that shape so the migration has something to migrate from.
+    /// </summary>
+    private const int UnversionedShape = 0;
+
     private static readonly JsonSerializerOptions SerializerOptions = new JsonSerializerOptions
     {
         WriteIndented = false
@@ -78,6 +103,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     private readonly string _directoryPath;
     private readonly string _filePath;
     private readonly string _pendingFilePath;
+    private readonly ILogger _logger;
 
     /// <summary>
     /// Held for the whole of a write, so no two writes are building the pending file at once and no
@@ -99,13 +125,19 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     /// The directory the file lives in. Nothing is created until the first write, so constructing a
     /// store against a directory that does not exist yet is not an error.
     /// </param>
-    public FileRequestStore(string directoryPath)
+    /// <param name="logger">
+    /// Where a refusal to open is written. It is required rather than optional, because a logger
+    /// that may be absent is one that is absent on the machine where the refusal happened.
+    /// </param>
+    public FileRequestStore(string directoryPath, ILogger logger)
     {
         ArgumentException.ThrowIfNullOrEmpty(directoryPath);
+        ArgumentNullException.ThrowIfNull(logger);
 
         _directoryPath = directoryPath;
         _filePath = Path.Combine(directoryPath, FileName);
         _pendingFilePath = Path.Combine(directoryPath, PendingFileName);
+        _logger = logger;
     }
 
     /// <summary>
@@ -292,54 +324,177 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     /// </summary>
     /// <param name="filePath">The file to read.</param>
     /// <returns>What the file holds, and an empty set where there is no file yet.</returns>
-    private static Dictionary<Guid, StoredRequest> Read(string filePath)
+    private Dictionary<Guid, StoredRequest> Read(string filePath)
     {
         if (!File.Exists(filePath))
         {
             return [];
         }
 
-        PersistedRequest?[]? persisted;
+        JsonElement root;
 
         try
         {
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            persisted = JsonSerializer.Deserialize<PersistedRequest?[]>(stream, SerializerOptions);
+            using var document = JsonDocument.Parse(stream);
+            root = document.RootElement.Clone();
         }
         catch (JsonException reason)
         {
-            throw new RequestStoreLoadException(
+            throw Refusing(
                 filePath,
                 "it is not the document this store writes, which is what an interruption in the middle of the file would leave if a write were made in place.",
                 reason);
         }
 
-        if (persisted is null)
-        {
-            throw new RequestStoreLoadException(filePath, "it holds a JSON null where the list of requests should be.");
-        }
-
+        var persisted = EntriesOf(filePath, root);
         var held = new Dictionary<Guid, StoredRequest>();
 
         foreach (var entry in persisted)
         {
             if (entry?.Request is null)
             {
-                throw new RequestStoreLoadException(filePath, "one of the entries carries no request.");
+                throw Refusing(filePath, "one of the entries carries no request.");
             }
 
             if (entry.Revision < 1)
             {
-                throw new RequestStoreLoadException(filePath, "one of the entries carries a revision below the one an added request starts at.");
+                throw Refusing(filePath, "one of the entries carries a revision below the one an added request starts at.");
             }
 
             if (!held.TryAdd(entry.Request.Id, new StoredRequest(entry.Request, entry.Revision)))
             {
-                throw new RequestStoreLoadException(filePath, "two entries carry one identifier, so which of them the store holds is not decidable.");
+                throw Refusing(filePath, "two entries carry one identifier, so which of them the store holds is not decidable.");
             }
         }
 
         return held;
+    }
+
+    /// <summary>
+    /// The entries a parsed file holds, having decided which shape it is in.
+    /// <para>
+    /// The shape is read off the root rather than off a field, because the version field is exactly
+    /// what an older document does not have. An array is the shape written before the version
+    /// existed and is migrated forward; an object is a versioned document and its number decides
+    /// whether this plugin may read it.
+    /// </para>
+    /// <para>
+    /// Migrating forward is a read and not a write. The file is left exactly as it was, and the
+    /// document this plugin writes reaches the disk when some later write replaces the file whole,
+    /// which is the one step this store ever makes to it. So a plugin that reads an older file and
+    /// is then replaced by the older plugin again finds the file it left.
+    /// </para>
+    /// </summary>
+    /// <param name="filePath">The file, for the refusal that names it.</param>
+    /// <param name="root">What the file parsed to.</param>
+    /// <returns>The entries, in the order the file holds them.</returns>
+    private PersistedRequest?[] EntriesOf(string filePath, JsonElement root)
+    {
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            // Guarded, because the two version numbers are boxed on the way into the call and this
+            // is the one line here that a server may have switched off.
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "The requests in {FilePath} are in the shape written before the store carried a version. They are read as version {From} and migrated to version {To}. The file is not changed until the next write.",
+                    filePath,
+                    UnversionedShape,
+                    OnDiskVersion);
+            }
+
+            return Entries(filePath, root);
+        }
+
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            throw Refusing(filePath, "it holds a JSON null where the list of requests should be.");
+        }
+
+        PersistedDocument? document;
+
+        try
+        {
+            document = root.Deserialize<PersistedDocument>(SerializerOptions);
+        }
+        catch (JsonException reason)
+        {
+            throw Refusing(filePath, "it is not the document this store writes.", reason);
+        }
+
+        if (document is null || document.Version < 1)
+        {
+            throw Refusing(
+                filePath,
+                "it carries no version this store recognises, so what its fields mean is not decidable.");
+        }
+
+        if (document.Version > OnDiskVersion)
+        {
+            // The one refusal that is not damage. The file is whole and was written by a later
+            // version of this plugin, which is what an operator sees after a downgrade. Reading it
+            // would mean guessing what a field this version has never heard of means, and a guess
+            // that is wrong is written back over the file on the first write.
+            _logger.LogError(
+                "The requests in {FilePath} are version {Found} and this plugin reads at most version {Known}. They were written by a later version of this plugin, so nothing is read and nothing is written. Install the newer version again, or move the file aside to start an empty queue.",
+                filePath,
+                document.Version,
+                OnDiskVersion);
+
+            throw new RequestStoreLoadException(
+                filePath,
+                FormattableString.Invariant(
+                    $"it is version {document.Version} and this plugin reads at most version {OnDiskVersion}, so it was written by a later version of this plugin."));
+        }
+
+        if (document.Requests is null)
+        {
+            throw Refusing(filePath, "it holds a JSON null where the list of requests should be.");
+        }
+
+        return document.Requests;
+    }
+
+    /// <summary>
+    /// The entries of a bare array, which is the shape written before the version existed.
+    /// </summary>
+    /// <param name="filePath">The file, for the refusal that names it.</param>
+    /// <param name="root">The array.</param>
+    /// <returns>The entries.</returns>
+    private PersistedRequest?[] Entries(string filePath, JsonElement root)
+    {
+        try
+        {
+            return root.Deserialize<PersistedRequest?[]>(SerializerOptions)
+                ?? throw Refusing(filePath, "it holds a JSON null where the list of requests should be.");
+        }
+        catch (JsonException reason)
+        {
+            throw Refusing(filePath, "it is not the document this store writes.", reason);
+        }
+    }
+
+    /// <summary>
+    /// The refusal to open, written to the log on its way to the caller. Every refusal goes through
+    /// here, so a file the store would not read leaves a line an operator can act on rather than
+    /// only an exception in whatever call happened to be the first one.
+    /// </summary>
+    /// <param name="filePath">The file that was refused.</param>
+    /// <param name="detail">What is wrong with it.</param>
+    /// <param name="reason">What the reader threw, where there was one.</param>
+    /// <returns>The exception for the caller to throw.</returns>
+    private RequestStoreLoadException Refusing(string filePath, string detail, Exception? reason = null)
+    {
+        _logger.LogError(
+            reason,
+            "The stored requests in {FilePath} could not be read: {Detail} Nothing has been changed on disk.",
+            filePath,
+            detail);
+
+        return reason is null
+            ? new RequestStoreLoadException(filePath, detail)
+            : new RequestStoreLoadException(filePath, detail, reason);
     }
 
     /// <summary>
@@ -449,9 +604,11 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     /// <returns>A task that completes when the set is on the disk.</returns>
     private async Task PersistAsync(Dictionary<Guid, StoredRequest> held, CancellationToken cancellationToken)
     {
-        var persisted = held.Values
-            .Select(stored => new PersistedRequest { Revision = stored.Revision, Request = stored.Request })
-            .ToArray();
+        var persisted = new PersistedDocument
+        {
+            Version = OnDiskVersion,
+            Requests = [.. held.Values.Select(stored => new PersistedRequest { Revision = stored.Revision, Request = stored.Request })]
+        };
 
         Directory.CreateDirectory(_directoryPath);
 
