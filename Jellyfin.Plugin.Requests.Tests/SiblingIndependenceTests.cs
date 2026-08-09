@@ -40,14 +40,23 @@ public class SiblingIndependenceTests
         "MediaBrowser.Model",
 
         // The API this plugin serves is mounted on the server's own, so its controllers are the
-        // server's web framework's controllers. This is the assembly holding `ControllerBase`, the
-        // routing attributes and the result types, and it is part of the framework the server runs
-        // on rather than a package this plugin carries: the package excludes the runtime assets, so
-        // nothing of it is in the install. Serving an API without it would mean a second web stack
-        // inside a plugin.
+        // server's web framework's controllers. These three are that framework, split across
+        // assemblies by the framework rather than by anything this plugin chose: the policy
+        // attribute, the request context an endpoint reads its caller from, and `ControllerBase`
+        // with the routing attributes and the result types. All three are part of the
+        // runtime the server already runs on rather than a package this plugin carries, because the
+        // project excludes the runtime assets and nothing of them lands in the install. Serving an
+        // API without them would mean a second web stack inside a plugin.
+        "Microsoft.AspNetCore.Authorization",
+        "Microsoft.AspNetCore.Http.Abstractions",
         "Microsoft.AspNetCore.Mvc.Core",
         "Microsoft.Extensions.DependencyInjection.Abstractions",
         "System.Collections",
+
+        // The endpoint declares which status codes it answers with, and the attribute that says so
+        // is a description of the method rather than behaviour. It arrives with the controller and
+        // is part of the same runtime.
+        "System.ComponentModel",
         "System.Linq",
         "System.Runtime",
 
