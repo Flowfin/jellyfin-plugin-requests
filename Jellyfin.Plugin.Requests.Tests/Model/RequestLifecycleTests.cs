@@ -128,14 +128,16 @@ public class RequestLifecycleTests
 
         // Everything the move is not about, compared as one value: the record's generated equality
         // covers every field, so a field added later is covered here without this test being
-        // edited.
+        // edited. The four the move is about are put back first. The history is one of them because
+        // a move appends to it, which RequestHistoryTests is about.
         Assert.Equal(
             request,
             moved with
             {
                 State = request.State,
                 StateChangedAt = request.StateChangedAt,
-                StateChangedByUserId = request.StateChangedByUserId
+                StateChangedByUserId = request.StateChangedByUserId,
+                History = request.History
             });
     }
 

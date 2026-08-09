@@ -289,3 +289,28 @@ rules:
       exclude:
         - "Jellyfin.Plugin.Requests.Tests/Doubles/TestRunDirectory.cs"
         - "Jellyfin.Plugin.Requests.Tests/TestRunDirectoryTests.cs"
+
+  # Invariant (model, #43): the history on a request is only ever appended to.
+  # Decided in #43, whose second done-condition names this rule. Entries are
+  # never edited or removed, and that is the only thing that makes the list
+  # worth reading: a history somebody can tidy answers "what happened" with
+  # whatever the last writer preferred. Nothing in the type system says so,
+  # because IReadOnlyList refuses a removal and says nothing about an
+  # assignment, and `with { History = ... }` is exactly how a caller would
+  # replace one. RequestLifecycle is the one place that appends, so it is the
+  # one place excluded.
+  - id: history-is-only-appended-to
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not assign to History here. A request's history is append-only and
+      RequestLifecycle is the only thing that grows it, so that a move cannot be
+      rewritten out of the record after the fact (#43).
+    patterns:
+      - pattern: History =
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.cs"
+        - "tools/opengrep/fixtures/history/**/*.cs"
+      exclude:
+        - "Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs"
