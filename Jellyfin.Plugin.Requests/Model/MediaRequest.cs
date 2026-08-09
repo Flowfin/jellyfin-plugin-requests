@@ -178,6 +178,24 @@ public sealed record MediaRequest
     }
 
     /// <summary>
+    /// Gets every move this request has made, oldest first. Empty on a request nothing has decided,
+    /// because being created is not a move.
+    /// <para>
+    /// Append-only. <see cref="RequestLifecycle"/> is the only thing that adds to it and it never
+    /// removes or rewrites an entry, which is what makes the list worth reading at all. Nothing in
+    /// the type system says so, because a list that could refuse a removal would be a type of its
+    /// own; what says so is the lint rule <c>history-is-only-appended-to</c>, which refuses an
+    /// assignment to this property anywhere but the one place that appends.
+    /// </para>
+    /// <para>
+    /// This is where a decline reason survives being taken back. The reason on the request is the
+    /// current one and is cleared when the request stops being declined; the entry that carried it
+    /// stays.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<RequestHistoryEntry> History { get; init; } = [];
+
+    /// <summary>
     /// Gets whether the server holds what was asked for. Separate from <see cref="State"/> on
     /// purpose: approval is a decision and availability is an observation, and the pair
     /// approved-and-absent is the ordinary case rather than a contradiction.
@@ -192,12 +210,14 @@ public sealed record MediaRequest
     public DateTimeOffset? AvailabilityCheckedAt { get; init; }
 
     /// <summary>
-    /// Refuses a note that is too long and flattens an empty one to nothing.
+    /// Refuses a note that is too long and flattens an empty one to nothing. Internal because
+    /// <see cref="RequestHistoryEntry"/> holds a copy of the same text and has to hold it under the
+    /// same rule; two implementations of one cap is one of them being raised alone.
     /// </summary>
     /// <param name="text">The text as it arrived.</param>
     /// <param name="field">The property being written, for the refusal to name.</param>
     /// <returns>The text, or <see langword="null"/> where there was nothing in it.</returns>
-    private static string? Note(string? text, string field)
+    internal static string? Note(string? text, string field)
     {
         if (string.IsNullOrWhiteSpace(text))
         {

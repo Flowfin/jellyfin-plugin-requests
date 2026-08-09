@@ -115,14 +115,11 @@ public static class RequestLifecycle
                 nameof(to));
         }
 
-        return Moved(request, to, at, movedByUserId) with
-        {
-            // A reason describes the decline it was given for. Carried onto a request that is no
-            // longer declined it is a sentence that is no longer true, and the surfaces would show
-            // it beside a state it contradicts. What the request used to say is #43.
-            DeclineReason = null,
-            DeclineNote = null
-        };
+        // A reason describes the decline it was given for. Carried onto a request that is no longer
+        // declined it is a sentence that is no longer true, and the surfaces would show it beside a
+        // state it contradicts. The entry that carried it stays in the history, so taking a decline
+        // back loses the current reason and not the record of it.
+        return Moved(request, to, at, movedByUserId, reason: null, note: null);
     }
 
     /// <summary>
@@ -166,18 +163,28 @@ public static class RequestLifecycle
                 nameof(note));
         }
 
-        return Moved(request, RequestState.Declined, at, declinedByUserId) with
-        {
-            DeclineReason = reason,
-            DeclineNote = note
-        };
+        return Moved(request, RequestState.Declined, at, declinedByUserId, reason, note);
     }
 
+    /// <summary>
+    /// The one place a request changes state, and therefore the one place the history grows. Both
+    /// public methods above go through here, so "every transition appends exactly one entry" is a
+    /// property of the code's shape rather than a thing two call sites have to remember.
+    /// </summary>
+    /// <param name="request">The request to move.</param>
+    /// <param name="to">The state to move it into.</param>
+    /// <param name="at">When the move happened.</param>
+    /// <param name="movedByUserId">Who moved it, or nothing where the plugin did.</param>
+    /// <param name="reason">The decline reason, where this is a decline.</param>
+    /// <param name="note">The text written beside the reason.</param>
+    /// <returns>A new request in the new state, one entry longer.</returns>
     private static MediaRequest Moved(
         MediaRequest request,
         RequestState to,
         DateTimeOffset at,
-        Guid? movedByUserId)
+        Guid? movedByUserId,
+        DeclineReason? reason,
+        string? note)
     {
         var cell = Cell(request.State, to);
 
@@ -186,11 +193,28 @@ public static class RequestLifecycle
             throw new IllegalRequestTransitionException(cell.From, cell.To, cell.Why);
         }
 
+        var entry = new RequestHistoryEntry
+        {
+            From = cell.From,
+            To = cell.To,
+            At = at,
+            ByUserId = movedByUserId,
+            Reason = reason,
+            Note = note
+        };
+
         return request with
         {
             State = to,
             StateChangedAt = at,
-            StateChangedByUserId = movedByUserId
+            StateChangedByUserId = movedByUserId,
+            DeclineReason = reason,
+            DeclineNote = note,
+
+            // A new list rather than an addition to the old one. The request handed in is a value
+            // somebody else may still be holding, and growing its list underneath them would move a
+            // history they had already read.
+            History = [.. request.History, entry]
         };
     }
 
