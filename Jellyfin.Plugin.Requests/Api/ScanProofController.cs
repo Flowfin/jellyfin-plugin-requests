@@ -39,3 +39,5 @@ public sealed class ScanProofController : RequestsControllerBase
         return Ok();
     }
 }
+
+// A second line, so this branch differs from its base and a pull request can exist.
