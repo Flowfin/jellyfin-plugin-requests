@@ -47,23 +47,33 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
     /// directory, including the three absences a hand-typed request arrives with. The comparison is
     /// field by field because <c>docs/storage.md</c> measured that the record's generated equality
     /// compares the provider identifiers by reference, which two dictionaries never satisfy once one
-    /// of them has come off a disk.
+    /// of them has come off a disk. The history is compared the same way and for the same reason: it
+    /// is held as an interface, so the generated equality compares the list itself and never its
+    /// entries, and a list that has been read back is a different list whatever it holds.
+    /// <para>
+    /// The state here is reached by making the move rather than by writing the state onto the
+    /// record, so the request carries a history and the round trip has one to lose. A request whose
+    /// history is empty would let a store that drops the field entirely pass this.
+    /// </para>
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
     public async Task EveryFieldComesBackFromAStoreOpenedFreshOverTheSameDirectory()
     {
         var directory = ADirectory();
-        var full = ARequest(1) with
-        {
-            DisplayTitle = "A title with a comma, an accent é and a quote \"",
-            DisplayYear = 1999,
-            ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "603", ["Imdb"] = "tt0133093" },
-            State = RequestState.Approved,
-            StateChangedByUserId = new Guid("2b7b4f1d-4f0e-4a63-9a3d-0f5a1c9e77aa"),
-            Availability = LibraryAvailability.Partial,
-            AvailabilityCheckedAt = new DateTimeOffset(2026, 3, 3, 0, 0, 0, TimeSpan.Zero)
-        };
+        var approvedBy = new Guid("2b7b4f1d-4f0e-4a63-9a3d-0f5a1c9e77aa");
+        var full = RequestLifecycle.Move(
+            ARequest(1) with
+            {
+                DisplayTitle = "A title with a comma, an accent é and a quote \"",
+                DisplayYear = 1999,
+                ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "603", ["Imdb"] = "tt0133093" },
+                Availability = LibraryAvailability.Partial,
+                AvailabilityCheckedAt = new DateTimeOffset(2026, 3, 3, 0, 0, 0, TimeSpan.Zero)
+            },
+            RequestState.Approved,
+            new DateTimeOffset(2026, 8, 8, 9, 0, 0, TimeSpan.Zero),
+            RequestCaller.Administrator(approvedBy));
 
         var bare = ARequest(2);
 
@@ -76,10 +86,21 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
         var readBare = await reading.GetAsync(bare.Id, CancellationToken.None).ConfigureAwait(true);
 
         Assert.NotNull(readFull);
-        Assert.Equal(full with { ProviderIds = readFull.Value.Request.ProviderIds }, readFull.Value.Request);
+        Assert.Equal(
+            full with
+            {
+                ProviderIds = readFull.Value.Request.ProviderIds,
+                History = readFull.Value.Request.History
+            },
+            readFull.Value.Request);
         Assert.Equal(
             full.ProviderIds.OrderBy(pair => pair.Key, StringComparer.Ordinal),
             readFull.Value.Request.ProviderIds.OrderBy(pair => pair.Key, StringComparer.Ordinal));
+
+        // Entry by entry, and the entries are records of values, so this compares what each move
+        // said and not which list it is in. The approval above is the one entry there is to lose.
+        Assert.Equal(full.History, readFull.Value.Request.History);
+        Assert.Single(readFull.Value.Request.History);
 
         Assert.NotNull(readBare);
         Assert.Null(readBare.Value.Request.DisplayYear);
