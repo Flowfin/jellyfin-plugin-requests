@@ -34,6 +34,22 @@ namespace Jellyfin.Plugin.Requests.Model;
 public sealed record MediaRequest
 {
     /// <summary>
+    /// The longest a piece of free text on a request may be. One number for both notes, because two
+    /// numbers that happen to be equal are two numbers that can drift apart for no reason anybody
+    /// wrote down.
+    /// <para>
+    /// Five hundred characters is a short paragraph. Both fields are read whole, in a queue row and
+    /// in whatever tells the requester what happened, and neither surface has anywhere to put an
+    /// essay. The cap is refused rather than applied, so nothing is ever stored that the person who
+    /// typed it did not write.
+    /// </para>
+    /// </summary>
+    public const int NoteMaximumLength = 500;
+
+    private readonly string? _requesterNote;
+    private readonly string? _declineNote;
+
+    /// <summary>
     /// Gets this request's own identifier, which is not the identifier of anything it refers to.
     /// Where it comes from is the injected identifier source in #34, so a test does not get a
     /// different value on every run.
@@ -105,6 +121,63 @@ public sealed record MediaRequest
     public Guid? StateChangedByUserId { get; init; }
 
     /// <summary>
+    /// Gets what the person who asked wanted to say about it, or <see langword="null"/> where they
+    /// said nothing. Sometimes this carries the only information that makes the request decidable:
+    /// which of two films with one title, or that it is for somebody's birthday on Friday.
+    /// <para>
+    /// Free text written by a person, so it is untrusted wherever it is shown. It is stored exactly
+    /// as it was typed and nothing here escapes it, because escaping belongs at the one place that
+    /// renders it and text escaped twice is text with visible ampersands in it.
+    /// </para>
+    /// <para>
+    /// Text that is only whitespace is held as <see langword="null"/>. "No note" and "an empty note"
+    /// are the same fact, and keeping two representations of it means every reader has to test for
+    /// both and one of them eventually will not.
+    /// </para>
+    /// </summary>
+    /// <exception cref="RequestTextTooLongException">
+    /// Where the text is longer than <see cref="NoteMaximumLength"/>.
+    /// </exception>
+    public string? RequesterNote
+    {
+        get => _requesterNote;
+        init => _requesterNote = Note(value, nameof(RequesterNote));
+    }
+
+    /// <summary>
+    /// Gets why this request was declined, or <see langword="null"/> where it is not declined. A
+    /// decline always carries one: <see cref="RequestLifecycle.Decline"/> is the only way into
+    /// <see cref="RequestState.Declined"/> and it requires a reason, decided on #113.
+    /// <para>
+    /// It is cleared when a request leaves <see cref="RequestState.Declined"/>, because a reason
+    /// standing on an approved request is a sentence that is no longer true. What the request used
+    /// to say is the append-only history in #43, and until that exists the earlier reason is gone
+    /// rather than kept somewhere else.
+    /// </para>
+    /// </summary>
+    public DeclineReason? DeclineReason { get; init; }
+
+    /// <summary>
+    /// Gets what the operator wrote alongside <see cref="DeclineReason"/>, or
+    /// <see langword="null"/> where they wrote nothing. Required beside
+    /// <see cref="Model.DeclineReason.Other"/>, which says nothing on its own, and optional beside
+    /// every other value.
+    /// <para>
+    /// Free text written by a person, under the same rules as
+    /// <see cref="RequesterNote"/>: untrusted where it is shown, stored as typed, whitespace held
+    /// as <see langword="null"/>, and cleared when the request stops being declined.
+    /// </para>
+    /// </summary>
+    /// <exception cref="RequestTextTooLongException">
+    /// Where the text is longer than <see cref="NoteMaximumLength"/>.
+    /// </exception>
+    public string? DeclineNote
+    {
+        get => _declineNote;
+        init => _declineNote = Note(value, nameof(DeclineNote));
+    }
+
+    /// <summary>
     /// Gets whether the server holds what was asked for. Separate from <see cref="State"/> on
     /// purpose: approval is a decision and availability is an observation, and the pair
     /// approved-and-absent is the ordinary case rather than a contradiction.
@@ -117,4 +190,22 @@ public sealed record MediaRequest
     /// operator asking why a request still says absent needs to know whether anything checked.
     /// </summary>
     public DateTimeOffset? AvailabilityCheckedAt { get; init; }
+
+    /// <summary>
+    /// Refuses a note that is too long and flattens an empty one to nothing.
+    /// </summary>
+    /// <param name="text">The text as it arrived.</param>
+    /// <param name="field">The property being written, for the refusal to name.</param>
+    /// <returns>The text, or <see langword="null"/> where there was nothing in it.</returns>
+    private static string? Note(string? text, string field)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return text.Length > NoteMaximumLength
+            ? throw new RequestTextTooLongException(field, NoteMaximumLength, text.Length)
+            : text;
+    }
 }

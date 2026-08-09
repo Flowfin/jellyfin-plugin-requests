@@ -24,6 +24,8 @@ public class MediaRequestTests
     [
         "Availability",
         "AvailabilityCheckedAt",
+        "DeclineNote",
+        "DeclineReason",
         "DisplayTitle",
         "DisplayYear",
         "Id",
@@ -31,6 +33,7 @@ public class MediaRequestTests
         "ProviderIds",
         "RequestedAt",
         "RequestedByUserId",
+        "RequesterNote",
         "State",
         "StateChangedAt",
         "StateChangedByUserId"

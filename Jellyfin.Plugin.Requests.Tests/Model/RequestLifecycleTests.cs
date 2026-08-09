@@ -174,11 +174,10 @@ public class RequestLifecycleTests
             var request = ARequest() with { State = cell.From };
 
             var refusal = Assert.Throws<IllegalRequestTransitionException>(
-                () => RequestLifecycle.Move(
+                () => MoveThroughTheRightDoor(
                     request,
                     cell.To,
-                    new DateTimeOffset(2026, 8, 9, 13, 0, 0, TimeSpan.Zero),
-                    movedByUserId: null));
+                    new DateTimeOffset(2026, 8, 9, 13, 0, 0, TimeSpan.Zero)));
 
             Assert.Equal(cell.From, refusal.From);
             Assert.Equal(cell.To, refusal.To);
@@ -272,6 +271,20 @@ public class RequestLifecycleTests
 
         Assert.Equal(expected, documented);
     }
+
+    /// <summary>
+    /// Makes a move through whichever of the two methods takes it. A decline needs a reason and so
+    /// has a door of its own, and a test walking the whole table has to knock on the right one or it
+    /// measures the wrong refusal.
+    /// </summary>
+    /// <param name="request">The request to move.</param>
+    /// <param name="to">The state to move it into.</param>
+    /// <param name="at">When the move happens.</param>
+    /// <returns>The moved request.</returns>
+    private static MediaRequest MoveThroughTheRightDoor(MediaRequest request, RequestState to, DateTimeOffset at)
+        => to == RequestState.Declined
+            ? RequestLifecycle.Decline(request, DeclineReason.NotWanted, note: null, at, declinedByUserId: null)
+            : RequestLifecycle.Move(request, to, at, movedByUserId: null);
 
     private static string Verdict(RequestTransition cell) => cell.IsLegal ? "allowed" : "refused";
 
