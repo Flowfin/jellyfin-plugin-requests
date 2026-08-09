@@ -15,6 +15,10 @@ public class RequestHistoryTests
 
     private static readonly Guid SecondOperator = new("6b09e13d-5f78-4a2c-90b4-8e1d7c3a5029");
 
+    private static readonly RequestCaller ByFirstOperator = RequestCaller.Administrator(FirstOperator);
+
+    private static readonly RequestCaller BySecondOperator = RequestCaller.Administrator(SecondOperator);
+
     /// <summary>
     /// A request nobody has decided has an empty history. Being created is not a move, and an entry
     /// saying it was created would put a row in every history that says nothing an operator asked
@@ -37,11 +41,11 @@ public class RequestHistoryTests
     {
         var request = ARequest();
 
-        var approved = RequestLifecycle.Move(request, RequestState.Approved, At(9), FirstOperator);
-        var failed = RequestLifecycle.Move(approved, RequestState.Failed, At(10), movedByUserId: null);
-        var declined = RequestLifecycle.Decline(failed, DeclineReason.CannotBeObtained, "Nothing has it.", At(11), SecondOperator);
-        var approvedAgain = RequestLifecycle.Move(declined, RequestState.Approved, At(12), FirstOperator);
-        var fulfilled = RequestLifecycle.Move(approvedAgain, RequestState.Fulfilled, At(13), movedByUserId: null);
+        var approved = RequestLifecycle.Move(request, RequestState.Approved, At(9), ByFirstOperator);
+        var failed = RequestLifecycle.Move(approved, RequestState.Failed, At(10), RequestCaller.Plugin);
+        var declined = RequestLifecycle.Decline(failed, DeclineReason.CannotBeObtained, "Nothing has it.", At(11), BySecondOperator);
+        var approvedAgain = RequestLifecycle.Move(declined, RequestState.Approved, At(12), ByFirstOperator);
+        var fulfilled = RequestLifecycle.Move(approvedAgain, RequestState.Fulfilled, At(13), RequestCaller.Plugin);
 
         Assert.Equal(
             [
@@ -64,8 +68,8 @@ public class RequestHistoryTests
     [Fact]
     public void AnEntryCarriesTheTimeAndTheMoverIncludingWhereThereWasNone()
     {
-        var approved = RequestLifecycle.Move(ARequest(), RequestState.Approved, At(9), FirstOperator);
-        var fulfilled = RequestLifecycle.Move(approved, RequestState.Fulfilled, At(13), movedByUserId: null);
+        var approved = RequestLifecycle.Move(ARequest(), RequestState.Approved, At(9), ByFirstOperator);
+        var fulfilled = RequestLifecycle.Move(approved, RequestState.Fulfilled, At(13), RequestCaller.Plugin);
 
         Assert.Equal(At(9), fulfilled.History[0].At);
         Assert.Equal(FirstOperator, fulfilled.History[0].ByUserId);
@@ -88,9 +92,9 @@ public class RequestHistoryTests
             DeclineReason.NoRoomForIt,
             "The disk is full until the archive move finishes.",
             At(9),
-            FirstOperator);
+            ByFirstOperator);
 
-        var approved = RequestLifecycle.Move(declined, RequestState.Approved, At(10), SecondOperator);
+        var approved = RequestLifecycle.Move(declined, RequestState.Approved, At(10), BySecondOperator);
 
         Assert.Null(approved.DeclineReason);
         Assert.Equal(DeclineReason.NoRoomForIt, approved.History[0].Reason);
@@ -109,13 +113,13 @@ public class RequestHistoryTests
     public void ARefusedMoveAppendsNothing()
     {
         var fulfilled = RequestLifecycle.Move(
-            RequestLifecycle.Move(ARequest(), RequestState.Approved, At(9), FirstOperator),
+            RequestLifecycle.Move(ARequest(), RequestState.Approved, At(9), ByFirstOperator),
             RequestState.Fulfilled,
             At(10),
-            FirstOperator);
+            RequestCaller.Plugin);
 
         Assert.Throws<IllegalRequestTransitionException>(
-            () => RequestLifecycle.Move(fulfilled, RequestState.Approved, At(11), FirstOperator));
+            () => RequestLifecycle.Move(fulfilled, RequestState.Approved, At(11), ByFirstOperator));
 
         Assert.Equal(2, fulfilled.History.Count);
     }
@@ -135,7 +139,7 @@ public class RequestHistoryTests
                 DeclineReason.Other,
                 new string('x', MediaRequest.NoteMaximumLength + 1),
                 At(9),
-                FirstOperator));
+                ByFirstOperator));
 
         Assert.Empty(request.History);
     }
@@ -149,9 +153,9 @@ public class RequestHistoryTests
     public void MovingARequestLeavesTheEarlierValuesHistoryAlone()
     {
         var request = ARequest();
-        var approved = RequestLifecycle.Move(request, RequestState.Approved, At(9), FirstOperator);
+        var approved = RequestLifecycle.Move(request, RequestState.Approved, At(9), ByFirstOperator);
 
-        _ = RequestLifecycle.Move(approved, RequestState.Fulfilled, At(10), FirstOperator);
+        _ = RequestLifecycle.Move(approved, RequestState.Fulfilled, At(10), RequestCaller.Plugin);
 
         Assert.Empty(request.History);
         Assert.Single(approved.History);
@@ -166,10 +170,10 @@ public class RequestHistoryTests
     public void EntriesAreOldestFirst()
     {
         var fulfilled = RequestLifecycle.Move(
-            RequestLifecycle.Move(ARequest(), RequestState.Approved, At(9), FirstOperator),
+            RequestLifecycle.Move(ARequest(), RequestState.Approved, At(9), ByFirstOperator),
             RequestState.Fulfilled,
             At(13),
-            FirstOperator);
+            RequestCaller.Plugin);
 
         Assert.Equal(
             fulfilled.History.Select(entry => entry.At).OrderBy(at => at).ToArray(),
