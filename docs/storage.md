@@ -54,7 +54,7 @@ before the implementation does.
 What is not decided here, and where it is:
 
 - What happens to a write interrupted halfway is #46.
-- The on-disk shape, its version, and the rules for changing it are #47.
+- The on-disk shape, its version, and the rules for changing it are below.
 - How long a finished request is kept is #49, and the number itself is decision 5 on #113.
 
 ## The three questions the store is asked
@@ -126,6 +126,81 @@ a second pass over the set.
 
 None of the three bounds is a benchmark, and none of them catches a path that is merely slower than
 it could be.
+
+## The version on the file, and what may change under it
+
+The file is one document, and the first field in it is the version of the shape:
+
+    {"Version":1,"Requests":[{"Revision":1,"Request":{ ... }}]}
+
+The version is a number about the bytes and not about the plugin. It says how a reader is to
+understand what follows, so it moves when the understanding changes and stays where it is when the
+plugin's own version moves for a reason that leaves the file alone.
+
+### Reading a version the plugin does not know
+
+Refused, and nothing is written. The file is left byte for byte as it was, the refusal is written to
+the server's log naming both numbers, and every call refuses rather than only the first.
+
+This is the downgrade case: an operator installs a newer plugin, it writes a shape this one has never
+seen, and the older plugin is put back. The alternative to refusing is to read what is recognised and
+ignore the rest, and the cost of that is not a failed read but a successful one: the first write
+afterwards puts the understood half back over the file and the rest is gone with no error anywhere.
+An operator who sees the refusal can install the newer version again and has lost nothing.
+
+### Reading an older version
+
+Migrated forward as the file is read, and the file itself is not touched. The document this plugin
+writes reaches the disk when some later write replaces the file whole, which is the one step this
+store ever makes to it. So an install that is opened by a newer plugin and then put back to the older
+one finds the file it left, until something writes.
+
+There is one older shape today. Before the version existed the file was a bare array of entries with
+no document around it, and that is what the root being an array means. It is read as version 0 and
+its entries are exactly the entries of version 1, so the migration is the wrapper and nothing else.
+A file in that shape is read, and the line saying so is in the log.
+
+### What needs a new version
+
+A change needs a new number wherever the version before it would read the new bytes and be wrong.
+Adding a field the older reader ignores does not, because ignoring it is what it would have done
+with a field that was absent. Changing what an existing field means does, renaming one does, and
+changing the shape around the entries does.
+
+Nothing here makes that judgement for anybody. What the tree holds is the refusal in the other
+direction, which is what stops a wrong judgement from costing the data.
+
+### The fixture rule
+
+A migration is tested from bytes the older shape actually produced, kept as a file under
+`Jellyfin.Plugin.Requests.Tests/Storage/Fixtures/`. A fixture typed by hand to look like what the
+older version would have written agrees with the migration by construction: both come out of the
+same belief about the old shape, so the test passes whether or not that belief is right, which is
+the same trap #97 names for the hop between shipped plugin versions.
+
+The fixture that is there was produced by this tree's own store at `592e517`, the commit before the
+version landed, by adding two requests through `AddAsync` and copying `requests.json` out.
+
+It is not a shipped version's output, and it could not be. One release exists, and the commit it was
+built from carries no store to write anything:
+
+    gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName,createdAt
+    [{"createdAt":"2026-08-08T09:38:30Z","tagName":"0.1.0.0-stable"}]
+    git rev-parse 0.1.0.0-stable^{commit}
+    c44552645f0dba120c49599deedbc0244b59dcec
+    git ls-tree -r --name-only c445526 -- Jellyfin.Plugin.Requests/Storage
+    Jellyfin.Plugin.Requests/Storage/DuplicateRequestException.cs
+    Jellyfin.Plugin.Requests/Storage/IRequestStore.cs
+    Jellyfin.Plugin.Requests/Storage/RequestConcurrencyException.cs
+    Jellyfin.Plugin.Requests/Storage/StoredRequest.cs
+
+The contract and its two exceptions, and no implementation. So the shape the fixture holds is what a
+server running the mainline between `7b62877` and this change has on its disk, and no released
+version of this plugin has ever written a request file at all.
+
+Whoever builds the next package should keep that package's own output as the next fixture at the
+moment it is built. After a field has been added there is no way to produce those bytes again except
+by hand, which is the thing this rule is against.
 
 ## It adds no package reference
 

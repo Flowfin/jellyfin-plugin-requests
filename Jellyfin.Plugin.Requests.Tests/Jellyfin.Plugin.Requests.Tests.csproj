@@ -53,6 +53,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The stored shapes an older version of this plugin wrote, kept as the bytes that version
+         produced. A migration test that builds its own starting bytes agrees with the migration by
+         construction, so these are files rather than string literals in a test. -->
+    <None Include="Storage/Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The project, not a built assembly: a stale copy in a bin directory would pass a suite that
          is testing last week's plugin. -->
     <ProjectReference Include="..\Jellyfin.Plugin.Requests\Jellyfin.Plugin.Requests.csproj" />

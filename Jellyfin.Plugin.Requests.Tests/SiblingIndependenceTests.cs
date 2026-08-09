@@ -51,6 +51,13 @@ public class SiblingIndependenceTests
         "Microsoft.AspNetCore.Http.Abstractions",
         "Microsoft.AspNetCore.Mvc.Core",
         "Microsoft.Extensions.DependencyInjection.Abstractions",
+
+        // The store refuses to open a file it cannot read, and the caller that sees the exception is
+        // whichever request happened to be first while the person who can act on it is reading the
+        // server's log. Taking the server's own logger is what puts the refusal there. It is the
+        // logging abstraction rather than an implementation: the server supplies the implementation,
+        // and this assembly is part of the runtime it already runs on.
+        "Microsoft.Extensions.Logging.Abstractions",
         "System.Collections",
 
         // The endpoint declares which status codes it answers with, and the attribute that says so

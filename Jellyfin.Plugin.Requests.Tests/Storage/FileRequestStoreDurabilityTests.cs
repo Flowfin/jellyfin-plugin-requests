@@ -165,11 +165,14 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
         Assert.Null(await reopened.GetAsync(interrupted.Id, CancellationToken.None).ConfigureAwait(true));
 
         // The write had already put bytes on the disk when it stopped, so this was an interruption
-        // in the middle of a document rather than one before it started. An unclosed array is what a
-        // reader of that file would find, and nothing reads it.
+        // in the middle of a document rather than one before it started. What a reader of that file
+        // would find is a document that never closed, and nothing reads it. The two closing bytes
+        // are checked rather than one, because a request object ends in a brace of its own and a
+        // stop just after one would look like the end of the document if only the last byte were
+        // read.
         var half = await File.ReadAllBytesAsync(store.PendingFilePath, CancellationToken.None).ConfigureAwait(true);
         Assert.NotEmpty(half);
-        Assert.NotEqual((byte)']', half[^1]);
+        Assert.False(half.Length >= 2 && half[^2] == (byte)']' && half[^1] == (byte)'}');
 
         var added = await reopened.AddAsync(ABulkyRequest(EnoughToHaveReachedTheDisk + 2), CancellationToken.None).ConfigureAwait(true);
         Assert.Equal(1, added.Revision);
@@ -216,7 +219,7 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
             await File.WriteAllBytesAsync(seeding.FilePath, before, CancellationToken.None).ConfigureAwait(true);
             await File.WriteAllBytesAsync(seeding.PendingFilePath, wholeWrite[..stopped], CancellationToken.None).ConfigureAwait(true);
 
-            var store = new FileRequestStore(directory);
+            var store = new FileRequestStore(directory, new RecordingLogger());
 
             try
             {
@@ -298,7 +301,7 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
         {
             await File.WriteAllBytesAsync(seeding.FilePath, whole[..cut], CancellationToken.None).ConfigureAwait(true);
 
-            var store = new FileRequestStore(directory);
+            var store = new FileRequestStore(directory, new RecordingLogger());
 
             try
             {
@@ -348,22 +351,22 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
         await seeding.AddAsync(ARequest(1), CancellationToken.None).ConfigureAwait(true);
 
         var written = await File.ReadAllTextAsync(seeding.FilePath, Encoding.UTF8, CancellationToken.None).ConfigureAwait(true);
-        var entry = written[1..^1];
+        var entry = written[(written.IndexOf('[', StringComparison.Ordinal) + 1)..written.LastIndexOf(']')];
 
         var damaged = damage switch
         {
             "garbage" => "this is not the document this store writes",
             "null" => "null",
-            "null-entry" => "[null]",
-            "no-request" => "[{\"Revision\":1}]",
+            "null-entry" => Document("null"),
+            "no-request" => Document("{\"Revision\":1}"),
             "revision-below-one" => written.Replace("\"Revision\":1", "\"Revision\":0", StringComparison.Ordinal),
-            _ => string.Format(CultureInfo.InvariantCulture, "[{0},{0}]", entry)
+            _ => Document(string.Format(CultureInfo.InvariantCulture, "{0},{0}", entry))
         };
 
         Assert.NotEqual(written, damaged);
         await File.WriteAllTextAsync(seeding.FilePath, damaged, Encoding.UTF8, CancellationToken.None).ConfigureAwait(true);
 
-        var store = new FileRequestStore(directory);
+        var store = new FileRequestStore(directory, new RecordingLogger());
 
         try
         {
@@ -444,6 +447,20 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
     }
 
     /// <summary>
+    /// A document of the shape the store writes, around entries a test chose. It is built here
+    /// rather than typed into each case, so a change to the document's own shape is one edit and
+    /// the cases stay about the entry that is wrong.
+    /// </summary>
+    /// <param name="entries">What goes inside the list, already written as JSON.</param>
+    /// <returns>The document.</returns>
+    private static string Document(string entries)
+        => string.Format(
+            CultureInfo.InvariantCulture,
+            "{{\"Version\":{0},\"Requests\":[{1}]}}",
+            FileRequestStore.OnDiskVersion,
+            entries);
+
+    /// <summary>
     /// Whether an exception is the one named or carries it underneath. The serialiser is free to
     /// wrap what a record throws, and the assertion is about what stopped the write rather than
     /// about how many layers it arrived through.
@@ -504,7 +521,7 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
 
     private FileRequestStore NewStore(string directory)
     {
-        var store = new FileRequestStore(directory);
+        var store = new FileRequestStore(directory, new RecordingLogger());
         _stores.Add(store);
         return store;
     }

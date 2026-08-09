@@ -43,7 +43,7 @@ public sealed class FileRequestStoreTests : RequestStoreContract, IDisposable
         var directory = TestRunDirectory.CreateSubdirectory();
         _directories.Add(directory);
 
-        var store = new FileRequestStore(directory);
+        var store = new FileRequestStore(directory, new RecordingLogger());
         _stores.Add(store);
         return store;
     }
