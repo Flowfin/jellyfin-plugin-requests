@@ -41,7 +41,18 @@ public class SiblingIndependenceTests
         "Microsoft.Extensions.DependencyInjection.Abstractions",
         "System.Collections",
         "System.Linq",
-        "System.Runtime"
+        "System.Runtime",
+
+        // The store keeps requests as JSON, so the serialiser the framework already ships is what
+        // reads and writes the file. It is part of the runtime the server provides on both claimed
+        // lines rather than a package this plugin carries, and choosing a serialiser from outside
+        // would have been a package in the install and a second thing to hold at a version.
+        "System.Text.Json",
+
+        // The store's calls are asynchronous and it holds one lock across a write, so the
+        // cancellation token, the task and the lock all come from here. It arrives with the store
+        // rather than with any decision of its own.
+        "System.Threading"
     ];
 
     /// <summary>
