@@ -101,9 +101,22 @@ public class SiblingIndependenceTests
         Assert.Empty(siblings);
     }
 
+    /// <summary>
+    /// The assemblies the built plugin references, by name, sorted.
+    /// <para>
+    /// One name is dropped. `netstandard` is a type-forwarding facade that the Release build carries
+    /// and the Debug build does not, measured on this tree: the same command against the two
+    /// configurations differs by that name and by nothing else. Keeping it would make the list
+    /// depend on which configuration ran, and the list has to be one list, because the whole value
+    /// of the comparison is that it is exact. The facade contains no code and forwards to the
+    /// framework, so it cannot be a sibling plugin arriving under another name.
+    /// </para>
+    /// </summary>
+    /// <returns>The reference names.</returns>
     private static string[] ReferencedAssemblyNames()
         => [.. typeof(PluginUnderTest).Assembly
             .GetReferencedAssemblies()
             .Select(reference => reference.Name ?? string.Empty)
+            .Where(name => !string.Equals(name, "netstandard", StringComparison.Ordinal))
             .OrderBy(name => name, StringComparer.Ordinal)];
 }
