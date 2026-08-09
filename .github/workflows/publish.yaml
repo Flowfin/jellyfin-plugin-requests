@@ -334,7 +334,30 @@ jobs:
         with:
           dotnet-target: "net9.0"
 
-      - name: Check both release inputs exist
+      - name: Write the bill of materials
+        id: bom
+        env:
+          ARTIFACT: ${{ steps.jprm.outputs.artifact }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          PACKAGE_VERSION: ${{ needs.gate.outputs.version }}
+        # What ships in the package, listed from the package rather than from the
+        # project, so it can be checked by anybody who downloads the archive and runs
+        # the same script on it. The attestation minted in the next job says where the
+        # archive came from; this says what is in it, and neither answers the other's
+        # question.
+        #
+        # Written here rather than in the release job because a failure has to happen
+        # before anything is published. A release that exists is never touched again,
+        # so a step that reds after the release is created leaves a version people can
+        # install with an asset missing and no way to repair it.
+        run: |
+          set -euo pipefail
+          bom="${ARTIFACT%.zip}.cdx.json"
+          scripts/bill-of-materials.sh "${ARTIFACT}" "${bom}"
+          echo "path=${bom}" >> "$GITHUB_OUTPUT"
+
+      - name: Check every release input exists
         env:
           ARTIFACT: ${{ steps.jprm.outputs.artifact }}
         # if-no-files-found on the upload below fires only when no pattern matches at
@@ -342,13 +365,13 @@ jobs:
         # release one asset short. Named here, one file at a time.
         run: |
           set -euo pipefail
-          for file in "${ARTIFACT}" "${ARTIFACT}.meta.json"; do
+          for file in "${ARTIFACT}" "${ARTIFACT}.meta.json" "${ARTIFACT%.zip}.cdx.json"; do
             if [ ! -f "${file}" ]; then
-              echo "::error::The packaging step did not produce ${file}. Both the archive and the metadata written beside it are release assets."
+              echo "::error::The packaging step did not produce ${file}. The archive, the metadata written beside it and the bill of materials are all release assets."
               exit 1
             fi
           done
-          ls -l "${ARTIFACT}" "${ARTIFACT}.meta.json"
+          ls -l "${ARTIFACT}" "${ARTIFACT}.meta.json" "${ARTIFACT%.zip}.cdx.json"
 
       - name: Hand the package to the later jobs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -356,12 +379,15 @@ jobs:
           name: build-artifact
           retention-days: 30
           if-no-files-found: error
-          # The archive and the metadata the packager writes beside it. The metadata
-          # travels with the release so a catalog can be built from the package that
-          # was actually shipped instead of from a file read back out of the tree.
+          # The archive, the metadata the packager writes beside it, and the bill of
+          # materials. The metadata travels with the release so a catalog can be built
+          # from the package that was actually shipped instead of from a file read back
+          # out of the tree, and the bill of materials travels with it so what is in
+          # that package can be checked without trusting this run.
           path: |
             ${{ steps.jprm.outputs.artifact }}
             ${{ steps.jprm.outputs.artifact }}.meta.json
+            ${{ steps.bom.outputs.path }}
 
   attest:
     name: Attest build provenance
