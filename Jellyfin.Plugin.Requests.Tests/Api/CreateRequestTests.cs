@@ -179,7 +179,8 @@ public sealed class CreateRequestTests
 
         var refused = Refusal(await controller.CreateAsync(AFilm(), CancellationToken.None).ConfigureAwait(true));
 
-        Assert.Equal("caller", refused.Field, StringComparer.Ordinal);
+        Assert.Equal(RequestFailureCode.NoUserOnTheCall, refused.Code);
+        Assert.Null(refused.Field);
         Assert.Empty(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
     }
 
@@ -200,7 +201,7 @@ public sealed class CreateRequestTests
             await ControllerFor(store, Asker).CreateAsync(body, CancellationToken.None).ConfigureAwait(true));
 
         Assert.Equal(field, refused.Field, StringComparer.Ordinal);
-        Assert.NotEmpty(refused.Reason);
+        Assert.NotEmpty(refused.Message);
         Assert.Empty(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
     }
 
@@ -384,11 +385,12 @@ public sealed class CreateRequestTests
     /// </summary>
     /// <param name="answered">What the action returned.</param>
     /// <returns>The refusal.</returns>
-    private static RequestRefused Refusal(ActionResult<CreatedRequest> answered)
+    private static RequestFailure Refusal(ActionResult<CreatedRequest> answered)
     {
-        var result = Assert.IsType<BadRequestObjectResult>(answered.Result);
-        Assert.Equal(400, result.StatusCode);
-        return Assert.IsType<RequestRefused>(result.Value);
+        var result = Assert.IsAssignableFrom<ObjectResult>(answered.Result);
+        var failure = Assert.IsType<RequestFailure>(result.Value);
+        Assert.Equal(RequestFailure.StatusFor(failure.Code), result.StatusCode);
+        return failure;
     }
 
     /// <summary>

@@ -119,10 +119,9 @@ request is an answer somebody gave, and joining it would make a new asker inheri
 never saw; a fulfilled one is finished; a failed one has been given up on. In each of those a new ask
 is a new request, which is also what puts it back in front of an operator.
 
-A body that cannot become a request is refused with `400` and a shape naming the field that is wrong,
-so a client can put the message beside the box somebody typed in rather than having to read English
-to work out which one. That shape is the smallest thing that carries it and is expected to be
-replaced by whatever #56 decides.
+A body that cannot become a request is refused with `400` and the field that is wrong is named, so a
+client can put the message beside the box somebody typed in rather than having to read English to
+work out which one. The shape is the one every failure of this API comes back in, below.
 
 ## Reading your own requests
 
@@ -190,27 +189,69 @@ for the same title again.
 ### What comes back
 
 A move that was made answers `200` with the queue row at its new revision, so a page can redraw that
-row without reading the queue again.
-
-A move that was refused answers with the refusal, which carries a value a client branches on, a
-sentence for the person, and the row as the store holds it now.
-
-| Refusal                       | Status | What happened                                             |
-| ----------------------------- | ------ | --------------------------------------------------------- |
-| `MovedSinceItWasRead`         | `409`  | Somebody moved it between the read and this call.         |
-| `TheTableRefusesTheMove`      | `409`  | The transition table has no such move from where it is.   |
-| `TheRequestNamesNothing`      | `409`  | It carries no identifier, so only a decline is available. |
-| `TheCallerMayNotMakeThisMove` | `403`  | The table allows the move and does not admit this caller. |
-
-A request the store does not hold answers `404`, and a body that cannot be acted on answers `400`
-naming the field, which is the same shape the create endpoint uses. Which status code each class of
-failure gets across the whole API is #56, and this is what refusing a move needs rather than a
-settled answer for everything.
+row without reading the queue again. A move that was refused answers with the failure shape below,
+and on the three codes about a request that is there it carries the row as the store holds it now, so
+the operator decides again against what is actually there rather than reading the queue a second
+time.
 
 `MovedSinceItWasRead` is answered for a request that moved into a state the move is illegal from,
 rather than `TheTableRefusesTheMove`. Both are refusals and they tell an operator different things:
 one says somebody else got there first and here is what they did, the other says this request can
 never be approved. The second would be false.
+
+## When a call fails
+
+Every failure of this API comes back in one shape, whichever endpoint it came from:
+
+    {
+      "code": "MovedSinceItWasRead",
+      "message": "This request has moved since it was read, ...",
+      "field": null,
+      "current": { ... }
+    }
+
+`code` is what a client branches on. `message` is the sentence for the person who will read it.
+`field` names the part of the body that is wrong and is present only on `InvalidBody`. `current` is
+the request as the store holds it and is present only where the failure is about a request that is
+there and the caller is one who may read it in full.
+
+One shape rather than one per endpoint. A client writes the handling once, and a failure it has never
+seen before still parses and still says which class it is. What that costs is two fields that are
+absent most of the time, which is cheaper than a client reading five shapes, four of them from an
+example rather than from a contract.
+
+| Code                          | Status | What happened                                              |
+| ----------------------------- | ------ | ---------------------------------------------------------- |
+| `InvalidBody`                 | `400`  | The body cannot become what it is for. `field` says where. |
+| `NoUserOnTheCall`             | `403`  | Authenticated, and no person behind it.                    |
+| `NoSuchRequest`               | `404`  | The store holds no request with that identifier.           |
+| `MovedSinceItWasRead`         | `409`  | Somebody moved it between the read and this call.          |
+| `TheTableRefusesTheMove`      | `409`  | The transition table has no such move from where it is.    |
+| `TheRequestNamesNothing`      | `409`  | It carries no identifier, so only a decline is available.  |
+| `TheCallerMayNotMakeThisMove` | `403`  | The table allows the move and does not admit this caller.  |
+| `TheStoreCouldNotBeRead`      | `503`  | The queue could not be read. Nothing was changed.          |
+
+Each code has exactly one status code, decided in one place, so a client may branch on either and
+never find them disagreeing. A client that does not know a code falls back on the status, which is
+why every code has one that is right on its own.
+
+`NoUserOnTheCall` is `403` rather than `400`. Nothing the caller puts in the body changes it: the
+call authenticated and names no person, which is what an API key looks like from an endpoint, and a
+request has to be attributable to somebody to exist at all.
+
+`TheStoreCouldNotBeRead` is `503` rather than `500`. A store that cannot be read is usually a disk or
+a file rather than this plugin being broken, and telling an operator to try again is the true
+statement. Nothing was changed when it is answered.
+
+**Nothing in a message names a person, a path on the server disk, or an exception.** The three are
+one rule with three shapes: a user identifier tells a caller about somebody else, a path tells
+anybody who can reach an endpoint how the server is laid out, and an exception is the plugin
+describing its own internals to whoever asked. `ErrorSurfaceTests` walks every failure a call can
+produce and refuses all three, and the store failure is the one it exists for, because the exception
+behind it names the file it could not read.
+
+`current` is the one field that carries anything about people, and it comes back only from the
+endpoints an administrator reaches. The same test holds that.
 
 ## The parameters both reads take
 
@@ -281,8 +322,6 @@ asked for, which is a weaker disclosure than a row and still a disclosure, is op
 ## What is not decided here
 
 - Whether a user may ever be told that a title has already been asked for is open between #51 and #71.
-- The shape of an error and which status code each failure gets is #56. What the two decisions answer
-  with is above, and it is what refusing a move needs rather than one shape for the whole API.
 - The capability endpoint is #55.
 - Deciding on several requests in one call is #62. Nothing here does it, and a client that wants it
   today makes one call per request.

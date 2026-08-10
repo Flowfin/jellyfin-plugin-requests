@@ -380,14 +380,12 @@ public sealed class ListRequestsTests
         var result = await controller.QueueAsync(
             [(RequestState)99],
             cancellationToken: CancellationToken.None).ConfigureAwait(true);
-        var refused = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("state", Assert.IsType<RequestRefused>(refused.Value).Field, StringComparer.Ordinal);
+        Assert.Equal("state", Field(result), StringComparer.Ordinal);
 
         result = await controller.QueueAsync(
             take: RequestsController.MaximumPageSize + 1,
             cancellationToken: CancellationToken.None).ConfigureAwait(true);
-        refused = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("take", Assert.IsType<RequestRefused>(refused.Value).Field, StringComparer.Ordinal);
+        Assert.Equal("take", Field(result), StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -463,7 +461,8 @@ public sealed class ListRequestsTests
         var controller = ControllerFor(store, caller: null);
 
         var refused = Refusal(await controller.MineAsync(cancellationToken: CancellationToken.None).ConfigureAwait(true));
-        Assert.Equal("caller", refused.Field, StringComparer.Ordinal);
+        Assert.Equal(RequestFailureCode.NoUserOnTheCall, refused.Code);
+        Assert.Null(refused.Field);
     }
 
     /// <summary>
@@ -578,15 +577,30 @@ public sealed class ListRequestsTests
     }
 
     /// <summary>
-    /// The refusal, with the status code checked.
+    /// The refusal, with the status code and the code in the body checked.
     /// </summary>
     /// <param name="answered">What the action returned.</param>
     /// <returns>The refusal.</returns>
-    private static RequestRefused Refusal(ActionResult<RequestsPage<MyRequest>> answered)
+    private static RequestFailure Refusal(ActionResult<RequestsPage<MyRequest>> answered)
     {
-        var result = Assert.IsType<BadRequestObjectResult>(answered.Result);
+        var result = Assert.IsAssignableFrom<ObjectResult>(answered.Result);
+        var failure = Assert.IsType<RequestFailure>(result.Value);
+        Assert.Equal(RequestFailure.StatusFor(failure.Code), result.StatusCode);
+        return failure;
+    }
+
+    /// <summary>
+    /// The field a refused query named, with the status code and the code checked.
+    /// </summary>
+    /// <param name="answered">What the action returned.</param>
+    /// <returns>The field.</returns>
+    private static string? Field(ActionResult<RequestsPage<QueuedRequest>> answered)
+    {
+        var result = Assert.IsAssignableFrom<ObjectResult>(answered.Result);
+        var failure = Assert.IsType<RequestFailure>(result.Value);
+        Assert.Equal(RequestFailureCode.InvalidBody, failure.Code);
         Assert.Equal(400, result.StatusCode);
-        return Assert.IsType<RequestRefused>(result.Value);
+        return failure.Field;
     }
 
     /// <summary>

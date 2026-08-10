@@ -137,16 +137,12 @@ public sealed class RequestsController : RequestsControllerBase
     {
         if (body is null)
         {
-            return BadRequest(new RequestRefused
-            {
-                Field = "body",
-                Reason = "There is no body on this call, and every field is in it."
-            });
+            return Invalid("body", "There is no body on this call, and every field is in it.");
         }
 
         if (!Valid(body, out var refusal))
         {
-            return BadRequest(new RequestRefused { Field = refusal.Field, Reason = refusal.Reason });
+            return Invalid(refusal.Field, refusal.Reason);
         }
 
         var caller = await _callers.UserIdAsync(HttpContext).ConfigureAwait(false);
@@ -156,11 +152,7 @@ public sealed class RequestsController : RequestsControllerBase
             // A token that authenticates but names no user is an API key rather than a person. It
             // can reach this endpoint under the server's policy and there is nobody to attribute the
             // request to, so it is refused here rather than stored against an empty identifier.
-            return BadRequest(new RequestRefused
-            {
-                Field = "caller",
-                Reason = "This call is authenticated but names no user, so there is nobody to record as having asked."
-            });
+            return NoUser("This call is authenticated but names no user, so there is nobody to record as having asked.");
         }
 
         var asked = _clock.UtcNow;
@@ -179,7 +171,16 @@ public sealed class RequestsController : RequestsControllerBase
             RequesterNote = body.Note
         };
 
-        var answer = await AskAsync(incoming, cancellationToken).ConfigureAwait(false);
+        CreatedRequest answer;
+
+        try
+        {
+            answer = await AskAsync(incoming, cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestStoreLoadException)
+        {
+            return TheStoreCouldNotBeRead();
+        }
 
         // 201 with no Location header, on purpose. Nothing reads one request back yet, so a
         // Location would point at something that answers 404, and a header that lies is worse than
@@ -227,7 +228,7 @@ public sealed class RequestsController : RequestsControllerBase
     {
         if (!Asked(state, kind, order, skip, take, descending, out var query, out var refusal))
         {
-            return BadRequest(refusal);
+            return Invalid(refusal.Field, refusal.Reason);
         }
 
         var caller = await _callers.UserIdAsync(HttpContext).ConfigureAwait(false);
@@ -237,14 +238,20 @@ public sealed class RequestsController : RequestsControllerBase
             // Authenticated and naming nobody, which is what an API key looks like from here. There
             // is no "own" for such a caller, and answering with an empty page would say there are
             // none rather than that the question does not apply.
-            return BadRequest(new RequestRefused
-            {
-                Field = "caller",
-                Reason = "This call is authenticated but names no user, so there is nobody whose requests these would be."
-            });
+            return NoUser("This call is authenticated but names no user, so there is nobody whose requests these would be.");
         }
 
-        var theirs = await _store.FindForUserAsync(reader, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<StoredRequest> theirs;
+
+        try
+        {
+            theirs = await _store.FindForUserAsync(reader, cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestStoreLoadException)
+        {
+            return TheStoreCouldNotBeRead();
+        }
+
         var page = query.PageOf(theirs);
 
         return Ok(new RequestsPage<MyRequest>
@@ -294,10 +301,19 @@ public sealed class RequestsController : RequestsControllerBase
     {
         if (!Asked(state, kind, order, skip, take, descending, out var query, out var refusal))
         {
-            return BadRequest(refusal);
+            return Invalid(refusal.Field, refusal.Reason);
         }
 
-        var page = await _store.PageAsync(query, cancellationToken).ConfigureAwait(false);
+        RequestPage page;
+
+        try
+        {
+            page = await _store.PageAsync(query, cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestStoreLoadException)
+        {
+            return TheStoreCouldNotBeRead();
+        }
 
         return Ok(new RequestsPage<QueuedRequest>
         {
@@ -322,7 +338,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// <returns>
     /// The request as the queue now holds it, at its new revision. A request that moved since it
     /// was read, or one the table refuses this move on, is refused with
-    /// <see cref="RequestMoveRefused"/> rather than obeyed.
+    /// <see cref="RequestFailure"/> rather than obeyed.
     /// </returns>
     [HttpPost("Requests/{id}/Approve")]
     [Authorize(Policy = AdministratorPolicy)]
@@ -338,16 +354,16 @@ public sealed class RequestsController : RequestsControllerBase
     {
         if (body is null)
         {
-            return BadRequest(Refused(
+            return Invalid(
                 "body",
-                "There is no body on this call, and the revision the decision was made against is in it."));
+                "There is no body on this call, and the revision the decision was made against is in it.");
         }
 
         if (body.Revision is not long revision)
         {
-            return BadRequest(Refused(
+            return Invalid(
                 nameof(ApproveRequestBody.Revision),
-                "A decision carries the revision it was made against. Without one this would be a write against whatever the store holds by the time it arrives, which is how two operators deciding one request end with one decision silently lost."));
+                "A decision carries the revision it was made against. Without one this would be a write against whatever the store holds by the time it arrives, which is how two operators deciding one request end with one decision silently lost.");
         }
 
         return await MoveAsync(
@@ -385,35 +401,35 @@ public sealed class RequestsController : RequestsControllerBase
     {
         if (body is null)
         {
-            return BadRequest(Refused(
+            return Invalid(
                 "body",
-                "There is no body on this call, and the revision the decision was made against is in it."));
+                "There is no body on this call, and the revision the decision was made against is in it.");
         }
 
         if (body.Revision is not long revision)
         {
-            return BadRequest(Refused(
+            return Invalid(
                 nameof(DeclineRequestBody.Revision),
-                "A decision carries the revision it was made against. Without one this would be a write against whatever the store holds by the time it arrives, which is how two operators deciding one request end with one decision silently lost."));
+                "A decision carries the revision it was made against. Without one this would be a write against whatever the store holds by the time it arrives, which is how two operators deciding one request end with one decision silently lost.");
         }
 
         if (body.Reason is not DeclineReason reason || !Enum.IsDefined(reason))
         {
-            return BadRequest(Refused(
+            return Invalid(
                 nameof(DeclineRequestBody.Reason),
-                "A decline carries a reason. Without one the person who asked is told no and nothing else, and what they do next is ask for the same title again."));
+                "A decline carries a reason. Without one the person who asked is told no and nothing else, and what they do next is ask for the same title again.");
         }
 
         if (reason == DeclineReason.Other && string.IsNullOrWhiteSpace(body.Note))
         {
-            return BadRequest(Refused(
+            return Invalid(
                 nameof(DeclineRequestBody.Note),
-                "A decline for a reason that is not on the list has to say what the reason was. Other with nothing beside it is a decline with no reason, which is the thing a required reason exists to prevent."));
+                "A decline for a reason that is not on the list has to say what the reason was. Other with nothing beside it is a decline with no reason, which is the thing a required reason exists to prevent.");
         }
 
         if (body.Note is not null && body.Note.Length > MediaRequest.NoteMaximumLength)
         {
-            return BadRequest(Refused(nameof(DeclineRequestBody.Note), Longer(nameof(DeclineRequestBody.Note), body.Note.Length)));
+            return Invalid(nameof(DeclineRequestBody.Note), Longer(nameof(DeclineRequestBody.Note), body.Note.Length));
         }
 
         return await MoveAsync(
@@ -459,26 +475,33 @@ public sealed class RequestsController : RequestsControllerBase
             // Authenticated and naming nobody, which is what an API key looks like from here. A
             // decision is somebody's, and the history entry this move appends has a field for who
             // made it that would otherwise read as the plugin having observed something.
-            return BadRequest(Refused(
-                "caller",
-                "This call is authenticated but names no user, so there is nobody to record as having decided."));
+            return NoUser("This call is authenticated but names no user, so there is nobody to record as having decided.");
         }
 
-        var stored = await _store.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        StoredRequest? stored;
+
+        try
+        {
+            stored = await _store.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestStoreLoadException)
+        {
+            return TheStoreCouldNotBeRead();
+        }
 
         if (stored is not StoredRequest held)
         {
-            return NotFound();
+            return Failed(
+                RequestFailureCode.NoSuchRequest,
+                "There is no request with that identifier. It may have been removed and it may never have existed, and this answer is the same either way.");
         }
 
         if (held.Revision != revision)
         {
-            return Conflict(new RequestMoveRefused
-            {
-                Refusal = RequestMoveRefusal.MovedSinceItWasRead,
-                Reason = "This request has moved since it was read, so the decision was made against something that is no longer there. What the queue holds now is beside this.",
-                Current = Queued(held)
-            });
+            return Failed(
+                RequestFailureCode.MovedSinceItWasRead,
+                "This request has moved since it was read, so the decision was made against something that is no longer there. What the queue holds now is beside this.",
+                current: Queued(held));
         }
 
         MediaRequest moved;
@@ -492,21 +515,11 @@ public sealed class RequestsController : RequestsControllerBase
         }
         catch (IllegalRequestTransitionException refused)
         {
-            return Conflict(new RequestMoveRefused
-            {
-                Refusal = RequestMoveRefusal.TheTableRefusesTheMove,
-                Reason = refused.Message,
-                Current = Queued(held)
-            });
+            return Failed(RequestFailureCode.TheTableRefusesTheMove, refused.Message, current: Queued(held));
         }
         catch (RequestNotIdentifiedException refused)
         {
-            return Conflict(new RequestMoveRefused
-            {
-                Refusal = RequestMoveRefusal.TheRequestNamesNothing,
-                Reason = refused.Message,
-                Current = Queued(held)
-            });
+            return Failed(RequestFailureCode.TheRequestNamesNothing, refused.Message, current: Queued(held));
         }
         catch (RequestMoveNotPermittedException refused)
         {
@@ -516,14 +529,7 @@ public sealed class RequestsController : RequestsControllerBase
             // admits one. TheOnlyCallerTheseEndpointsBuildIsAdmittedByEveryMoveTheyCanMake holds
             // that, and it reds the day a cell in the table stops admitting an administrator. This
             // arm is what that day answers with instead of a stack trace.
-            return StatusCode(
-                StatusCodes.Status403Forbidden,
-                new RequestMoveRefused
-                {
-                    Refusal = RequestMoveRefusal.TheCallerMayNotMakeThisMove,
-                    Reason = refused.Message,
-                    Current = Queued(held)
-                });
+            return Failed(RequestFailureCode.TheCallerMayNotMakeThisMove, refused.Message, current: Queued(held));
         }
 
         try
@@ -537,12 +543,14 @@ public sealed class RequestsController : RequestsControllerBase
             // The window between the read above and this write. It is small and it is real: two
             // administrators clicking within it both pass the revision check and exactly one of
             // them is accepted here.
-            return Conflict(new RequestMoveRefused
-            {
-                Refusal = RequestMoveRefusal.MovedSinceItWasRead,
-                Reason = "This request moved while the decision was being written, so it was refused rather than applied over somebody else's.",
-                Current = lost.Current is StoredRequest now ? Queued(now) : null
-            });
+            return Failed(
+                RequestFailureCode.MovedSinceItWasRead,
+                "This request moved while the decision was being written, so it was refused rather than applied over the decision that got there first.",
+                current: lost.Current is StoredRequest now ? Queued(now) : null);
+        }
+        catch (RequestStoreLoadException)
+        {
+            return TheStoreCouldNotBeRead();
         }
     }
 
@@ -571,7 +579,7 @@ public sealed class RequestsController : RequestsControllerBase
         int take,
         bool descending,
         out RequestQuery query,
-        out RequestRefused refusal)
+        out (string Field, string Reason) refusal)
     {
         query = null!;
 
@@ -626,7 +634,7 @@ public sealed class RequestsController : RequestsControllerBase
             Take = take
         };
 
-        refusal = null!;
+        refusal = default;
         return true;
     }
 
@@ -635,9 +643,69 @@ public sealed class RequestsController : RequestsControllerBase
     /// </summary>
     /// <param name="field">The parameter, spelled as the caller wrote it.</param>
     /// <param name="reason">What is wrong with it.</param>
-    /// <returns>The refusal.</returns>
-    private static RequestRefused Refused(string field, string reason)
-        => new RequestRefused { Field = field, Reason = reason };
+    /// <returns>The field and the reason.</returns>
+    private static (string Field, string Reason) Refused(string field, string reason) => (field, reason);
+
+    /// <summary>
+    /// One failure, under the status code its class is reported with.
+    /// <para>
+    /// Every failure this controller answers goes through here, so the pairing of a code and a
+    /// status code is decided once, in <see cref="RequestFailure.StatusFor"/>, rather than at each
+    /// call. An endpoint that answered one code under two status codes would leave a caller
+    /// branching on the status for one of them and on the code for the other, and the first breaks
+    /// the day the second endpoint is the one it meets.
+    /// </para>
+    /// </summary>
+    /// <param name="code">What went wrong.</param>
+    /// <param name="message">The sentence for the person reading it.</param>
+    /// <param name="field">The field that is wrong, where there is one.</param>
+    /// <param name="current">What the store holds now, where the caller may see it.</param>
+    /// <returns>The failure.</returns>
+    private ObjectResult Failed(
+        RequestFailureCode code,
+        string message,
+        string? field = null,
+        QueuedRequest? current = null)
+        => StatusCode(
+            RequestFailure.StatusFor(code),
+            new RequestFailure { Code = code, Message = message, Field = field, Current = current });
+
+    /// <summary>
+    /// A body that cannot be acted on, naming the field that is wrong.
+    /// </summary>
+    /// <param name="field">The field, spelled as the body spells it.</param>
+    /// <param name="reason">What is wrong with it.</param>
+    /// <returns>The failure.</returns>
+    private ObjectResult Invalid(string field, string reason)
+        => Failed(RequestFailureCode.InvalidBody, reason, field: field);
+
+    /// <summary>
+    /// A call that authenticated and names no person.
+    /// </summary>
+    /// <param name="reason">What that means for this endpoint.</param>
+    /// <returns>The failure.</returns>
+    private ObjectResult NoUser(string reason)
+        => Failed(RequestFailureCode.NoUserOnTheCall, reason);
+
+    /// <summary>
+    /// A store this call could not read.
+    /// <para>
+    /// The exception is caught and nothing from it reaches the caller. Its message names the file
+    /// the store could not read, which is a path on the server disk and is exactly what an error
+    /// from this API may not carry. The message here is written for the person who will read it and
+    /// says the one thing they can act on, which is that this is not their call being wrong.
+    /// </para>
+    /// <para>
+    /// The rule is here once and the <c>try</c> around each store call is what repeats. That is the
+    /// smaller of the two costs: a wrapper that swallowed every store call would also swallow the
+    /// concurrency refusal, which is an answer rather than a failure.
+    /// </para>
+    /// </summary>
+    /// <returns>The failure.</returns>
+    private ObjectResult TheStoreCouldNotBeRead()
+        => Failed(
+            RequestFailureCode.TheStoreCouldNotBeRead,
+            "The queue could not be read, so this call was not answered rather than answered with part of it. Nothing was changed. This is a fault on the server rather than anything wrong with the call, and the server log says which file and why.");
 
     /// <summary>
     /// One request as the person waiting for it sees it.
