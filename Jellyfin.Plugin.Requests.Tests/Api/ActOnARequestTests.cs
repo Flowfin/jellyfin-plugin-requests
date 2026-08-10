@@ -159,7 +159,7 @@ public sealed class ActOnARequestTests
         var refused = Refusal(late, expectedStatus: 409);
         var held = await Held(store, open.Request.Id).ConfigureAwait(true);
 
-        Assert.Equal(RequestMoveRefusal.MovedSinceItWasRead, refused.Refusal);
+        Assert.Equal(RequestFailureCode.MovedSinceItWasRead, refused.Code);
         Assert.NotNull(refused.Current);
         Assert.Equal(RequestState.Approved, refused.Current!.State);
         Assert.Equal(open.Revision + 1, refused.Current.Revision);
@@ -193,7 +193,7 @@ public sealed class ActOnARequestTests
         var refused = Refusal(answered, expectedStatus: 409);
         var held = await Held(inner, open.Request.Id).ConfigureAwait(true);
 
-        Assert.Equal(RequestMoveRefusal.MovedSinceItWasRead, refused.Refusal);
+        Assert.Equal(RequestFailureCode.MovedSinceItWasRead, refused.Code);
         Assert.NotNull(refused.Current);
         Assert.Equal(RequestState.Approved, refused.Current!.State);
         Assert.Equal(RequestState.Approved, held.Request.State);
@@ -222,7 +222,7 @@ public sealed class ActOnARequestTests
 
         var refused = Refusal(answered, expectedStatus: 409);
 
-        Assert.Equal(RequestMoveRefusal.MovedSinceItWasRead, refused.Refusal);
+        Assert.Equal(RequestFailureCode.MovedSinceItWasRead, refused.Code);
         Assert.NotNull(refused.Current);
         Assert.Equal(RequestState.Fulfilled, refused.Current!.State);
     }
@@ -246,10 +246,10 @@ public sealed class ActOnARequestTests
 
         var refused = Refusal(answered, expectedStatus: 409);
 
-        Assert.Equal(RequestMoveRefusal.TheTableRefusesTheMove, refused.Refusal);
+        Assert.Equal(RequestFailureCode.TheTableRefusesTheMove, refused.Code);
         Assert.Contains(
             RequestLifecycle.Cell(RequestState.Fulfilled, RequestState.Approved).Why,
-            refused.Reason,
+            refused.Message,
             StringComparison.Ordinal);
         Assert.Equal(RequestState.Fulfilled, (await Held(store, held.Request.Id).ConfigureAwait(true)).Request.State);
     }
@@ -283,7 +283,7 @@ public sealed class ActOnARequestTests
             .ConfigureAwait(true);
 
         var refused = Refusal(approving, expectedStatus: 409);
-        Assert.Equal(RequestMoveRefusal.TheRequestNamesNothing, refused.Refusal);
+        Assert.Equal(RequestFailureCode.TheRequestNamesNothing, refused.Code);
 
         var declining = await ControllerFor(store, Operator)
             .DeclineAsync(
@@ -308,7 +308,10 @@ public sealed class ActOnARequestTests
             .ApproveAsync(_identifiers.NewId(), new ApproveRequestBody { Revision = 1 }, CancellationToken.None)
             .ConfigureAwait(true);
 
-        Assert.IsType<NotFoundResult>(answered.Result);
+        var refused = Refusal(answered, expectedStatus: 404);
+
+        Assert.Equal(RequestFailureCode.NoSuchRequest, refused.Code);
+        Assert.Null(refused.Current);
         Assert.Empty(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
     }
 
@@ -439,7 +442,10 @@ public sealed class ActOnARequestTests
             .ApproveAsync(open.Request.Id, new ApproveRequestBody { Revision = open.Revision }, CancellationToken.None)
             .ConfigureAwait(true);
 
-        Assert.Equal("caller", Field(answered), StringComparer.Ordinal);
+        var refused = Refusal(answered, expectedStatus: 403);
+
+        Assert.Equal(RequestFailureCode.NoUserOnTheCall, refused.Code);
+        Assert.Null(refused.Field);
         Assert.Equal(RequestState.Open, (await Held(store, open.Request.Id).ConfigureAwait(true)).Request.State);
     }
 
@@ -447,7 +453,7 @@ public sealed class ActOnARequestTests
     /// Both endpoints build one caller, an administrator, so the only authority these two moves are
     /// ever attempted under is that one. Every legal cell they can reach admits it.
     /// <para>
-    /// This is why the arm answering <see cref="RequestMoveRefusal.TheCallerMayNotMakeThisMove"/> is
+    /// This is why the arm answering <see cref="RequestFailureCode.TheCallerMayNotMakeThisMove"/> is
     /// not reached by any leg above: no call can produce it while this holds. It is the day it stops
     /// holding that the arm is for, and this reds on that day rather than the endpoint returning a
     /// failure nobody shaped.
@@ -535,11 +541,13 @@ public sealed class ActOnARequestTests
     /// <param name="answered">What the action returned.</param>
     /// <param name="expectedStatus">The status code it has to have used.</param>
     /// <returns>The refusal.</returns>
-    private static RequestMoveRefused Refusal(ActionResult<QueuedRequest> answered, int expectedStatus)
+    private static RequestFailure Refusal(ActionResult<QueuedRequest> answered, int expectedStatus)
     {
         var result = Assert.IsAssignableFrom<ObjectResult>(answered.Result);
         Assert.Equal(expectedStatus, result.StatusCode);
-        return Assert.IsType<RequestMoveRefused>(result.Value);
+        var failure = Assert.IsType<RequestFailure>(result.Value);
+        Assert.Equal(RequestFailure.StatusFor(failure.Code), result.StatusCode);
+        return failure;
     }
 
     /// <summary>
@@ -547,12 +555,13 @@ public sealed class ActOnARequestTests
     /// </summary>
     /// <param name="answered">What the action returned.</param>
     /// <returns>The field.</returns>
-    private static string Field(ActionResult<QueuedRequest> answered)
+    private static string? Field(ActionResult<QueuedRequest> answered)
     {
-        var result = Assert.IsType<BadRequestObjectResult>(answered.Result);
+        var result = Assert.IsAssignableFrom<ObjectResult>(answered.Result);
         Assert.Equal(400, result.StatusCode);
-        var refused = Assert.IsType<RequestRefused>(result.Value);
-        Assert.NotEmpty(refused.Reason);
-        return refused.Field;
+        var failure = Assert.IsType<RequestFailure>(result.Value);
+        Assert.Equal(RequestFailureCode.InvalidBody, failure.Code);
+        Assert.NotEmpty(failure.Message);
+        return failure.Field;
     }
 }
