@@ -396,3 +396,48 @@ rules:
       include:
         - "Jellyfin.Plugin.Requests/**/*.cs"
         - "tools/opengrep/fixtures/policy/**/*.cs"
+
+  # Invariant (model, #54): a request's state is written by RequestLifecycle and
+  # by nothing else. Decided in docs/lifecycle.md, which until now carried this
+  # as the paragraph headed "What is not enforced": the record is immutable, so
+  # a move produces a new value rather than going through the two methods that
+  # make one, and a surface could write its own. What that walks past is the
+  # transition table, the check on who may make the move, and the one history
+  # entry a move appends, which is three of this plugin's rules at once.
+  #
+  # What is refused is a state literal written onto a request. That is the shape
+  # a surface reaches for when it has a state in mind and the model in the way,
+  # and it is one line every time it is written, so a spelling spread over
+  # several lines is not a way around it.
+  #
+  # What is NOT refused, and is named here so the rule is not read as wider than
+  # it is: a state held in a variable first, then written. Refusing that means
+  # refusing the token `State =`, which is how every projection of a request into
+  # a response shape is written and would red the gate on correct code.
+  #
+  # The test project is deliberately outside the path list. A store's conformance
+  # suite has to put a request into a state the lifecycle would not move it into
+  # from where it is, because what it is testing is the store rather than the
+  # move, and those requests are fixtures rather than decisions anybody made.
+  #
+  # RequestLifecycle needs no exclusion, which is worth saying because every
+  # other rule here has one. It writes the state it was handed rather than one it
+  # names, so the one place allowed to make a move does not match the pattern for
+  # making one badly. What that costs is that the rule cannot be read out of the
+  # file it holds: the pattern is quoted nowhere in the plugin, this comment
+  # included, because a comment quoting it would be refused by the rule it
+  # documents.
+  - id: state-written-only-by-the-lifecycle
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not write a request's state here. RequestLifecycle.Move and
+      RequestLifecycle.Decline are the two doors, and they carry the transition
+      table, who may make the move, and the one history entry a move appends
+      (#54). A state written straight onto the record walks past all three.
+    patterns:
+      - pattern: 'State = RequestState.'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.cs"
+        - "tools/opengrep/fixtures/lifecycle/**/*.cs"

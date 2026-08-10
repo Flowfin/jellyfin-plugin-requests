@@ -159,6 +159,59 @@ is move it and the store refuses a write made against a revision that has moved 
 What a queue must show for a decision to be possible is #59, so this is what the queue can show
 rather than a settled answer to what it should.
 
+## Deciding on one
+
+    POST MediaRequests/v1/Requests/{id}/Approve
+    POST MediaRequests/v1/Requests/{id}/Decline
+
+One endpoint per operation rather than one taking a target state. The path says in a log what was
+done, a caller cannot ask for one move and get another, and the decline reason is a required field on
+exactly the operation that needs it rather than a field that is required when another field holds a
+particular value.
+
+There are two of them and not four. Marking something fulfilled is not here because the table makes
+that the plugin's own move, on something it observed in the library, and a person marking it would be
+making the state say something about the library that the library does not say; #42 is where it is
+detected instead. Cancelling is not here because there is no state to cancel into, refused on #113.
+
+**The move is `RequestLifecycle`'s and this API decides none of it.** Which states can be approved or
+declined from, who may make each move, and the single history entry a move appends are the model's,
+so the endpoint cannot be the surface that knows one rule fewer than the page or the bridge does.
+
+Both bodies carry the revision the caller read the request at, from the queue row. It is required,
+and a body without one is refused rather than read as a revision nobody sent: two administrators with
+the queue open will decide the same request in the same minute, and a write against whatever the
+store holds by the time it arrives is exactly the decision silently lost.
+
+A decline carries a reason from a short list, decided on #113, and `Other` requires the note beside
+it. A decline with no reason reads as arbitrary to the person who asked, and what they do next is ask
+for the same title again.
+
+### What comes back
+
+A move that was made answers `200` with the queue row at its new revision, so a page can redraw that
+row without reading the queue again.
+
+A move that was refused answers with the refusal, which carries a value a client branches on, a
+sentence for the person, and the row as the store holds it now.
+
+| Refusal                       | Status | What happened                                             |
+| ----------------------------- | ------ | --------------------------------------------------------- |
+| `MovedSinceItWasRead`         | `409`  | Somebody moved it between the read and this call.         |
+| `TheTableRefusesTheMove`      | `409`  | The transition table has no such move from where it is.   |
+| `TheRequestNamesNothing`      | `409`  | It carries no identifier, so only a decline is available. |
+| `TheCallerMayNotMakeThisMove` | `403`  | The table allows the move and does not admit this caller. |
+
+A request the store does not hold answers `404`, and a body that cannot be acted on answers `400`
+naming the field, which is the same shape the create endpoint uses. Which status code each class of
+failure gets across the whole API is #56, and this is what refusing a move needs rather than a
+settled answer for everything.
+
+`MovedSinceItWasRead` is answered for a request that moved into a state the move is illegal from,
+rather than `TheTableRefusesTheMove`. Both are refusals and they tell an operator different things:
+one says somebody else got there first and here is what they did, the other says this request can
+never be approved. The second would be false.
+
 ## The parameters both reads take
 
 | Parameter    | Meaning                                            | Default       |
@@ -187,11 +240,20 @@ Every endpoint carries a policy of its own, and the controller carries one as th
 them. An endpoint with no policy of its own is reachable under whatever its class happens to declare
 on the day it is added, and a class attribute is edited by somebody who is not reading the endpoint.
 
-| Endpoint             | Policy                 | Who that is          |
-| -------------------- | ---------------------- | -------------------- |
-| `POST Requests`      | `DefaultAuthorization` | any signed-in person |
-| `GET Requests`       | `DefaultAuthorization` | any signed-in person |
-| `GET Requests/Queue` | `RequiresElevation`    | an administrator     |
+| Endpoint                     | Policy                 | Who that is          |
+| ---------------------------- | ---------------------- | -------------------- |
+| `POST Requests`              | `DefaultAuthorization` | any signed-in person |
+| `GET Requests`               | `DefaultAuthorization` | any signed-in person |
+| `GET Requests/Queue`         | `RequiresElevation`    | an administrator     |
+| `POST Requests/{id}/Approve` | `RequiresElevation`    | an administrator     |
+| `POST Requests/{id}/Decline` | `RequiresElevation`    | an administrator     |
+
+The two decisions carry the same policy as the queue, and that is the endpoint agreeing with the
+model rather than deciding anything: every cell of the table these two can reach admits an
+administrator and nobody else, so an endpoint open to any signed-in person would refuse each such
+call one layer down. A permission answered in two places is a permission that comes to be answered
+two ways, and `TheOnlyCallerTheseEndpointsBuildIsAdmittedByEveryMoveTheyCanMake` in the suite is what
+reds if the table stops agreeing.
 
 **Nothing here is anonymous.** A request has to be attributable to somebody to exist at all, and a
 queue is a list of who asked for what, so there is no answer this plugin gives that is safe to hand a
@@ -219,6 +281,9 @@ asked for, which is a weaker disclosure than a row and still a disclosure, is op
 ## What is not decided here
 
 - Whether a user may ever be told that a title has already been asked for is open between #51 and #71.
-- The shape of an error and which status code each failure gets is #56.
-- What each endpoint does is #52, #54 and #55.
+- The shape of an error and which status code each failure gets is #56. What the two decisions answer
+  with is above, and it is what refusing a move needs rather than one shape for the whole API.
+- The capability endpoint is #55.
+- Deciding on several requests in one call is #62. Nothing here does it, and a client that wants it
+  today makes one call per request.
 - Whether these endpoints appear in the server's published API documentation is #57.

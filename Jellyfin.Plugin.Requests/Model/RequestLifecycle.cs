@@ -113,9 +113,10 @@ public static class RequestLifecycle
     /// Moves a request into any state except <see cref="RequestState.Declined"/>, or refuses to.
     /// <para>
     /// This and <see cref="Decline"/> are the only places in the plugin that change a request's
-    /// state. The record is immutable and a caller could still write <c>with { State = ... }</c>, so
-    /// that being true is held by review and by the callers that exist rather than by anything that
-    /// refuses the alternative; that gap is named in <c>docs/lifecycle.md</c>.
+    /// state. The record is immutable, so a caller could copy a request with a different state and
+    /// never meet the table; <c>state-written-only-by-the-lifecycle</c> in the invariant lint
+    /// refuses that copy where the state is named as a literal. What it does not reach, and why, is
+    /// in <c>docs/lifecycle.md</c>.
     /// </para>
     /// </summary>
     /// <param name="request">The request to move.</param>
