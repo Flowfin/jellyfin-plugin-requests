@@ -15,8 +15,16 @@ using Microsoft.AspNetCore.Mvc;
 namespace Jellyfin.Plugin.Requests.Api;
 
 /// <summary>
-/// Asking for something. This is the endpoint everything else calls: the user surface, the sibling
-/// discover plugin, and any script an operator writes.
+/// Asking for something, reading what has been asked for, and deciding on it. These are the
+/// endpoints everything else calls: the user surface, the administrator page, the sibling discover
+/// plugin, and any script an operator writes.
+/// <para>
+/// <b>A decision is a call into the model and never a state written here.</b> Approving and
+/// declining go through <see cref="RequestLifecycle"/>, which is where the transition table, the
+/// caller's authority and the one history entry per move are. Four surfaces ask the same question,
+/// and four copies of the rule are four chances for one of them to be a version behind. The lint
+/// rule <c>state-written-only-by-the-lifecycle</c> refuses the shortcut in the source.
+/// </para>
 /// <para>
 /// <b>Who asked is the authenticated caller and nothing else.</b> It is read from the server's own
 /// authorisation context rather than from the body, and <see cref="CreateRequestBody"/> carries no
@@ -298,6 +306,244 @@ public sealed class RequestsController : RequestsControllerBase
             Skip = query.Skip,
             Take = query.Take
         });
+    }
+
+    /// <summary>
+    /// Approves a request.
+    /// <para>
+    /// The move is <see cref="RequestLifecycle.Move"/>'s and nothing here decides it. Which states
+    /// can be approved from, and by whom, is the table, so this endpoint cannot be the surface that
+    /// knows one rule fewer than the page or the bridge does.
+    /// </para>
+    /// </summary>
+    /// <param name="id">The request being approved.</param>
+    /// <param name="body">The revision the operator was looking at.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>
+    /// The request as the queue now holds it, at its new revision. A request that moved since it
+    /// was read, or one the table refuses this move on, is refused with
+    /// <see cref="RequestMoveRefused"/> rather than obeyed.
+    /// </returns>
+    [HttpPost("Requests/{id}/Approve")]
+    [Authorize(Policy = AdministratorPolicy)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<QueuedRequest>> ApproveAsync(
+        Guid id,
+        [FromBody] ApproveRequestBody body,
+        CancellationToken cancellationToken)
+    {
+        if (body is null)
+        {
+            return BadRequest(Refused(
+                "body",
+                "There is no body on this call, and the revision the decision was made against is in it."));
+        }
+
+        if (body.Revision is not long revision)
+        {
+            return BadRequest(Refused(
+                nameof(ApproveRequestBody.Revision),
+                "A decision carries the revision it was made against. Without one this would be a write against whatever the store holds by the time it arrives, which is how two operators deciding one request end with one decision silently lost."));
+        }
+
+        return await MoveAsync(
+            id,
+            revision,
+            static (request, at, by) => RequestLifecycle.Move(request, RequestState.Approved, at, by),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Declines a request, with the reason a decline is required to carry.
+    /// <para>
+    /// The reason is checked here as well as in the model, so the caller is told which field was
+    /// wrong instead of getting whatever an unhandled exception turns into. The rule is stated once,
+    /// in <see cref="RequestLifecycle.Decline"/>, and this agrees with it rather than restating it.
+    /// </para>
+    /// </summary>
+    /// <param name="id">The request being declined.</param>
+    /// <param name="body">The revision, the reason, and what the operator wants to say.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>
+    /// The request as the queue now holds it, at its new revision, or the refusal.
+    /// </returns>
+    [HttpPost("Requests/{id}/Decline")]
+    [Authorize(Policy = AdministratorPolicy)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<QueuedRequest>> DeclineAsync(
+        Guid id,
+        [FromBody] DeclineRequestBody body,
+        CancellationToken cancellationToken)
+    {
+        if (body is null)
+        {
+            return BadRequest(Refused(
+                "body",
+                "There is no body on this call, and the revision the decision was made against is in it."));
+        }
+
+        if (body.Revision is not long revision)
+        {
+            return BadRequest(Refused(
+                nameof(DeclineRequestBody.Revision),
+                "A decision carries the revision it was made against. Without one this would be a write against whatever the store holds by the time it arrives, which is how two operators deciding one request end with one decision silently lost."));
+        }
+
+        if (body.Reason is not DeclineReason reason || !Enum.IsDefined(reason))
+        {
+            return BadRequest(Refused(
+                nameof(DeclineRequestBody.Reason),
+                "A decline carries a reason. Without one the person who asked is told no and nothing else, and what they do next is ask for the same title again."));
+        }
+
+        if (reason == DeclineReason.Other && string.IsNullOrWhiteSpace(body.Note))
+        {
+            return BadRequest(Refused(
+                nameof(DeclineRequestBody.Note),
+                "A decline for a reason that is not on the list has to say what the reason was. Other with nothing beside it is a decline with no reason, which is the thing a required reason exists to prevent."));
+        }
+
+        if (body.Note is not null && body.Note.Length > MediaRequest.NoteMaximumLength)
+        {
+            return BadRequest(Refused(nameof(DeclineRequestBody.Note), Longer(nameof(DeclineRequestBody.Note), body.Note.Length)));
+        }
+
+        return await MoveAsync(
+            id,
+            revision,
+            (request, at, by) => RequestLifecycle.Decline(request, reason, body.Note, at, by),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads the request, makes the move the caller asked for, and writes it back against the
+    /// revision they read it at.
+    /// <para>
+    /// Both endpoints above are this method and a move. What each one does that is its own is the
+    /// body it takes and the cell of the table it aims at; everything else - who is calling, whether
+    /// the request is still where the caller thinks it is, what the table says, and what a refused
+    /// write means - is one piece of code, so a third operation added later cannot come with one of
+    /// these steps missing.
+    /// </para>
+    /// <para>
+    /// <b>The revision is checked before the model is asked and again by the store.</b> The second
+    /// is what makes the write safe; the first is what makes the answer true. Without it, a request
+    /// that was fulfilled between the read and the call would be refused by the table, and the
+    /// caller would be told this move is never available on that request when what actually happened
+    /// is that somebody else moved it a moment ago.
+    /// </para>
+    /// </summary>
+    /// <param name="id">The request being moved.</param>
+    /// <param name="revision">The revision the caller read it at.</param>
+    /// <param name="move">The move, as the model makes it.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>The request at its new revision, or the refusal.</returns>
+    private async Task<ActionResult<QueuedRequest>> MoveAsync(
+        Guid id,
+        long revision,
+        Func<MediaRequest, DateTimeOffset, RequestCaller, MediaRequest> move,
+        CancellationToken cancellationToken)
+    {
+        var caller = await _callers.UserIdAsync(HttpContext).ConfigureAwait(false);
+
+        if (caller is not Guid administrator)
+        {
+            // Authenticated and naming nobody, which is what an API key looks like from here. A
+            // decision is somebody's, and the history entry this move appends has a field for who
+            // made it that would otherwise read as the plugin having observed something.
+            return BadRequest(Refused(
+                "caller",
+                "This call is authenticated but names no user, so there is nobody to record as having decided."));
+        }
+
+        var stored = await _store.GetAsync(id, cancellationToken).ConfigureAwait(false);
+
+        if (stored is not StoredRequest held)
+        {
+            return NotFound();
+        }
+
+        if (held.Revision != revision)
+        {
+            return Conflict(new RequestMoveRefused
+            {
+                Refusal = RequestMoveRefusal.MovedSinceItWasRead,
+                Reason = "This request has moved since it was read, so the decision was made against something that is no longer there. What the queue holds now is beside this.",
+                Current = Queued(held)
+            });
+        }
+
+        MediaRequest moved;
+
+        try
+        {
+            // The whole of the decision is this line. The transition table, who may make the move
+            // and the one history entry it appends are the model's, and an endpoint that reached
+            // around them would be a fourth copy of a rule that already has three readers.
+            moved = move(held.Request, _clock.UtcNow, RequestCaller.Administrator(administrator));
+        }
+        catch (IllegalRequestTransitionException refused)
+        {
+            return Conflict(new RequestMoveRefused
+            {
+                Refusal = RequestMoveRefusal.TheTableRefusesTheMove,
+                Reason = refused.Message,
+                Current = Queued(held)
+            });
+        }
+        catch (RequestNotIdentifiedException refused)
+        {
+            return Conflict(new RequestMoveRefused
+            {
+                Refusal = RequestMoveRefusal.TheRequestNamesNothing,
+                Reason = refused.Message,
+                Current = Queued(held)
+            });
+        }
+        catch (RequestMoveNotPermittedException refused)
+        {
+            // No call that reaches here can produce this today, and the reason is measured rather
+            // than assumed: both endpoints require elevation, so the caller is built as an
+            // administrator, and every legal cell into Approved or Declined is a decision cell that
+            // admits one. TheOnlyCallerTheseEndpointsBuildIsAdmittedByEveryMoveTheyCanMake holds
+            // that, and it reds the day a cell in the table stops admitting an administrator. This
+            // arm is what that day answers with instead of a stack trace.
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new RequestMoveRefused
+                {
+                    Refusal = RequestMoveRefusal.TheCallerMayNotMakeThisMove,
+                    Reason = refused.Message,
+                    Current = Queued(held)
+                });
+        }
+
+        try
+        {
+            var written = await _store.ReplaceAsync(moved, revision, cancellationToken).ConfigureAwait(false);
+
+            return Ok(Queued(written));
+        }
+        catch (RequestConcurrencyException lost)
+        {
+            // The window between the read above and this write. It is small and it is real: two
+            // administrators clicking within it both pass the revision check and exactly one of
+            // them is accepted here.
+            return Conflict(new RequestMoveRefused
+            {
+                Refusal = RequestMoveRefusal.MovedSinceItWasRead,
+                Reason = "This request moved while the decision was being written, so it was refused rather than applied over somebody else's.",
+                Current = lost.Current is StoredRequest now ? Queued(now) : null
+            });
+        }
     }
 
     /// <summary>

@@ -41,19 +41,35 @@ public sealed class EndpointPolicyTests
     /// commit that adds the line is where the reason for that policy lives, and <c>docs/api.md</c>
     /// is where a reader finds it.
     /// </para>
+    /// <para>
+    /// The lines are in the order the comparison sorts them, which is by the whole line and so by
+    /// the action's name. A line added in the place a reader would put it fails until it is moved,
+    /// which is noise rather than a finding, and the alternative is a comparison that cannot say
+    /// which endpoint is missing.
+    /// </para>
     /// </summary>
     private static readonly string[] Expected =
     [
+        // Saying yes. A decision is an administrator's, in the transition table and here, and the
+        // two answers have to agree: an endpoint reachable by a signed-in user would refuse every
+        // such call in the model, which is a permission decided in two places.
+        "RequestsController.ApproveAsync POST Requests/{id}/Approve -> RequiresElevation",
+
         // Asking for something. An authenticated user, because a request has to be attributable to
         // somebody and a caller with no session names nobody.
         "RequestsController.CreateAsync POST Requests -> DefaultAuthorization",
 
-        // One person's own requests. The same policy, and the narrowing is the read rather than the
-        // policy: this endpoint has nothing wider than the caller's own requests to return.
+        // Saying no. The same policy as an approval, and the decline reason is something a user
+        // reads rather than writes.
+        "RequestsController.DeclineAsync POST Requests/{id}/Decline -> RequiresElevation",
+
+        // One person's own requests. The same policy as asking, and the narrowing is the read
+        // rather than the policy: this endpoint has nothing wider than the caller's own requests to
+        // return.
         "RequestsController.MineAsync GET Requests -> DefaultAuthorization",
 
         // The whole queue, which is every person's requests and who asked for each. An
-        // administrator, and it is the only endpoint here that needs one.
+        // administrator, and it is the only read here that needs one.
         "RequestsController.QueueAsync GET Requests/Queue -> RequiresElevation"
     ];
 

@@ -101,14 +101,26 @@ one is a request for the right one, and it is a new request because the old one 
 asked for and got an answer. A library that no longer holds the media is an observation, which the
 `Availability` field on the record already carries with the time it was made.
 
-## What is not enforced
+## What holds the two doors, and what it does not reach
 
 `RequestLifecycle.Move` and `RequestLifecycle.Decline` are the two places in the plugin that change
-a state, and both refuse a move this table refuses. Nothing stops a caller writing
-`with { State = ... }` on the record instead: the record is immutable, and immutability makes a move
-produce a new value rather than making it go through here. There are no callers yet, so the property
-holds today by there being nothing to hold it against. The invariant lint in #28 is where a rule
-refusing that shape would live, and this paragraph is what it does not yet do.
+a state, and both refuse a move this table refuses. Nothing in the type system says so: the record is
+immutable, and immutability makes a move produce a new value rather than making it go through here,
+so a surface can copy a request with a different state and never meet the table at all.
+
+`state-written-only-by-the-lifecycle` in the invariant lint refuses that copy where the state is
+named as a literal, anywhere under `Jellyfin.Plugin.Requests/`, and it carries a fixture, so the rule
+going quiet reds the gate rather than passing. That is the shape a surface reaches for when it has a
+state in mind and the model in the way.
+
+What the rule does not reach is a state put in a variable first and written from there. Refusing that
+means refusing the assignment itself, which is how every projection of a request into a response
+shape is written, and the rule would then red on correct code. The bound is real and the review is
+where that spelling is caught.
+
+It also does not reach the test project, on purpose. A store's conformance suite puts requests into
+states the table would not move them into from where they are, because what it tests is the store
+rather than the move.
 
 ## The history
 
