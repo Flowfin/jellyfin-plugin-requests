@@ -336,6 +336,16 @@ public sealed class PublishedApiDocumentTests
     /// <summary>
     /// One operation as a caller reading the document sees it: what it is, what it takes and what it
     /// answers with.
+    /// <para>
+    /// A parameter's type is the one the action declares rather than the one the description carries,
+    /// and the difference is not cosmetic. The description reports a scalar enumeration read from the
+    /// query as the type it arrives as, and which type that is moved between the two runtimes this
+    /// plugin is built for: <c>order</c> comes through as <c>String</c> on one and as
+    /// <c>RequestQueryOrder</c> on the other, off the same source. Writing the runtime's answer down
+    /// would mean one of the two lines failing on a difference nobody here made. Where each parameter
+    /// is read from is taken from the description, because that is a fact about the endpoint rather
+    /// than about the runtime, and it is the half that moves when somebody changes a route.
+    /// </para>
     /// </summary>
     /// <returns>The lines, sorted.</returns>
     private static string[] Published()
@@ -353,7 +363,7 @@ public sealed class PublishedApiDocumentTests
                             "{0}@{1}:{2}",
                             parameter.Name,
                             parameter.Source.Id,
-                            Named(parameter.Type)))
+                            Named(parameter.ParameterDescriptor?.ParameterType ?? parameter.Type)))
                         .OrderBy(parameter => parameter, StringComparer.Ordinal)),
                 string.Join(
                     ", ",
