@@ -53,6 +53,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The documents somebody arriving from outside this repository is sent to, and the check that
+         sends them. A workflow that names a file never opens it, so the only thing that can refuse
+         a gate pointing at a document nobody added is a test that opens both. The link targets are
+         here too, because following a link is what the reader does next. -->
+    <None Include="../CONTRIBUTING.md" Link="CONTRIBUTING.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../SECURITY.md" Link="SECURITY.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../CODE_OF_CONDUCT.md" Link="CODE_OF_CONDUCT.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../DCO" Link="DCO" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../docs/quality-parity.md" Link="docs/quality-parity.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../.github/workflows/dco.yml" Link="dco.yml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The stored shapes an older version of this plugin wrote, kept as the bytes that version
          produced. A migration test that builds its own starting bytes agrees with the migration by
          construction, so these are files rather than string literals in a test. -->
