@@ -202,6 +202,90 @@ Whoever builds the next package should keep that package's own output as the nex
 moment it is built. After a field has been added there is no way to produce those bytes again except
 by hand, which is the thing this rule is against.
 
+## Backing up, and restoring
+
+### What is on the disk, and where
+
+Two files, both under the directory the server keeps its own data in, so a backup of that directory
+is a backup of this plugin and an operator has nothing extra to configure:
+
+| What              | Where                                                    | In a backup |
+| ----------------- | -------------------------------------------------------- | ----------- |
+| The queue         | `plugins/Jellyfin.Plugin.Requests/requests.json`         | Required    |
+| The settings      | `plugin-configurations/Jellyfin.Plugin.Requests.xml`     | Required    |
+| A write in flight | `plugins/Jellyfin.Plugin.Requests/requests.json.writing` | Not needed  |
+
+The paths are relative to the server's data directory. Where that directory is differs by
+installation and by operating system, and this document does not name it: the server is the
+authority for its own paths.
+
+The layout under it is not a guess. The first leg of `FileRequestStoreRestoreTests` reads the
+plugin's data folder and its configuration path off the host, and compares each name against the
+literal in the table above rather than against the constant that produces it, so a rename reds
+rather than agreeing with itself:
+
+    DOTNET_CLI_UI_LANGUAGE=en dotnet test Jellyfin.Plugin.Requests.sln -f net9.0 \
+        --filter "FullyQualifiedName~FileRequestStoreRestoreTests"
+    Passed!  - Failed: 0, Passed: 5, Skipped: 0, Total: 5, Duration: 200 ms
+
+One step in that chain is read by nothing. That the store is built over the plugin's own data folder
+at all is one line in `PluginServiceRegistrator`, and no test asserts it, because the plugin instance
+that line reads is a static that any other test class can replace while a leg is running and a leg
+built on it would fail for reasons nobody caused. It is a line to read rather than a property the
+suite holds.
+
+The third row is the file a write is built in before it replaces the queue. It is listed so a backup
+that swept it up is not read as a problem: a restore that carries one ignores it and reads the queue,
+which is `APendingFileCarriedIntoTheBackupIsNotWhatIsRestored`.
+
+### Restoring
+
+Putting the file back into a data folder that holds nothing is the whole procedure, and the store is
+opened over it as though it had always been there. What comes back is what was captured, revisions
+included, and the directory is a store afterwards rather than a document: it takes writes, and they
+survive the next restart. `AStoreRestoredIntoAFreshDataFolderHoldsWhatItHeldWhenItWasCaptured` is
+that leg, and it checks the revisions because a restore that reset them would refuse the first
+approval afterwards against a read no caller could see was stale.
+
+The case worth planning for is a restore onto a plugin that is not the version the backup came from,
+and the two directions are not symmetric.
+
+**A restore onto a newer plugin works.** An older shape is migrated forward as the file is read, under the
+rule above, and the restored directory is writable immediately.
+`AStoreCapturedFromAnOlderShapeIsReadableAndWritableAfterBeingRestored` restores the fixture into an
+empty data folder, reads both requests and writes a third.
+
+**A restore onto an older plugin is refused, whole.** A file carrying a version this plugin does not read is
+not partly restored, and the point is the word partly: entries that this version would understand
+perfectly well are still not served, because a queue missing whatever the reader did not recognise is
+a queue an operator decides from believing it complete.
+`AStoreCapturedFromANewerVersionIsRefusedWholeRatherThanPartlyRestored` puts a readable entry inside
+an unreadable document and asserts that every read refuses it, that the refusal is in the log, and
+that the backup is byte for byte what it was. Install the newer plugin again and nothing has been
+lost.
+
+Each of the five legs was proven to bite by a one-line change to the store, one at a time, with the
+other four left passing:
+
+| The change made to the store                                           | What went red               |
+| ---------------------------------------------------------------------- | --------------------------- |
+| `FileName` renamed to `queue.json`                                     | the paths leg               |
+| every entry loaded at revision 1 rather than the one it was written at | the capture-and-restore leg |
+| the shape written before the version existed read as an empty queue    | the older-shape leg         |
+| `document.Version > OnDiskVersion` off by one                          | the refused-whole leg       |
+| a load resuming the file a write was being built in                    | the pending-file leg        |
+
+### What this does not cover
+
+Nothing here restores across two shipped versions of the plugin, because there are none to restore
+across: no released version has ever written a request file, which is the same absence the fixture
+rule above names. The hop between shipped versions is #97, and the fixture it needs is captured at
+release time or not at all.
+
+Nothing here has been run against a server's own backup and restore feature. What is asserted is
+about the files and the store that reads them, and an operator who takes their backup some other way
+is covered by the same table.
+
 ## It adds no package reference
 
 The chosen medium needs nothing that is not already in the runtime. The plugin project's package
