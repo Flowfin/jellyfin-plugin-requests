@@ -128,9 +128,11 @@ public sealed class RequestsController : RequestsControllerBase
     /// </returns>
     [HttpPost("Requests")]
     [Authorize(Policy = AuthenticatedUserPolicy)]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<CreatedRequest>(StatusCodes.Status201Created)]
+    [ProducesResponseType<CreatedRequest>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<CreatedRequest>> CreateAsync(
         [FromBody] CreateRequestBody body,
         CancellationToken cancellationToken)
@@ -215,8 +217,10 @@ public sealed class RequestsController : RequestsControllerBase
     /// <returns>The page, and how many of the caller's requests matched.</returns>
     [HttpGet("Requests")]
     [Authorize(Policy = AuthenticatedUserPolicy)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<RequestsPage<MyRequest>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<RequestsPage<MyRequest>>> MineAsync(
         [FromQuery] RequestState[]? state = null,
         [FromQuery] RequestedItemKind[]? kind = null,
@@ -288,8 +292,9 @@ public sealed class RequestsController : RequestsControllerBase
     /// <returns>The page, and how many requests matched.</returns>
     [HttpGet("Requests/Queue")]
     [Authorize(Policy = AdministratorPolicy)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<RequestsPage<QueuedRequest>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<RequestsPage<QueuedRequest>>> QueueAsync(
         [FromQuery] RequestState[]? state = null,
         [FromQuery] RequestedItemKind[]? kind = null,
@@ -342,11 +347,12 @@ public sealed class RequestsController : RequestsControllerBase
     /// </returns>
     [HttpPost("Requests/{id}/Approve")]
     [Authorize(Policy = AdministratorPolicy)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<QueuedRequest>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<QueuedRequest>> ApproveAsync(
         Guid id,
         [FromBody] ApproveRequestBody body,
@@ -389,11 +395,12 @@ public sealed class RequestsController : RequestsControllerBase
     /// </returns>
     [HttpPost("Requests/{id}/Decline")]
     [Authorize(Policy = AdministratorPolicy)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<QueuedRequest>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<QueuedRequest>> DeclineAsync(
         Guid id,
         [FromBody] DeclineRequestBody body,
