@@ -94,6 +94,73 @@ reads the built assembly rather than the source text: every controller type in t
 from `RequestsControllerBase` and declares no route of its own. A controller written in a file the
 rule's path list does not reach would pass the lint and fail there.
 
+## The published document
+
+The server generates one API document from every controller it has loaded, this plugin's included,
+and serves it beside its own endpoints:
+
+    api-docs/openapi.json
+
+with `api-docs/swagger` and `api-docs/redoc` as the two browsable forms of the same thing. Those
+paths are the server's rather than this plugin's, and they are the same on both claimed lines:
+
+    gh api repos/jellyfin/jellyfin/contents/Jellyfin.Server/Extensions/ApiApplicationBuilderExtensions.cs?ref=v10.11.0 --jq .content | base64 -d | grep -n "RouteTemplate\|RoutePrefix"
+    39:                    c.RouteTemplate = "{documentName}/openapi.json";
+    50:                    c.RoutePrefix = "api-docs/swagger";
+    57:                    c.RoutePrefix = "api-docs/redoc";
+
+**That document is the reference, and this one is the reasons.** Every path, every parameter and
+where it is read from, and the shape and status code of every answer are in it, generated from the
+endpoints rather than typed by somebody. What is written here instead is why each of them is the way
+it is, which is the half a generator cannot produce. Where the two disagree the document is right and
+this file is stale, which is the whole reason for not restating it.
+
+### Every failure carries this API's own shape
+
+A response type that names no shape is not an undocumented failure. Under `[ApiController]` the
+framework fills one in, and what it fills in is `ProblemDetails`, which nothing here returns. A client
+generated from a document saying that parses every refusal into the wrong type and finds out at the
+first refusal rather than at the first call. So every status at or above 400 is published as
+`RequestFailure`, which is the shape the table above describes.
+
+### What holds it
+
+`PublishedApiDocumentTests` reads the description set a generator is given and holds four things: the
+operations are exactly the ones written down, with their parameters and their answers; every endpoint
+the assembly carries is in that set, so one hidden from the document and still reachable reds; every
+failure is published as `RequestFailure`; and the status codes published for an endpoint are the ones
+it answers with, taken from calls that produce them rather than from a list, in both directions.
+
+**What that is not.** It is the input a document is generated from and not the document, derived from
+the plugin assembly by itself. Two things sit between it and what a caller fetches: whether the server
+loads these controllers into its own application parts, which is the subject of the recorded first-load
+run in `docs/testing.md`, and what its generator writes from them. No route in this tree fetches a
+generated document from a running server, and nothing here claims one.
+
+### The summaries do not reach it, and this is why
+
+Every endpoint here carries an XML summary and every parameter has one, and none of them is expected
+to reach the generated document. That is read off the server's own source rather than out of a
+document, because no route in this tree fetches one, so it is where the prose is taken from rather
+than an observation of a document without it:
+
+    gh api repos/jellyfin/jellyfin/contents/Jellyfin.Server/Extensions/ApiServiceCollectionExtensions.cs --jq .content | base64 -d | sed -n '221,230p'
+                    // Add all xml doc files to swagger generator.
+                    var xmlFiles = Directory.EnumerateFiles(
+                        AppContext.BaseDirectory,
+                        "*.xml",
+                        SearchOption.TopDirectoryOnly);
+
+                    foreach (var xmlFile in xmlFiles)
+                    {
+                        c.IncludeXmlComments(xmlFile);
+                    }
+
+The generator is handed the XML files sitting in the server's own directory, and a plugin's assembly
+is not in that directory. So the prose a caller gets about these endpoints is what is written here,
+and the document gives them the shapes. That is a limit of the route rather than a decision, and it is
+written down so nobody spends an afternoon wondering why a summary they wrote is not showing up.
+
 ## Asking for something
 
     POST MediaRequests/v1/Requests
@@ -325,4 +392,3 @@ asked for, which is a weaker disclosure than a row and still a disclosure, is op
 - The capability endpoint is #55.
 - Deciding on several requests in one call is #62. Nothing here does it, and a client that wants it
   today makes one call per request.
-- Whether these endpoints appear in the server's published API documentation is #57.
