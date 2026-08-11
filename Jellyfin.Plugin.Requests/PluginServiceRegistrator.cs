@@ -1,11 +1,13 @@
 using System;
 using Jellyfin.Plugin.Requests.Api;
 using Jellyfin.Plugin.Requests.Bridge;
+using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
+using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -63,5 +65,34 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // service exists before deciding what to do. An adapter, when there is one, replaces this
         // registration and nothing else.
         serviceCollection.AddSingleton<IRequestBackend, NoRequestBackend>();
+
+        // The server's library, as the two questions this plugin asks of it. One per server, because
+        // the instance subscribes to the library's own events and a second subscription would look
+        // at every arrival twice.
+        serviceCollection.AddSingleton<ILibrary, ServerLibrary>();
+
+        // The logger is named for the type that writes through it, which is what puts this plugin's
+        // own category beside the rest in an operator's log. It is handed in rather than resolved by
+        // the container's generic rule, because both types take a plain logger for the same reason
+        // the store does: a test hands one in without a container.
+        serviceCollection.AddSingleton(provider => new FulfilmentSweep(
+            provider.GetRequiredService<IRequestStore>(),
+            provider.GetRequiredService<ILibrary>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ILogger<FulfilmentSweep>>()));
+
+        // The event half of the fulfilment check. A hosted service rather than something built when
+        // somebody first asks for it, because it has to be subscribed before the first library event
+        // rather than after the first request, and because the server is what tells it to stop.
+        serviceCollection.AddHostedService(provider => new LibraryWatcher(
+            provider.GetRequiredService<ILibrary>(),
+            provider.GetRequiredService<FulfilmentSweep>(),
+            provider.GetRequiredService<ILogger<LibraryWatcher>>()));
+
+        // The scheduled half. The server finds a scheduled task by scanning the plugin's assembly
+        // rather than by reading this container, so nothing here is what makes it run; it is
+        // registered so that the one it constructs is built from the same objects as everything
+        // above rather than from a second set.
+        serviceCollection.AddSingleton<IScheduledTask, FulfilmentTask>();
     }
 }
