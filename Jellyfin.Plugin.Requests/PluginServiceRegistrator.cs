@@ -1,6 +1,7 @@
 using System;
 using Jellyfin.Plugin.Requests.Api;
 using Jellyfin.Plugin.Requests.Bridge;
+using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Storage;
@@ -58,6 +59,12 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // takes the seam and never the server's context directly, which is what keeps an endpoint
         // testable without a running server.
         serviceCollection.AddSingleton<ICallerIdentity, ServerCallerIdentity>();
+
+        // What this install is set to, for the same reason. The settings live on the plugin instance
+        // the host constructed and are replaced whole when an operator saves the page, so this reads
+        // them per call rather than holding one, and everything above takes the seam instead of
+        // reaching for the static.
+        serviceCollection.AddSingleton<IInstallSettings, ServerInstallSettings>();
 
         // The bridge to an external request service, which on most servers is the one that has no
         // service behind it. Registered like the others because it is the shipping default rather

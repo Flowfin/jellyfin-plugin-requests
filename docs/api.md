@@ -161,6 +161,35 @@ is not in that directory. So the prose a caller gets about these endpoints is wh
 and the document gives them the shapes. That is a limit of the route rather than a decision, and it is
 written down so nobody spends an afternoon wondering why a summary they wrote is not showing up.
 
+## Asking what this install allows
+
+    GET MediaRequests/v1/Capabilities
+
+The endpoint something calls before it calls anything else. Without it a caller learns what this
+plugin allows by calling and reading the refusals, and a caller that has to tell a `404` for "no such
+plugin" from a `404` for "no such request" is a caller that gets it wrong.
+
+Four facts and no more. `apiVersion` is the segment the routes sit under, so a caller that finds a
+version it does not know stops instead of guessing at the shape. `acceptedKinds` is what an operator
+has switched on, so nothing offers a button for a kind this server refuses. `automaticApproval` says
+whether anybody will look at a request, because "an administrator will look at this" is the wrong
+thing to tell somebody on a server where nobody will. `bridgeConfigured` says whether an external
+request service sits behind the plugin.
+
+**It carries no credential, no address and nothing about any other person.** Whether a bridge exists
+is the whole of what it says about one: not which service, not where it is, and not whether it
+answered when it was last asked. The first two are the operator's business and the third is the state
+of a system the caller does not administer. `CapabilityEndpointTests` holds the shape to those four
+fields, so a fifth is a red suite rather than a review somebody might not run.
+
+It answers on a fresh install, because every one of those facts has an answer before anybody has
+configured anything. It reads no store, so nothing it says depends on the queue being readable, and
+it publishes one status code where the other endpoints publish five.
+
+**This is not the seam.** The sibling discover plugin runs in the same server process and finds this
+one through the server's container, so it never calls this. `docs/seam.md` is where that difference
+is argued.
+
 ## Asking for something
 
     POST MediaRequests/v1/Requests
@@ -350,6 +379,7 @@ on the day it is added, and a class attribute is edited by somebody who is not r
 
 | Endpoint                     | Policy                 | Who that is          |
 | ---------------------------- | ---------------------- | -------------------- |
+| `GET Capabilities`           | `DefaultAuthorization` | any signed-in person |
 | `POST Requests`              | `DefaultAuthorization` | any signed-in person |
 | `GET Requests`               | `DefaultAuthorization` | any signed-in person |
 | `GET Requests/Queue`         | `RequiresElevation`    | an administrator     |

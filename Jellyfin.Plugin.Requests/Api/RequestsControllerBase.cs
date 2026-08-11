@@ -49,4 +49,23 @@ public abstract class RequestsControllerBase : ControllerBase
     /// </para>
     /// </summary>
     public const string RoutePrefix = "MediaRequests/" + VersionSegment;
+
+    /// <summary>
+    /// The server's policy for a call that has to come from a signed-in user. Named as a literal
+    /// because the constant that holds it lives in the server's own web assembly, which a plugin
+    /// does not reference; the string is the contract either way.
+    /// <para>
+    /// It is here rather than on one controller because there is more than one, and a second copy of
+    /// the literal beside the second controller would be a second spelling of a contract this
+    /// repository does not own.
+    /// </para>
+    /// </summary>
+    protected const string AuthenticatedUserPolicy = "DefaultAuthorization";
+
+    /// <summary>
+    /// The server's policy for a call that has to come from an administrator, named as a literal for
+    /// the same reason as the one above. It is what the server's own dashboard endpoints carry, so an
+    /// endpoint under it is reachable by exactly the people who can already administer the server.
+    /// </summary>
+    protected const string AdministratorPolicy = "RequiresElevation";
 }
