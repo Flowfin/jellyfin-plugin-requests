@@ -56,20 +56,6 @@ namespace Jellyfin.Plugin.Requests.Api;
 public sealed class RequestsController : RequestsControllerBase
 {
     /// <summary>
-    /// The server's policy for a call that has to come from a signed-in user. Named as a literal
-    /// because the constant that holds it lives in the server's own web assembly, which a plugin
-    /// does not reference; the string is the contract either way.
-    /// </summary>
-    private const string AuthenticatedUserPolicy = "DefaultAuthorization";
-
-    /// <summary>
-    /// The server's policy for a call that has to come from an administrator, named as a literal for
-    /// the same reason as the one above. It is what the server's own dashboard endpoints carry, so an
-    /// endpoint under it is reachable by exactly the people who can already administer the server.
-    /// </summary>
-    private const string AdministratorPolicy = "RequiresElevation";
-
-    /// <summary>
     /// How many rows a page holds when the caller does not say. Fifty is a screen of a queue and a
     /// small answer for a client that only wanted to know whether there is anything at all.
     /// </summary>

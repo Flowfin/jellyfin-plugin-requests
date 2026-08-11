@@ -50,6 +50,11 @@ public sealed class EndpointPolicyTests
     /// </summary>
     private static readonly string[] Expected =
     [
+        // What this install is and what it allows. A signed-in person, because nothing this plugin
+        // answers is safe to hand a caller the server has not authenticated, and because the kinds
+        // an install accepts is a fact about somebody's server rather than about this version.
+        "CapabilitiesController.CapabilitiesAsync GET Capabilities -> DefaultAuthorization",
+
         // Saying yes. A decision is an administrator's, in the transition table and here, and the
         // two answers have to agree: an endpoint reachable by a signed-in user would refuse every
         // such call in the model, which is a permission decided in two places.

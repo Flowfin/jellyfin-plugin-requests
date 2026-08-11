@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Api;
+using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
@@ -70,6 +71,11 @@ public sealed class PublishedApiDocumentTests
     /// </summary>
     private static readonly string[] Expected =
     [
+        // What this install is and what it allows, for a caller that has not called anything yet.
+        // No failure shape, because it reads no store and refuses nothing: what it answers is known
+        // before anybody configures anything.
+        "GET MediaRequests/v1/Capabilities () -> 200:InstallCapabilities",
+
         // One person's own requests. The parameters are the same six the queue takes, because the
         // difference between the two reads is what the store is asked rather than what the caller
         // may ask for.
@@ -237,11 +243,21 @@ public sealed class PublishedApiDocumentTests
         var store = new InMemoryRequestStore();
         var unreadable = new StoreThatCannotBeRead();
 
+        const string Capabilities = "GET MediaRequests/v1/Capabilities";
         const string Create = "POST MediaRequests/v1/Requests";
         const string Mine = "GET MediaRequests/v1/Requests";
         const string Queue = "GET MediaRequests/v1/Requests/Queue";
         const string Approve = "POST MediaRequests/v1/Requests/{id}/Approve";
         const string Decline = "POST MediaRequests/v1/Requests/{id}/Decline";
+
+        // What this install allows. One call and one status: it reads no store, refuses nothing and
+        // has no failure to walk, which is why it publishes one code where every other endpoint
+        // publishes five.
+        Saw(
+            Capabilities,
+            await new CapabilitiesController(new FakeInstallSettings(), new NoRequestBackend())
+                .CapabilitiesAsync(CancellationToken.None)
+                .ConfigureAwait(true));
 
         // Asking for something. The same body twice: the first is a new request and the second is
         // the caller already waiting for it, which is the endpoint's other success code.

@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Jellyfin.Plugin.Requests.Bridge;
+using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Time;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,6 +46,20 @@ public class PluginServiceRegistrationTests
         using var provider = Registered();
 
         Assert.IsType<NoRequestBackend>(provider.GetRequiredService<IRequestBackend>());
+    }
+
+    /// <summary>
+    /// A server asking what this install is set to gets the settings the host holds, rather than a
+    /// second object nothing writes to. The dashboard replaces the configuration whole when an
+    /// operator saves the page, so anything resolving its own copy would answer with what was set
+    /// when the server started.
+    /// </summary>
+    [Fact]
+    public void ServerGetsTheSettingsTheHostHolds()
+    {
+        using var provider = Registered();
+
+        Assert.IsType<ServerInstallSettings>(provider.GetRequiredService<IInstallSettings>());
     }
 
     /// <summary>
