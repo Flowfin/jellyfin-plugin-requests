@@ -35,6 +35,10 @@ public class SiblingIndependenceTests
     /// </summary>
     private static readonly string[] AllowedReferences =
     [
+        // The library query the fulfilment check makes names the kinds of item it wants back, and
+        // that enumeration lives here rather than beside the library interface it is passed to. It
+        // arrives with the server's own libraries and is excluded from the install with them.
+        "Jellyfin.Data",
         "MediaBrowser.Common",
         "MediaBrowser.Controller",
         "MediaBrowser.Model",
@@ -51,6 +55,12 @@ public class SiblingIndependenceTests
         "Microsoft.AspNetCore.Http.Abstractions",
         "Microsoft.AspNetCore.Mvc.Core",
         "Microsoft.Extensions.DependencyInjection.Abstractions",
+
+        // The thing that listens for a library arrival has to be running before the first one rather
+        // than when somebody first asks for it, and a hosted service is how the server starts and
+        // stops such a thing. This is the abstraction only; the host is the generic host the server
+        // already is, and this assembly is part of the runtime it runs on.
+        "Microsoft.Extensions.Hosting.Abstractions",
 
         // The store refuses to open a file it cannot read, and the caller that sees the exception is
         // whichever request happened to be first while the person who can act on it is reading the
@@ -76,7 +86,13 @@ public class SiblingIndependenceTests
         // The store's calls are asynchronous and it holds one lock across a write, so the
         // cancellation token, the task and the lock all come from here. It arrives with the store
         // rather than with any decision of its own.
-        "System.Threading"
+        "System.Threading",
+
+        // A library event is raised on the thread that is scanning the library, so what handles it
+        // puts it in a queue and returns rather than holding that scan behind a store read and a
+        // store write per item. The queue is the runtime's own rather than a list and a lock written
+        // here, and it is part of the runtime the server already runs on.
+        "System.Threading.Channels"
     ];
 
     /// <summary>
