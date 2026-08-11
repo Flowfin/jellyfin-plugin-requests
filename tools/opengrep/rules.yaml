@@ -441,3 +441,47 @@ rules:
       include:
         - "Jellyfin.Plugin.Requests/**/*.cs"
         - "tools/opengrep/fixtures/lifecycle/**/*.cs"
+
+  # Invariant (catalogue, #92): this plugin asks no metadata source about
+  # anything. Decided in #92 and stated in docs/seam.md: the catalogue belongs to
+  # the sibling browsing plugin, and what this side holds is a title and a year
+  # taken at the moment of the request and never refreshed. Two catalogues on one
+  # server is a cost nobody would choose twice, and fetching from a source also
+  # brings that source's terms onto whoever fetched.
+  #
+  # What it reaches: the server's own provider interfaces, which are how a plugin
+  # asks the host to fetch or refresh metadata, and the addresses of the sources
+  # a plugin would otherwise call directly. The message names the snapshot,
+  # because the repair is almost always to read what the request already carries.
+  #
+  # What it does not reach, on purpose: an outbound call in general. The
+  # notification sink in #78 and the bridge in #82 are outbound by design, so a
+  # rule refusing every HTTP client here would have to be narrowed by whoever
+  # lands them, and a rule narrowed to let work through is one nobody trusts
+  # afterwards. What keeps an HTTP stack from arriving unnoticed is the exact
+  # reference list in SiblingIndependenceTests, which fails on any addition.
+  - id: no-call-to-a-metadata-source
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not ask a metadata source about a title here. The catalogue is the
+      sibling browsing plugin's (#92), and what this plugin holds is the display
+      snapshot taken when the request was made, which is what lets the queue
+      render with nothing outbound reachable.
+    patterns:
+      - pattern-either:
+          - pattern: IProviderManager
+          - pattern: IRemoteMetadataProvider
+          - pattern: IRemoteImageProvider
+          - pattern: IMetadataProvider
+          - pattern: MediaBrowser.Providers
+          - pattern: api.themoviedb.org
+          - pattern: api.thetvdb.com
+          - pattern: api4.thetvdb.com
+          - pattern: webservice.fanart.tv
+          - pattern: musicbrainz.org
+          - pattern: omdbapi.com
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.cs"
+        - "tools/opengrep/fixtures/metadata/**/*.cs"

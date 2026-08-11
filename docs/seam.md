@@ -56,12 +56,47 @@ plugins. That is not duplicated work anybody has to remove: each side is watchin
 reason, one to move a request out of the queue and one for whatever that board decides, and neither
 observation depends on the other having happened.
 
+## The catalogue is the sibling's, and this side holds a snapshot
+
+Both plugins hold something that looks like a title, and left unsaid that grows into two
+catalogues, two refresh schedules and two sets of source terms to comply with.
+
+The catalogue is the sibling's, and its board says so: the source adapters, the fetched records,
+when they expire, and the surface every client browses. What this plugin holds is a title and a
+year per request, taken at the moment somebody asked for it and never refreshed from anywhere. That
+is not a small catalogue. It is a different thing, a record of what was asked for as it appeared
+when it was asked for.
+
+Two consequences, and both are the point rather than a cost of it.
+
+**A snapshot goes stale, and that is correct.** A film renamed upstream afterwards still reads in
+the queue and in the history as the name the person actually asked for. A queue that silently
+followed the rename would be a record of what a source says today rather than of what somebody
+wanted.
+
+**This plugin calls no metadata source at all.** It has nothing to ask and nothing to ask with, so
+the queue renders on a server where nothing outbound resolves, and the terms a source imposes on
+whoever fetches from it never reach this repository.
+
+The second consequence is refused rather than written down here. `no-call-to-a-metadata-source` in
+`tools/opengrep/rules.yaml` refuses the server's provider interfaces and the addresses of the
+sources a plugin would otherwise call directly, anywhere under `Jellyfin.Plugin.Requests/`, and it
+carries the fixture it is watched refusing. What it deliberately does not refuse is an outbound call
+in general: the notification sink in #78 and the bridge in #82 are outbound by design, and a rule
+that had to be narrowed to let those land is a rule nobody trusts afterwards.
+
+`CatalogueSplitTests` holds the rendering half. The queue is rendered from a store holding one
+request and the rows carry the stored title and year, and the same test reads the controller's
+dependencies and refuses a fifth one, because a fetch would arrive as something injected. What the
+suite cannot say is that a socket was blocked while it ran; what it says instead is that the
+assembly references nothing that could open one, which is the exact reference list in
+`SiblingIndependenceTests` and fails on any addition.
+
 ## What this document does not yet hold
 
 Named here so the absence is read as absence rather than as a decision nobody wrote down. Each is
 the closing condition of the issue beside it.
 
-- Which side owns the catalogue, and the two consequences of that split. #92.
 - What happens to a field set carrying a contract version this plugin does not know. #90.
 - The trust position of an in-process handover, and what this side checks before it believes a user
   identifier it cannot verify. #118.
