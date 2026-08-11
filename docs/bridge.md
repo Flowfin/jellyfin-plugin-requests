@@ -76,6 +76,33 @@ history, and the person it belongs to is told something untrue about their own r
 Case is ignored when a word is looked up, because two adapters written against one service will spell
 one word two ways and both mean what the service meant. Nothing else is normalised.
 
+## What needs a bridge
+
+Nothing does, and that is a claim the suite refuses to let drift rather than a sentence somebody
+wrote once. The register below is every part of this plugin that touches the bridge at all, with
+what it does on a server that has none, which is most of them.
+
+`NoBackendCompletenessTests` compares this table against the assembly. Anything that takes
+`IRequestBackend` and is not named here reds the suite, so a feature that only works with a bridge
+cannot arrive quietly: it either gets a line in this table saying so, or the change does not land.
+
+<!-- needs-a-bridge begins -->
+
+| What                     | Without a bridge                                |
+| ------------------------ | ----------------------------------------------- |
+| `CapabilitiesController` | Answers, and says that no bridge is configured. |
+
+<!-- needs-a-bridge ends -->
+
+The register is deliberately not a list of features. A feature that needs a bridge is one that takes
+the bridge, and taking it is a fact about a type that reflection can read; "which features need a
+service" is a judgement nobody can check. So the check is over what touches it, and the column is
+where the judgement is written down for a reader.
+
+The other half of the same claim is that only one implementation ships. Every server this plugin runs
+on resolves `NoRequestBackend` until an adapter replaces that one registration, and the suite refuses
+a second implementation arriving in the plugin assembly unnamed for the same reason.
+
 ## Where the list of words came from
 
 The words above are the ones issue #81 names for the Overseerr form, which is the form the first
