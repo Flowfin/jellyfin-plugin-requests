@@ -59,14 +59,21 @@ public class PluginConstructionTests
     /// The configuration page the dashboard asks for comes from the plugin instance, not from the
     /// assembly metadata alone, so this is the instance-level counterpart of the resource check in
     /// <see cref="PluginContractTests"/>.
+    /// <para>
+    /// It is about the settings page in particular: that is the one the dashboard sends somebody to
+    /// when they press a plugin's settings, and it is reached under the plugin's own name. The other
+    /// pages, and the rule that every registration names a resource the assembly carries, are
+    /// <see cref="DashboardPagesTests"/>.
+    /// </para>
     /// </summary>
     [Fact]
     public void GetPagesNamesTheEmbeddedConfigurationPage()
     {
         using var host = new PluginHost();
 
-        var pages = host.Plugin.GetPages().ToList();
-        var page = Assert.Single(pages);
+        var page = Assert.Single(
+            host.Plugin.GetPages(),
+            entry => string.Equals(entry.Name, host.Plugin.Name, StringComparison.Ordinal));
 
         Assert.IsType<PluginPageInfo>(page);
         Assert.Contains(

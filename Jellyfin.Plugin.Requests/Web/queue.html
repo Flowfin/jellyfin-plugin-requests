@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Requests</title>
+    </head>
+    <body>
+        <div id="RequestsQueuePage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-button">
+            <div data-role="content">
+                <div class="content-primary">
+                    <div class="requestsShell"></div>
+
+                    <h2>Queue</h2>
+
+                    <p class="requestsMessage" role="status"></p>
+
+                    <!--
+                        The rows an operator works through, with the filter, the sort and the paging
+                        that make a long queue usable, are #60, and acting on them is #61 and #62.
+                        This page is the shell those are built into.
+
+                        Nothing here reads the queue yet, and that is not only because the rows are
+                        somebody else's issue. Every endpoint this plugin serves answers 500 on a
+                        real server today, because the policy the controller names is not one the
+                        server registers; the run that measured it is in this change's pull request
+                        and the repair is #51's. A page shipped now with a call in it would show an
+                        operator an error every time they opened it.
+                    -->
+                    <p>The queue view is not built yet.</p>
+                </div>
+            </div>
+
+            <script type="text/javascript">
+                (function () {
+                    var page = document.querySelector("#RequestsQueuePage");
+
+                    // Loaded through the same endpoint the dashboard fetches this page from, because
+                    // an embedded resource is reachable only under a name the plugin registered.
+                    function shell() {
+                        if (window.RequestsShell) {
+                            return Promise.resolve();
+                        }
+
+                        return new Promise(function (resolve, reject) {
+                            var script = document.createElement("script");
+                            script.src = ApiClient.getUrl("web/ConfigurationPage", { name: "Requests.js" });
+                            script.onload = resolve;
+                            script.onerror = function () {
+                                reject(new Error("The shared script for this plugin's pages could not be loaded."));
+                            };
+                            document.head.appendChild(script);
+                        });
+                    }
+
+                    page.addEventListener("pageshow", function () {
+                        Dashboard.showLoadingMsg();
+
+                        shell()
+                            .then(function () {
+                                RequestsShell.attach(page, "RequestsQueue");
+                                Dashboard.hideLoadingMsg();
+                            })
+                            .catch(function () {
+                                Dashboard.hideLoadingMsg();
+                            });
+                    });
+                })();
+            </script>
+        </div>
+    </body>
+</html>

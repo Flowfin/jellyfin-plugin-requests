@@ -31,6 +31,15 @@
   <ItemGroup>
     <None Remove="Configuration\configPage.html" />
     <EmbeddedResource Include="Configuration\configPage.html" />
+    <!-- The queue page and the two files both pages share. Each is reachable only under a name the
+         plugin registers in GetPages, and PagesAreServedFromResourcesTheAssemblyCarries refuses a
+         registration whose resource is not here. -->
+    <None Remove="Web\queue.html" />
+    <EmbeddedResource Include="Web\queue.html" />
+    <None Remove="Web\shell.js" />
+    <EmbeddedResource Include="Web\shell.js" />
+    <None Remove="Web\shell.css" />
+    <EmbeddedResource Include="Web\shell.css" />
   </ItemGroup>
 
 </Project>
