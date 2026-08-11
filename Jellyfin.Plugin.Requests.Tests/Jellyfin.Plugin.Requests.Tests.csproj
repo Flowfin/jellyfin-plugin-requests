@@ -54,6 +54,9 @@
          and this plugin's states is printed for a reader out of the table the code reads, and the
          two are compared rather than kept in step by hand. -->
     <None Include="../docs/bridge.md" Link="docs/bridge.md" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The configuration document, for the same reason again: the settings and the value a fresh
+         install runs for each are printed for an operator out of the class the plugin reads. -->
+    <None Include="../docs/configuration.md" Link="docs/configuration.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
