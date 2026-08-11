@@ -1,5 +1,6 @@
 using System;
 using Jellyfin.Plugin.Requests.Api;
+using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
@@ -55,5 +56,12 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // takes the seam and never the server's context directly, which is what keeps an endpoint
         // testable without a running server.
         serviceCollection.AddSingleton<ICallerIdentity, ServerCallerIdentity>();
+
+        // The bridge to an external request service, which on most servers is the one that has no
+        // service behind it. Registered like the others because it is the shipping default rather
+        // than a placeholder: a fresh install resolves this and no caller above it asks whether a
+        // service exists before deciding what to do. An adapter, when there is one, replaces this
+        // registration and nothing else.
+        serviceCollection.AddSingleton<IRequestBackend, NoRequestBackend>();
     }
 }

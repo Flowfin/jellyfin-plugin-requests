@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Time;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,20 @@ public class PluginServiceRegistrationTests
 
         Assert.IsType<SystemClock>(provider.GetRequiredService<IClock>());
         Assert.IsType<GuidIdentifierSource>(provider.GetRequiredService<IIdentifierSource>());
+    }
+
+    /// <summary>
+    /// A fresh install gets the bridge that has no external service behind it. That is the shipping
+    /// default and the one most servers run, so a registration pointing anywhere else, or missing,
+    /// would leave the majority case resolving nothing while every test handing its own bridge in
+    /// went on passing.
+    /// </summary>
+    [Fact]
+    public void ServerGetsTheBridgeWithNoServiceBehindIt()
+    {
+        using var provider = Registered();
+
+        Assert.IsType<NoRequestBackend>(provider.GetRequiredService<IRequestBackend>());
     }
 
     /// <summary>
