@@ -15,7 +15,33 @@
                     <p class="requestsMessage" role="status"></p>
 
                     <form id="RequestsConfigForm">
-                        <p>This plugin has no settings yet. The configuration surface is designed in M12; the sample settings this page started with were removed rather than kept, so nothing here carries a shape the design did not choose.</p>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsOpenRequestsPerUser">Open requests per person</label>
+                            <input is="emby-input" type="number" id="RequestsOpenRequestsPerUser" min="1" step="1" required />
+                            <div class="fieldDescription">How many requests one person may have waiting at once. This is what stands between one person and the whole disk.</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="RequestsAcceptsMovies" />
+                                <span>Accept requests for films</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Turning both kinds off leaves nothing anybody can ask for.</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="RequestsAcceptsSeries" />
+                                <span>Accept requests for series</span>
+                            </label>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsFinishedRequestRetentionDays">Keep finished requests for, in days</label>
+                            <input is="emby-input" type="number" id="RequestsFinishedRequestRetentionDays" min="30" step="1" required />
+                            <div class="fieldDescription">A finished request names a person, a title and a date. After this many days it is removed. Thirty days is the shortest period allowed, so the history cannot be switched off by setting this to nothing.</div>
+                        </div>
+
                         <div>
                             <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                                 <span>Save</span>
@@ -24,6 +50,7 @@
                     </form>
                 </div>
             </div>
+
             <script type="text/javascript">
                 var RequestsConfig = {
                     pluginUniqueId: "0f9c9107-b31b-459e-81fa-6d35dac25e79",
@@ -51,6 +78,41 @@
                         });
                     }
 
+                    // One place names a setting and the field it is edited in. A second list would
+                    // be the thing that goes stale when a setting is added, and the setting would
+                    // then be one the page cannot reach while the page still looks complete.
+                    var numbers = {
+                        OpenRequestsPerUser: "#RequestsOpenRequestsPerUser",
+                        FinishedRequestRetentionDays: "#RequestsFinishedRequestRetentionDays",
+                    };
+
+                    var switches = {
+                        AcceptsMovies: "#RequestsAcceptsMovies",
+                        AcceptsSeries: "#RequestsAcceptsSeries",
+                    };
+
+                    function show(config) {
+                        Object.keys(numbers).forEach(function (setting) {
+                            page.querySelector(numbers[setting]).value = config[setting];
+                        });
+
+                        Object.keys(switches).forEach(function (setting) {
+                            page.querySelector(switches[setting]).checked = config[setting];
+                        });
+                    }
+
+                    function read(config) {
+                        Object.keys(numbers).forEach(function (setting) {
+                            config[setting] = parseInt(page.querySelector(numbers[setting]).value, 10);
+                        });
+
+                        Object.keys(switches).forEach(function (setting) {
+                            config[setting] = page.querySelector(switches[setting]).checked;
+                        });
+
+                        return config;
+                    }
+
                     page.addEventListener("pageshow", function () {
                         Dashboard.showLoadingMsg();
 
@@ -60,7 +122,8 @@
 
                                 return ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId);
                             })
-                            .then(function () {
+                            .then(function (config) {
+                                show(config);
                                 Dashboard.hideLoadingMsg();
                             })
                             .catch(function () {
@@ -71,7 +134,7 @@
                     document.querySelector("#RequestsConfigForm").addEventListener("submit", function (e) {
                         Dashboard.showLoadingMsg();
                         ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId).then(function (config) {
-                            ApiClient.updatePluginConfiguration(RequestsConfig.pluginUniqueId, config).then(function (result) {
+                            ApiClient.updatePluginConfiguration(RequestsConfig.pluginUniqueId, read(config)).then(function (result) {
                                 Dashboard.processPluginConfigurationUpdateResult(result);
                             });
                         });
