@@ -50,6 +50,10 @@
     <!-- The lifecycle document, next to the suite, so the transition table printed for a reader is
          compared against the table the code reads rather than against a copy of it in a test. -->
     <None Include="../docs/lifecycle.md" Link="docs/lifecycle.md" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The bridge document, for the same reason: the mapping between the external service's words
+         and this plugin's states is printed for a reader out of the table the code reads, and the
+         two are compared rather than kept in step by hand. -->
+    <None Include="../docs/bridge.md" Link="docs/bridge.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
