@@ -71,10 +71,11 @@ it.
 
 Nothing here is softened, and the parts that are claims rather than measurements say so.
 
-**No cell of the reach matrix has been checked against a real client in this repository.** The matrix
-is #72 and it does not exist yet. Until it does, which client families render a channel, and how,
-is a claim taken from the plan rather than a thing anybody here has run. Do not read the section
-above as a measurement of reach.
+**Nothing here has been measured against a client.** The reach matrix is below and it opens with
+the sentence that says so; every cell of it that says a user could do something carries the word
+untested. Which client families render a channel, and how, is a claim taken from the plan rather
+than a thing anybody here has run. Do not read the section above, or the table below, as a
+measurement of reach.
 
 **A client with no browser cannot open the page.** That is what the page is: a document served over
 HTTP to a signed-in session. A client that draws its own interface and offers no way to open a URL
@@ -91,6 +92,83 @@ the sibling discover plugin owns the catalogue and this plugin calls no metadata
 nothing to ask with. The gesture that creates a request arrives from the sibling, which is #68 and
 #89.
 
+## The reach matrix
+
+No cell of the reach matrix in docs/surface.md has been checked against a real client, and neither
+the channel nor the page it describes is on the mainline today.
+
+That sentence is the first thing in this section because the table under it looks like a
+capability list and is not one. It is what the decision above would reach if it were built, written
+down so that a user on a client that renders none of it can find that out here instead of by trying.
+The same sentence is in `README.md`, word for word, so the two cannot drift apart quietly. Line
+breaks differ because the two files wrap at different widths, so the comparison collapses whitespace
+before it looks. Each file becomes one line, so the count is 1 where the sentence is present and 0
+where a word of it has moved:
+
+    for f in README.md docs/surface.md; do printf '%s: ' "$f"; tr -s '[:space:]' ' ' < "$f" \
+      | grep -c 'No cell of the reach matrix in docs/surface.md has been checked against a real client, and neither the channel nor the page it describes is on the mainline today.'; done
+    README.md: 1
+    docs/surface.md: 1
+
+The rows are client families grouped by what draws the interface, not by vendor, because the two
+things that decide reach here are whether the client renders a channel and whether it can open a
+URL. Two clients that share both answers share a row.
+
+| Client family                               | See their own requests     | Ask for something new  | Cancel one they asked for |
+| ------------------------------------------- | -------------------------- | ---------------------- | ------------------------- |
+| Browser                                     | page and channel, untested | sibling only, untested | page, untested            |
+| Desktop client wrapping the web interface   | page and channel, untested | sibling only, untested | page, untested            |
+| Android phone and tablet                    | channel, untested          | sibling only, untested | nothing                   |
+| Android TV and Fire TV                      | channel, untested          | sibling only, untested | nothing                   |
+| iPhone and iPad                             | channel, untested          | sibling only, untested | nothing                   |
+| Apple TV                                    | channel, untested          | sibling only, untested | nothing                   |
+| Roku                                        | channel, untested          | sibling only, untested | nothing                   |
+| LG webOS television                         | channel, untested          | sibling only, untested | nothing                   |
+| Samsung Tizen television                    | channel, untested          | sibling only, untested | nothing                   |
+| Kodi                                        | channel, untested          | sibling only, untested | nothing                   |
+| A script or another program against the API | the API                    | the API                | no route today            |
+
+What the cells mean.
+
+`untested` means nobody in this repository has opened that client and looked. It is not a
+prediction that the cell works; it is the admission that it has not been tried, and it stands on
+every cell that says a user could do something on a client. When a cell is checked against a real
+client, the word is replaced by the client and the version it was checked on, so a checked cell and
+an untested one can never be read as the same thing.
+
+The cells that say `nothing` or `no route today` are the other kind and are not marked. They say
+what does not exist, which no client can contradict, and writing them the same way as a claim about
+a client would hide the difference between something nobody has tried and something nobody has
+built.
+
+`page and channel` is the browser rows, which reach both surfaces. `channel` is every client that
+renders a channel, and whether a given client does is exactly what has not been tried.
+
+`sibling only` is the sharpest cell and the one that is certain rather than untested. This plugin
+ships no way to find a title the server does not have, so there is no gesture here to make. On a
+server with the browsing sibling installed the want arrives through the seam; on a server without
+it, the answer in that column is nothing, on every row above the last. What is untested there is
+whether the sibling draws anything on that client, which is that board's measurement and not this
+one's.
+
+`nothing` in the cancel column is the cost of the folder tree. Cancelling is a per-state operation
+with a reason a person reads, and a channel renders items, so the gesture has nowhere to live there.
+A user on a television can see that they asked for something and cannot take it back from that
+client.
+
+The last row is not a client family and is in the table because leaving it out would make the API
+look like it is not reachable. It is the floor under every other row, it reaches whoever writes
+against it, and it reaches nobody else. Its three cells are read off the routes rather than from
+the plan, which is also where its `no route today` comes from: nothing on this surface cancels
+anything, and what cancelling will mean per state is #68.
+
+    git grep -oh 'Http\(Get\|Post\)("[^"]*")' -- Jellyfin.Plugin.Requests/Api/RequestsController.cs
+    HttpPost("Requests")
+    HttpGet("Requests")
+    HttpGet("Requests/Queue")
+    HttpPost("Requests/{id}/Approve")
+    HttpPost("Requests/{id}/Decline")
+
 ## What the rest of this milestone follows from
 
 Every issue after #65 in milestone 8 is read against the decision above.
@@ -104,7 +182,8 @@ Every issue after #65 in milestone 8 is read against the decision above.
 - #69, serving a page for browsers, is the page.
 - #70, what a user sees when the answer is no or not yet, is written once and rendered by both.
 - #71, never revealing a title a user is not allowed to see, applies to both.
-- #72, the reach matrix, is the measurement this page says it does not have.
+- #72, the reach matrix, is the table above. It is the shape of the measurement this page says it
+  does not have, with every cell still saying so.
 - #73, the localisation catalogue, covers the strings both surfaces show.
 
 None of them assumes a surface other than these, and none is closed as not wanted.

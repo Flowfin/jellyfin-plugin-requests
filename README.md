@@ -43,6 +43,23 @@ What is supported, what is only expected to work, and what a downgrade does to
 the requests a server already holds are in
 [docs/compatibility.md](docs/compatibility.md).
 
+## Which clients this reaches
+
+No cell of the reach matrix in docs/surface.md has been checked against a real
+client, and neither the channel nor the page it describes is on the mainline
+today.
+
+That sentence is the whole claim this file makes about client reach, and it is
+the sentence the matrix opens with. The matrix itself, a row per client family
+and what a user could do there, is in [docs/surface.md](docs/surface.md). It is
+not repeated here, because two copies of a table drift and the reader then has
+two answers.
+
+One line of it is worth having before installing anything. On a server with no
+browsing sibling plugin there is no way to ask for a title the server does not
+have from a television client at all. This plugin ships no title search of its
+own, and that was decided rather than overlooked.
+
 ## Building
 
 ```
