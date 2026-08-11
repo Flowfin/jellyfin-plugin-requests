@@ -8,6 +8,12 @@
         <div id="RequestsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
             <div data-role="content">
                 <div class="content-primary">
+                    <div class="requestsShell"></div>
+
+                    <h2>Settings</h2>
+
+                    <p class="requestsMessage" role="status"></p>
+
                     <form id="RequestsConfigForm">
                         <p>This plugin has no settings yet. The configuration surface is designed in M12; the sample settings this page started with were removed rather than kept, so nothing here carries a shape the design did not choose.</p>
                         <div>
@@ -23,24 +29,57 @@
                     pluginUniqueId: "0f9c9107-b31b-459e-81fa-6d35dac25e79",
                 };
 
-                document.querySelector("#RequestsConfigPage").addEventListener("pageshow", function () {
-                    Dashboard.showLoadingMsg();
-                    ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId).then(function () {
-                        Dashboard.hideLoadingMsg();
-                    });
-                });
+                (function () {
+                    var page = document.querySelector("#RequestsConfigPage");
 
-                document.querySelector("#RequestsConfigForm").addEventListener("submit", function (e) {
-                    Dashboard.showLoadingMsg();
-                    ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId).then(function (config) {
-                        ApiClient.updatePluginConfiguration(RequestsConfig.pluginUniqueId, config).then(function (result) {
-                            Dashboard.processPluginConfigurationUpdateResult(result);
+                    // The shared script is fetched through the same endpoint the dashboard fetches
+                    // this page from, because an embedded resource is reachable only under a name
+                    // the plugin registered.
+                    function shell() {
+                        if (window.RequestsShell) {
+                            return Promise.resolve();
+                        }
+
+                        return new Promise(function (resolve, reject) {
+                            var script = document.createElement("script");
+                            script.src = ApiClient.getUrl("web/ConfigurationPage", { name: "Requests.js" });
+                            script.onload = resolve;
+                            script.onerror = function () {
+                                reject(new Error("The shared script for this plugin's pages could not be loaded."));
+                            };
+                            document.head.appendChild(script);
                         });
+                    }
+
+                    page.addEventListener("pageshow", function () {
+                        Dashboard.showLoadingMsg();
+
+                        shell()
+                            .then(function () {
+                                RequestsShell.attach(page, "Requests");
+
+                                return ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId);
+                            })
+                            .then(function () {
+                                Dashboard.hideLoadingMsg();
+                            })
+                            .catch(function () {
+                                Dashboard.hideLoadingMsg();
+                            });
                     });
 
-                    e.preventDefault();
-                    return false;
-                });
+                    document.querySelector("#RequestsConfigForm").addEventListener("submit", function (e) {
+                        Dashboard.showLoadingMsg();
+                        ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId).then(function (config) {
+                            ApiClient.updatePluginConfiguration(RequestsConfig.pluginUniqueId, config).then(function (result) {
+                                Dashboard.processPluginConfigurationUpdateResult(result);
+                            });
+                        });
+
+                        e.preventDefault();
+                        return false;
+                    });
+                })();
             </script>
         </div>
     </body>

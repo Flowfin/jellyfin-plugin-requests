@@ -1,0 +1,52 @@
+/*
+ * The shell both plugin pages share: a strip of links at the top and the frame the page's own
+ * content sits in.
+ *
+ * It styles almost nothing. The dashboard already has a look, and a plugin page that brings its own
+ * is a page that stops matching the server the day the server's theme changes. What is here is the
+ * layout the dashboard has no class for: the strip, which link in it is the current one, and the
+ * one line that says something went wrong. Colours are the dashboard's own custom properties where
+ * it defines them, with a plain fallback for a theme that does not.
+ */
+
+.requestsShell {
+    margin-bottom: 1.5em;
+}
+
+.requestsShellNav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    border-bottom: 1px solid rgba(127, 127, 127, 0.4);
+    padding-bottom: 0.5em;
+}
+
+.requestsShellNav a {
+    padding: 0.4em 0.8em;
+    text-decoration: none;
+    border-radius: 0.2em;
+    color: inherit;
+}
+
+.requestsShellNav a:hover,
+.requestsShellNav a:focus {
+    background: rgba(127, 127, 127, 0.2);
+}
+
+/*
+ * The current page is marked by more than colour. A strip where the only difference is a shade is
+ * a strip somebody using a high-contrast theme cannot read, and the operator surface is held to the
+ * same rules as the rest of the tree.
+ */
+.requestsShellNav a[aria-current="page"] {
+    font-weight: bold;
+    box-shadow: inset 0 -2px 0 0 currentColor;
+}
+
+.requestsMessage {
+    margin: 1em 0;
+}
+
+.requestsMessage:empty {
+    display: none;
+}
