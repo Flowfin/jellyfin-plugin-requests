@@ -131,12 +131,57 @@ which is neither a leak that has been shown nor a safety anybody has earned. The
 that a caller reads their own requests and never another person's, is enforced at the endpoints in
 `docs/api.md` and not by the store beneath them.
 
+## A field set this side does not understand is refused whole
+
+The contract carries a version. What this side does with one it does not know is a stated rule
+rather than whatever the code happens to do, because the two plausible behaviours differ in a way
+nobody notices until it has already gone wrong.
+
+**The rule.** This plugin implements exactly the contract versions in its known set, which today is
+one version and is `WantHandover.KnownContractVersion`. A field set carrying anything else is
+refused whole. Not one field is read out of it, and no request is made from it.
+
+    git grep -n 'public const int KnownContractVersion' -- Jellyfin.Plugin.Requests/Seam/WantHandover.cs
+
+**Why not read the fields it recognises.** Because that behaviour cannot tell the two kinds of
+version change apart. A version that added a field and a version that changed what an existing field
+means look identical to a reader that takes what it knows and ignores the rest, and the second one
+turns into a want filed against the wrong title, the wrong person or the wrong kind. A refusal is a
+want that did not arrive, which the other side can see; a misread is a request in somebody's queue
+that nobody can trace back.
+
+**What the number is, today.** It is what this side believes it implements rather than a number read
+off the contract, because the contract's own version rule is still open on the sibling's board. That
+is cheap to correct: the seam is an in-process call, it serialises nothing, nothing on disk carries
+the number, and no caller outside this process can be pinned to it. When the contract mints its
+rule, the constant moves to match it and the behaviour above does not change.
+
+## What a refusal looks like from each side
+
+The contract lets this side answer one thing, which is whether the handover was accepted. So a
+refusal reaches the sibling as exactly that and carries no reason, and this is the shape rather than
+an omission: a reason travelling back would be a second thing the contract has to define and keep in
+step.
+
+The reason is written on this side instead, to the server's log, with the sibling's own identifier
+for the want so an operator asked about a want by that identifier can find what happened to it. The
+line names the refusal and the version that arrived. It carries neither the title nor the person,
+because a log is pasted into issue trackers and what somebody asked for is the thing in this plugin
+worth being careful with.
+
+The refusals that exist are in `HandoverRefusal`, and reading them from there rather than from a
+list here is deliberate:
+
+    git grep -n '^    [A-Z][A-Za-z]* = [0-9]' -- Jellyfin.Plugin.Requests/Seam/HandoverRefusal.cs
+
+Where an operator reads it is the server's log and nowhere else today. A page that says what this
+install is refusing and why is the diagnostics view in #63.
+
 ## What this document does not yet hold
 
 Named here so the absence is read as absence rather than as a decision nobody wrote down. Each is
 the closing condition of the issue beside it.
 
-- What happens to a field set carrying a contract version this plugin does not know. #90.
 - The trust position of an in-process handover, and what this side checks before it believes a user
   identifier it cannot verify. #118.
 - How each side finds the other. #89.

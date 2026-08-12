@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Identity;
+using Jellyfin.Plugin.Requests.Intake;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
@@ -70,14 +71,6 @@ public sealed class RequestsController : RequestsControllerBase
     public const int MaximumPageSize = 200;
 
     /// <summary>
-    /// How many times a join is attempted before giving up. A join is a read followed by a write
-    /// against the revision that was read, so two people joining one request in the same moment
-    /// means one of them is refused and re-decides. Three is enough for that and small enough that
-    /// a genuinely contended request fails visibly instead of spinning.
-    /// </summary>
-    private const int JoinAttempts = 3;
-
-    /// <summary>
     /// The store failure, written once because it is answered from a call and from inside one
     /// request of an action on several.
     /// <para>
@@ -97,6 +90,7 @@ public sealed class RequestsController : RequestsControllerBase
     private readonly IClock _clock;
     private readonly IIdentifierSource _identifiers;
     private readonly ICallerIdentity _callers;
+    private readonly RequestIntake _intake;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RequestsController"/> class.
@@ -115,6 +109,12 @@ public sealed class RequestsController : RequestsControllerBase
         _clock = clock;
         _identifiers = identifiers;
         _callers = callers;
+
+        // Built here rather than injected, because it is this controller's use of the store rather
+        // than a fifth thing the server has to supply. CatalogueSplitTests counts what this
+        // controller is constructed from, and a request intake that arrived as a dependency would
+        // read as one.
+        _intake = new RequestIntake(store);
     }
 
     /// <summary>
@@ -961,22 +961,6 @@ public sealed class RequestsController : RequestsControllerBase
         };
 
     /// <summary>
-    /// Whether a request already in the queue is one a new ask may join.
-    /// <para>
-    /// Only a request that is still waiting for an answer or waiting to arrive. A declined request
-    /// is an answer somebody gave and joining it would make a new asker inherit a refusal they never
-    /// saw; a fulfilled one is finished, and a person asking for something the server already holds
-    /// is asking a question the queue is the wrong place to answer; a failed one has been given up
-    /// on. In every one of those a new ask is a new request, which is also what puts it back in front
-    /// of an operator.
-    /// </para>
-    /// </summary>
-    /// <param name="request">A request the store holds.</param>
-    /// <returns><see langword="true"/> where a new ask may join it.</returns>
-    private static bool StillOpenToJoiners(MediaRequest request)
-        => request.State is RequestState.Open or RequestState.Approved;
-
-    /// <summary>
     /// Refuses a body that cannot become a request, naming the field that is wrong.
     /// <para>
     /// The cap on the note and the shape of a season list are the record's own rules and are refused
@@ -1210,20 +1194,14 @@ public sealed class RequestsController : RequestsControllerBase
             MediaRequest.NoteMaximumLength);
 
     /// <summary>
-    /// Puts the ask against what is already in the queue, and either joins one of them or creates it.
+    /// Puts the ask against what is already in the queue, and answers in the shape this endpoint
+    /// returns.
     /// <para>
-    /// The candidates are read out of the store by identifier rather than by walking it, which is
-    /// what makes this cheap on a queue of any size. A request carrying no identifier reaches nobody
-    /// and is joined by nobody, which is <see cref="RequestIdentity"/>'s answer and not this
-    /// method's: such a request has no identity, so it is different from everything including
-    /// another copy of itself.
-    /// </para>
-    /// <para>
-    /// The seasons narrow as the walk goes on. Where an existing request covers some of what is
-    /// being asked for, what is left to ask for is what the next candidate is compared against, so a
-    /// series whose seasons are spread over two existing requests is joined to the second rather
-    /// than duplicated. If the narrowing ever leaves nothing, the candidate that took the last
-    /// season compares as the same request and is joined.
+    /// Whether an ask joins something or becomes something is <see cref="RequestIntake"/>'s, and it
+    /// is there rather than here because the seam to the sibling discover plugin asks the same
+    /// question over the same store. What is left here is the translation into
+    /// <see cref="RequestOutcome"/>, which is the wire shape this endpoint publishes and is not the
+    /// vocabulary the seam answers in.
     /// </para>
     /// </summary>
     /// <param name="incoming">The ask, as a request that does not exist yet.</param>
@@ -1231,110 +1209,37 @@ public sealed class RequestsController : RequestsControllerBase
     /// <returns>What the caller is now waiting for and what asking did.</returns>
     private async Task<CreatedRequest> AskAsync(MediaRequest incoming, CancellationToken cancellationToken)
     {
-        for (var attempt = 1; ; attempt++)
+        var intake = await _intake.AskAsync(incoming, cancellationToken).ConfigureAwait(false);
+
+        return new CreatedRequest
         {
-            var ask = incoming;
-            var candidates = await CandidatesAsync(ask, cancellationToken).ConfigureAwait(false);
-            StoredRequest? joining = null;
-
-            foreach (var candidate in candidates)
-            {
-                var match = RequestIdentity.Compare(candidate.Request, ask);
-
-                if (match == RequestMatch.Same)
-                {
-                    joining = candidate;
-                    break;
-                }
-
-                if (match == RequestMatch.Overlapping)
-                {
-                    ask = ask with
-                    {
-                        Seasons = RequestIdentity.SeasonsNotAlreadyAskedFor(candidate.Request, ask, [])
-                    };
-                }
-            }
-
-            if (joining is not StoredRequest existing)
-            {
-                var added = await _store.AddAsync(ask, cancellationToken).ConfigureAwait(false);
-
-                return new CreatedRequest
-                {
-                    Id = added.Request.Id,
-                    State = added.Request.State,
-                    Outcome = RequestOutcome.Created
-                };
-            }
-
-            if (existing.Request.WasAskedForBy(ask.RequestedByUserId))
-            {
-                return new CreatedRequest
-                {
-                    Id = existing.Request.Id,
-                    State = existing.Request.State,
-                    Outcome = RequestOutcome.AlreadyWaiting
-                };
-            }
-
-            var joined = existing.Request with
-            {
-                JoinedByUserIds = [.. existing.Request.JoinedByUserIds, ask.RequestedByUserId]
-            };
-
-            try
-            {
-                var written = await _store
-                    .ReplaceAsync(joined, existing.Revision, cancellationToken)
-                    .ConfigureAwait(false);
-
-                return new CreatedRequest
-                {
-                    Id = written.Request.Id,
-                    State = written.Request.State,
-                    Outcome = RequestOutcome.Joined
-                };
-            }
-            catch (RequestConcurrencyException) when (attempt < JoinAttempts)
-            {
-                // Somebody moved that request between the read and the write, which on this endpoint
-                // is usually a second person joining it in the same moment. Deciding again against
-                // what the store holds now is exactly what the store contract asks a refused caller
-                // to do, and the decision may come out differently: an operator who declined it
-                // meanwhile makes it no longer joinable, and the next pass creates instead.
-            }
-        }
+            Id = intake.Request.Request.Id,
+            State = intake.Request.Request.State,
+            Outcome = Reported(intake.Outcome)
+        };
     }
 
     /// <summary>
-    /// The requests already in the queue that could be the same thing as this ask.
+    /// One intake outcome as this endpoint publishes it.
+    /// <para>
+    /// Written as a switch with no default arm on purpose. A value added to
+    /// <see cref="IntakeOutcome"/> and not answered here fails the build rather than being reported
+    /// as whichever arm happened to be written last.
+    /// </para>
     /// </summary>
-    /// <param name="ask">The ask.</param>
-    /// <param name="cancellationToken">Cancels the reads.</param>
-    /// <returns>Every joinable request naming at least one of the ask's identifiers, each once.</returns>
-    private async Task<IReadOnlyList<StoredRequest>> CandidatesAsync(
-        MediaRequest ask,
-        CancellationToken cancellationToken)
-    {
-        var found = new Dictionary<Guid, StoredRequest>();
-
-        foreach (var identifier in ask.ProviderIds)
+    /// <param name="outcome">What asking did.</param>
+    /// <returns>The same thing in the vocabulary this endpoint answers in.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Where the outcome is a value nothing here reports.
+    /// </exception>
+    private static RequestOutcome Reported(IntakeOutcome outcome)
+        => outcome switch
         {
-            var carrying = await _store
-                .FindByProviderIdentifierAsync(ask.Kind, identifier.Key, identifier.Value, cancellationToken)
-                .ConfigureAwait(false);
+            IntakeOutcome.Created => RequestOutcome.Created,
+            IntakeOutcome.Joined => RequestOutcome.Joined,
+            IntakeOutcome.AlreadyWaiting => RequestOutcome.AlreadyWaiting,
 
-            foreach (var candidate in carrying.Where(candidate => StillOpenToJoiners(candidate.Request)))
-            {
-                // Keyed by identifier, because one existing request can carry two of the identifiers
-                // the caller sent and would otherwise be compared and joined twice.
-                found[candidate.Request.Id] = candidate;
-            }
-        }
-
-        // Oldest first, so the request people have been waiting on longest is the one a new asker
-        // joins, and so the answer does not depend on which order the store happened to return them.
-        return [.. found.Values.OrderBy(candidate => candidate.Request.RequestedAt).ThenBy(candidate => candidate.Request.Id)];
-    }
+            _ => throw new InvalidOperationException(FormattableString.Invariant(
+                $"There is no answer this endpoint reports for the intake outcome {outcome}."))
+        };
 }
