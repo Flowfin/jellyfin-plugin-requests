@@ -133,11 +133,21 @@
 
                     document.querySelector("#RequestsConfigForm").addEventListener("submit", function (e) {
                         Dashboard.showLoadingMsg();
-                        ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId).then(function (config) {
-                            ApiClient.updatePluginConfiguration(RequestsConfig.pluginUniqueId, read(config)).then(function (result) {
+                        ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId)
+                            .then(function (config) {
+                                return ApiClient.updatePluginConfiguration(RequestsConfig.pluginUniqueId, read(config));
+                            })
+                            .then(function (result) {
                                 Dashboard.processPluginConfigurationUpdateResult(result);
+                            })
+                            // The plugin refuses settings it cannot run on rather than saving a
+                            // corrected version of them, so a save can come back refused. Without
+                            // this the loading indicator is hidden by nothing and the operator is
+                            // left looking at a form that appears to have been accepted.
+                            .catch(function () {
+                                Dashboard.hideLoadingMsg();
+                                RequestsShell.say(page, "These settings were refused and nothing was changed. The server log names the field and says why.");
                             });
-                        });
 
                         e.preventDefault();
                         return false;
