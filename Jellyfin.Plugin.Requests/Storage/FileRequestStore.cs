@@ -199,6 +199,23 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task<StoredRequest?> FindByWantAsync(Guid wantId, CancellationToken cancellationToken)
+    {
+        if (wantId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "A want identifier that names nothing cannot be looked up, because it is not one any request can have absorbed.",
+                nameof(wantId));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var held = await HeldAsync(cancellationToken).ConfigureAwait(false);
+
+        return held.ByWant.TryGetValue(wantId, out var carrying) ? carrying : null;
+    }
+
+    /// <inheritdoc />
     public async Task<RequestPage> PageAsync(RequestQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -595,7 +612,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     private readonly record struct ProviderKey(RequestedItemKind Kind, string Provider, string Value);
 
     /// <summary>
-    /// What the store holds, and the two lookups the surfaces read it through.
+    /// What the store holds, and the lookups the surfaces read it through.
     /// <para>
     /// Both lookups are built once, here, out of the set that is about to be published, and neither
     /// is edited afterwards. That is what makes them safe to hand out: a reader that took this
@@ -622,6 +639,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
 
             var byUser = new Dictionary<Guid, List<StoredRequest>>();
             var byProviderIdentifier = new Dictionary<ProviderKey, List<StoredRequest>>(ProviderKeyComparer.Instance);
+            var byWant = new Dictionary<Guid, StoredRequest>();
 
             foreach (var stored in held.Values)
             {
@@ -642,8 +660,19 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
                 {
                     Under(byProviderIdentifier, identifier).Add(stored);
                 }
+
+                // One request per want and not a list. A want is absorbed once, so two requests
+                // claiming one would be a defect rather than a case to serve, and the last writer
+                // winning here would hide it. The set on the record refuses a repeat inside one
+                // request; nothing refuses two records claiming the same want, and this is where
+                // that would show as a wrong answer rather than as a crash.
+                foreach (var want in stored.Request.WantIds)
+                {
+                    byWant[want] = stored;
+                }
             }
 
+            ByWant = byWant;
             ByUser = byUser.ToDictionary(entry => entry.Key, entry => entry.Value.ToArray());
             ByProviderIdentifier = byProviderIdentifier.ToDictionary(
                 entry => entry.Key,
@@ -665,6 +694,11 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
         /// Gets the requests carrying each external identifier.
         /// </summary>
         public Dictionary<ProviderKey, StoredRequest[]> ByProviderIdentifier { get; }
+
+        /// <summary>
+        /// Gets the request that absorbed each want the sibling handed over.
+        /// </summary>
+        public Dictionary<Guid, StoredRequest> ByWant { get; }
 
         /// <summary>
         /// The list under a key, made if it is the first one.

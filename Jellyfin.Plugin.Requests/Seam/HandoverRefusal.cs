@@ -27,6 +27,12 @@ public enum HandoverRefusal
     NoUserNamed = 1,
 
     /// <summary>
+    /// The field set carried no identifier for the want itself, so a repeat of it could never be
+    /// recognised as one and every arrival would be a new request.
+    /// </summary>
+    NoWantNamed = 7,
+
+    /// <summary>
     /// The want named no title, and a request carries the title as it read when it was asked for.
     /// </summary>
     NoTitle = 2,

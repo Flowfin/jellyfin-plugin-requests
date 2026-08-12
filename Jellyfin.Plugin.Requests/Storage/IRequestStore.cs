@@ -133,6 +133,32 @@ public interface IRequestStore
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// The request that already absorbed one want from the sibling discover plugin, if any.
+    /// <para>
+    /// This is the question the seam asks before it does anything else, and it is a different
+    /// question from the one above. The identifier lookup asks whether anything names the same
+    /// title; this asks whether this exact want has already been taken. The other side derives its
+    /// identifier from the title and the user and hands it over again after a refresh, a restart, or
+    /// a gesture undone and redone, so an answer here is what stops each of those becoming another
+    /// acquisition.
+    /// </para>
+    /// <para>
+    /// Answered over everything held, whatever state the request is in. A want whose request was
+    /// declined has still been taken, and answering only for the open ones would make a refusal the
+    /// one thing that lets a repeat through.
+    /// </para>
+    /// </summary>
+    /// <param name="wantId">The sibling's own identifier for the want.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>
+    /// The request carrying that want, at the revision the store holds it at, or
+    /// <see langword="null"/> where no request has absorbed it. At most one request can, because a
+    /// want is absorbed once.
+    /// </returns>
+    /// <exception cref="ArgumentException">Where the want identifier names nothing.</exception>
+    Task<StoredRequest?> FindByWantAsync(Guid wantId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// One page of the queue an operator reads, filtered, ordered and counted from a single
     /// snapshot.
     /// <para>

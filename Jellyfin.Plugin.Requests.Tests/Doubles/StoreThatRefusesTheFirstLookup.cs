@@ -60,6 +60,10 @@ internal sealed class StoreThatRefusesTheFirstLookup : IRequestStore
     }
 
     /// <inheritdoc />
+    public Task<StoredRequest?> FindByWantAsync(Guid wantId, CancellationToken cancellationToken)
+        => _inner.FindByWantAsync(wantId, cancellationToken);
+
+    /// <inheritdoc />
     public Task<RequestPage> PageAsync(RequestQuery query, CancellationToken cancellationToken)
         => _inner.PageAsync(query, cancellationToken);
 

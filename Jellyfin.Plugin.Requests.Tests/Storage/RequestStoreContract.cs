@@ -721,6 +721,84 @@ public abstract class RequestStoreContract
     }
 
     /// <summary>
+    /// A want the sibling handed over is found again by its own identifier. This is the lookup that
+    /// makes a repeat recognisable as one, and without it every refresh that recreated an item on the
+    /// browsing side is another acquisition here.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task ARequestIsFoundByAWantItAbsorbed()
+    {
+        var store = NewStore();
+        var want = Guid.NewGuid();
+        var request = ARequest() with { WantIds = [Guid.NewGuid(), want] };
+
+        var added = await store.AddAsync(request, CancellationToken.None).ConfigureAwait(true);
+        var found = await store.FindByWantAsync(want, CancellationToken.None).ConfigureAwait(true);
+
+        Assert.NotNull(found);
+        Assert.Equal(added, found.Value);
+    }
+
+    /// <summary>
+    /// A want nothing has absorbed is an answer rather than a failure, in the same way an unknown
+    /// request identifier is. The seam asks this of every handover, and most of them are the first
+    /// time that want has been seen.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AWantNobodyHasHandedOverIsAnsweredWithNothing()
+    {
+        var store = NewStore();
+
+        await store.AddAsync(ARequest() with { WantIds = [Guid.NewGuid()] }, CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Null(await store.FindByWantAsync(Guid.NewGuid(), CancellationToken.None).ConfigureAwait(true));
+    }
+
+    /// <summary>
+    /// The lookup answers whatever state the request is in. A want whose request was declined has
+    /// still been taken, and a store that answered only for the open ones would make a refusal the
+    /// one thing that lets a repeat through.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AWantIsStillFoundAfterItsRequestWasAnswered()
+    {
+        var store = NewStore();
+        var want = Guid.NewGuid();
+
+        var added = await store
+            .AddAsync(ARequest() with { WantIds = [want] }, CancellationToken.None)
+            .ConfigureAwait(true);
+
+        await store
+            .ReplaceAsync(added.Request with { State = RequestState.Declined }, added.Revision, CancellationToken.None)
+            .ConfigureAwait(true);
+
+        var found = await store.FindByWantAsync(want, CancellationToken.None).ConfigureAwait(true);
+
+        Assert.NotNull(found);
+        Assert.Equal(RequestState.Declined, found.Value.Request.State);
+    }
+
+    /// <summary>
+    /// A want identifier that names nothing is refused rather than answered. It is not an identifier
+    /// any request can have absorbed, so an answer of nothing found would read as a fact about the
+    /// store instead of as a caller's mistake.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AWantIdentifierThatNamesNothingIsRefused()
+    {
+        var store = NewStore();
+
+        await Assert
+            .ThrowsAsync<ArgumentException>(() => store.FindByWantAsync(Guid.Empty, CancellationToken.None))
+            .ConfigureAwait(true);
+    }
+
+    /// <summary>
     /// A request with only the fields that have no default, and its own identifier each time so a
     /// test can add two without arranging anything.
     /// </summary>

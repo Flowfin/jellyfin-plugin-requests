@@ -102,8 +102,17 @@ The contract is one way. A handover carries a want across and nothing is learned
 was accepted. A query in the other direction would make each side hold a piece of the other's state,
 which is the arrangement both boards are avoiding and the reason the contract is shaped this way at
 all. So this side offers the seam no way to read request state, and the duplicate case is answered
-where the handover happens instead: the same want arriving twice produces one request, which is
-#116, and the sibling's own repeat handling does the rest on its side.
+where the handover happens instead: the same want arriving twice produces one request, and the
+sibling's own repeat handling does the rest on its side.
+
+That is a rule of its own and not the identity rule wearing another name. The want identifier is an
+idempotency key, looked up before anything is built, over every request the store holds and in every
+state, so a want whose request was declined is still a want that has been taken. The identity rule
+answers a different question, whether two asks are the same thing, and it answers it against the
+provider identifiers, so a want carrying none is different from every other want including another
+copy of itself. Each rule catches what the other cannot:
+
+    git grep -n 'Task<StoredRequest?> FindByWantAsync' -- Jellyfin.Plugin.Requests/Storage/IRequestStore.cs
 
 The user's answer to what happened to their request comes from this plugin's own surface, decided in
 [`docs/surface.md`](surface.md) and reaching the same clients: the channel for a client that renders
