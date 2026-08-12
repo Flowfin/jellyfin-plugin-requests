@@ -295,6 +295,59 @@ rather than `TheTableRefusesTheMove`. Both are refusals and they tell an operato
 one says somebody else got there first and here is what they did, the other says this request can
 never be approved. The second would be false.
 
+## Deciding on several
+
+    POST MediaRequests/v1/Requests/Approve
+    POST MediaRequests/v1/Requests/Decline
+
+The same two operations over a selection rather than over one request. An operator who has been away
+comes back to forty requests, and one call per request is why people stop working a queue.
+
+Each entry carries its own revision, because the rows were read at whatever revision each one was at
+and one of them can move while the others do not. A decline carries one reason and one note for the
+whole action: the gesture is answering a batch the same way, and an operator who wants to say
+something different about one request makes that one decision on its own.
+
+An action carries at most 200 requests, which is the page they are selected from. More is **refused**
+rather than acted on as far as the cap, for the reason a large `take` is refused rather than
+answered with fewer.
+
+### What comes back
+
+`200`, with one entry per request, in the order they were sent. Every request that was sent has an
+entry. Each entry carries the row at its new revision, or the failure that request got, and never
+both.
+
+    {
+      "requests": [
+        { "id": "...", "request": { "state": "Approved", "revision": 4 } },
+        { "id": "...", "failure": { "code": "MovedSinceItWasRead", "current": { ... } } }
+      ]
+    }
+
+**A refusal about one request is in that request's entry rather than in the status of the call.** By
+the time one of them is refused another may already be written, so a call answering with a failure
+would be saying nothing happened while something had. The successful ones stay done and are not
+rolled back: a decision an operator made is not something this API takes away because the next row
+in the list had moved.
+
+So a client cannot read the status code alone. `200` here means the action was carried out, not that
+every request in it moved, and a surface that draws it as done without reading the entries is the
+failure this shape exists against.
+
+What stays a refusal of the whole call is what is decided before anything is written: a body that
+cannot be read, and a call that names no person. Both answer exactly as they do on a single
+decision, and neither leaves anything written.
+
+A body is refused whole rather than in part. An entry naming no request, an entry with no revision,
+an empty selection and the same request twice are all `InvalidBody` with the position named, and
+nothing in the action is attempted. The last of those would otherwise report that a request had
+moved since it was read, against a move the same call had just made.
+
+There is no status code on an entry. A status code is an answer to a call and several entries come
+back under one; the failure carries the code, and the table below is where a code and a status are
+paired, once.
+
 ## When a call fails
 
 Every failure of this API comes back in one shape, whichever endpoint it came from:
@@ -385,8 +438,10 @@ on the day it is added, and a class attribute is edited by somebody who is not r
 | `GET Requests/Queue`         | `RequiresElevation`    | an administrator     |
 | `POST Requests/{id}/Approve` | `RequiresElevation`    | an administrator     |
 | `POST Requests/{id}/Decline` | `RequiresElevation`    | an administrator     |
+| `POST Requests/Approve`      | `RequiresElevation`    | an administrator     |
+| `POST Requests/Decline`      | `RequiresElevation`    | an administrator     |
 
-The two decisions carry the same policy as the queue, and that is the endpoint agreeing with the
+The four decisions carry the same policy as the queue, and that is the endpoint agreeing with the
 model rather than deciding anything: every cell of the table these two can reach admits an
 administrator and nobody else, so an endpoint open to any signed-in person would refuse each such
 call one layer down. A permission answered in two places is a permission that comes to be answered
@@ -420,5 +475,6 @@ asked for, which is a weaker disclosure than a row and still a disclosure, is op
 
 - Whether a user may ever be told that a title has already been asked for is open between #51 and #71.
 - The capability endpoint is #55.
-- Deciding on several requests in one call is #62. Nothing here does it, and a client that wants it
-  today makes one call per request.
+- Which of these a page calls, and what an operator sees while an action on several is running, is
+  the administrator surface rather than this document. The endpoints promise what is written above
+  and nothing about a screen.

@@ -77,6 +77,22 @@ public sealed class RequestsController : RequestsControllerBase
     /// </summary>
     private const int JoinAttempts = 3;
 
+    /// <summary>
+    /// The store failure, written once because it is answered from a call and from inside one
+    /// request of an action on several.
+    /// <para>
+    /// The sentence says nothing about the rest of the call on purpose. It was true of a single
+    /// decision that nothing at all had been changed, and it is not true of the fourth request in an
+    /// action whose first three were written; what holds in both places is that this request was not
+    /// decided and nothing about it moved.
+    /// </para>
+    /// </summary>
+    private static readonly RequestFailure StoreCouldNotBeRead = new RequestFailure
+    {
+        Code = RequestFailureCode.TheStoreCouldNotBeRead,
+        Message = "The queue could not be read, so this was not decided and nothing about it was changed. This is a fault on the server rather than anything wrong with the call, and the server log says which file and why."
+    };
+
     private readonly IRequestStore _store;
     private readonly IClock _clock;
     private readonly IIdentifierSource _identifiers;
@@ -406,30 +422,140 @@ public sealed class RequestsController : RequestsControllerBase
                 "A decision carries the revision it was made against. Without one this would be a write against whatever the store holds by the time it arrives, which is how two operators deciding one request end with one decision silently lost.");
         }
 
-        if (body.Reason is not DeclineReason reason || !Enum.IsDefined(reason))
+        if (!Declining(body.Reason, body.Note, out var refusal))
         {
-            return Invalid(
-                nameof(DeclineRequestBody.Reason),
-                "A decline carries a reason. Without one the person who asked is told no and nothing else, and what they do next is ask for the same title again.");
+            return Invalid(refusal.Field, refusal.Reason);
         }
 
-        if (reason == DeclineReason.Other && string.IsNullOrWhiteSpace(body.Note))
-        {
-            return Invalid(
-                nameof(DeclineRequestBody.Note),
-                "A decline for a reason that is not on the list has to say what the reason was. Other with nothing beside it is a decline with no reason, which is the thing a required reason exists to prevent.");
-        }
-
-        if (body.Note is not null && body.Note.Length > MediaRequest.NoteMaximumLength)
-        {
-            return Invalid(nameof(DeclineRequestBody.Note), Longer(nameof(DeclineRequestBody.Note), body.Note.Length));
-        }
+        var reason = body.Reason!.Value;
 
         return await MoveAsync(
             id,
             revision,
             (request, at, by) => RequestLifecycle.Decline(request, reason, body.Note, at, by),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Approves several requests in one action.
+    /// <para>
+    /// The gesture is an operator who has been away and is answering a batch. What it is not is a
+    /// faster way to make one decision: every request in it goes through the same code as the single
+    /// endpoint, one at a time, so no rule of the transition table is reachable here that is not
+    /// reachable there.
+    /// </para>
+    /// </summary>
+    /// <param name="body">The requests, each with the revision the operator was looking at.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>One entry per request, in the order they were sent.</returns>
+    [HttpPost("Requests/Approve")]
+    [Authorize(Policy = AdministratorPolicy)]
+    [ProducesResponseType<DecidedRequests>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<DecidedRequests>> ApproveManyAsync(
+        [FromBody] ApproveManyBody body,
+        CancellationToken cancellationToken)
+    {
+        if (body is null)
+        {
+            return Invalid(
+                "body",
+                "There is no body on this call, and the requests being decided are in it.");
+        }
+
+        if (!Chosen(body.Requests, out var chosen, out var refusal))
+        {
+            return Invalid(refusal.Field, refusal.Reason);
+        }
+
+        return await DecideEachAsync(
+            chosen,
+            static (request, at, by) => RequestLifecycle.Move(request, RequestState.Approved, at, by),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Declines several requests in one action, for one reason.
+    /// </summary>
+    /// <param name="body">The requests, the reason they are all declined for, and the note.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>One entry per request, in the order they were sent.</returns>
+    [HttpPost("Requests/Decline")]
+    [Authorize(Policy = AdministratorPolicy)]
+    [ProducesResponseType<DecidedRequests>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<DecidedRequests>> DeclineManyAsync(
+        [FromBody] DeclineManyBody body,
+        CancellationToken cancellationToken)
+    {
+        if (body is null)
+        {
+            return Invalid(
+                "body",
+                "There is no body on this call, and the requests being decided are in it.");
+        }
+
+        if (!Chosen(body.Requests, out var chosen, out var refusal)
+            || !Declining(body.Reason, body.Note, out refusal))
+        {
+            return Invalid(refusal.Field, refusal.Reason);
+        }
+
+        var reason = body.Reason!.Value;
+
+        return await DecideEachAsync(
+            chosen,
+            (request, at, by) => RequestLifecycle.Decline(request, reason, body.Note, at, by),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Makes one move on each of several requests, in the order they were sent.
+    /// <para>
+    /// <b>One at a time, and each one through <see cref="DecideAsync"/>.</b> That is the whole of
+    /// what makes this path the same path as the single decision: the read, the revision check, the
+    /// call into the model and the write against the revision are one piece of code with one caller
+    /// more, rather than a second implementation that has to be kept in step with the first.
+    /// </para>
+    /// <para>
+    /// Sequential rather than at once. A decision is a read followed by a write against the revision
+    /// that was read, so running them together would have the writes of one action contend with each
+    /// other and refuse each other for a conflict this call created itself.
+    /// </para>
+    /// <para>
+    /// <b>A refusal that is about one request is in that request's entry, not in the status of the
+    /// call.</b> By the time one of them is refused another may already be written, and a call that
+    /// answered with a failure would be saying nothing happened while something had. What stays a
+    /// refusal of the call is what is decided before anything is written: a body that cannot be
+    /// read, and a caller that names nobody.
+    /// </para>
+    /// </summary>
+    /// <param name="chosen">The requests and the revisions they were read at.</param>
+    /// <param name="move">The move, as the model makes it.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>One entry per request.</returns>
+    private async Task<ActionResult<DecidedRequests>> DecideEachAsync(
+        IReadOnlyList<(Guid Id, long Revision)> chosen,
+        Func<MediaRequest, DateTimeOffset, RequestCaller, MediaRequest> move,
+        CancellationToken cancellationToken)
+    {
+        var caller = await _callers.UserIdAsync(HttpContext).ConfigureAwait(false);
+
+        if (caller is not Guid administrator)
+        {
+            return NoUser("This call is authenticated but names no user, so there is nobody to record as having decided.");
+        }
+
+        var decided = new List<DecidedRequest>(chosen.Count);
+
+        foreach (var one in chosen)
+        {
+            decided.Add(await DecideAsync(one.Id, one.Revision, administrator, move, cancellationToken).ConfigureAwait(false));
+        }
+
+        return Ok(new DecidedRequests { Requests = decided });
     }
 
     /// <summary>
@@ -471,6 +597,41 @@ public sealed class RequestsController : RequestsControllerBase
             return NoUser("This call is authenticated but names no user, so there is nobody to record as having decided.");
         }
 
+        var decided = await DecideAsync(id, revision, administrator, move, cancellationToken).ConfigureAwait(false);
+
+        // One request, so the entry's refusal becomes the status of the call. On the endpoints that
+        // carry several, the same entry stays in the answer beside the others, which is the only
+        // difference between the two paths.
+        return decided.Failure is RequestFailure refusal ? Answer(refusal) : Ok(decided.Request);
+    }
+
+    /// <summary>
+    /// The decision itself: read the request, check it is where the caller thinks it is, ask the
+    /// model to move it, and write it back against the revision that was read.
+    /// <para>
+    /// It answers with an entry rather than with a status code, which is what lets one request and
+    /// forty go through it. A status code is an answer to a call, and an action on several requests
+    /// is one call with several answers in it.
+    /// </para>
+    /// <para>
+    /// <b>Who is calling is decided above this and passed in.</b> An action on forty requests asks
+    /// the server once who is calling rather than forty times, and the answer cannot change halfway
+    /// through an action.
+    /// </para>
+    /// </summary>
+    /// <param name="id">The request being moved.</param>
+    /// <param name="revision">The revision the caller read it at.</param>
+    /// <param name="administrator">Who is deciding, recorded on the move.</param>
+    /// <param name="move">The move, as the model makes it.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>The request at its new revision, or why it was refused.</returns>
+    private async Task<DecidedRequest> DecideAsync(
+        Guid id,
+        long revision,
+        Guid administrator,
+        Func<MediaRequest, DateTimeOffset, RequestCaller, MediaRequest> move,
+        CancellationToken cancellationToken)
+    {
         StoredRequest? stored;
 
         try
@@ -479,22 +640,26 @@ public sealed class RequestsController : RequestsControllerBase
         }
         catch (RequestStoreLoadException)
         {
-            return TheStoreCouldNotBeRead();
+            return NotMoved(id, StoreCouldNotBeRead);
         }
 
         if (stored is not StoredRequest held)
         {
-            return Failed(
-                RequestFailureCode.NoSuchRequest,
-                "There is no request with that identifier. It may have been removed and it may never have existed, and this answer is the same either way.");
+            return NotMoved(
+                id,
+                Refusal(
+                    RequestFailureCode.NoSuchRequest,
+                    "There is no request with that identifier. It may have been removed and it may never have existed, and this answer is the same either way."));
         }
 
         if (held.Revision != revision)
         {
-            return Failed(
-                RequestFailureCode.MovedSinceItWasRead,
-                "This request has moved since it was read, so the decision was made against something that is no longer there. What the queue holds now is beside this.",
-                current: Queued(held));
+            return NotMoved(
+                id,
+                Refusal(
+                    RequestFailureCode.MovedSinceItWasRead,
+                    "This request has moved since it was read, so the decision was made against something that is no longer there. What the queue holds now is beside this.",
+                    current: Queued(held)));
         }
 
         MediaRequest moved;
@@ -508,42 +673,45 @@ public sealed class RequestsController : RequestsControllerBase
         }
         catch (IllegalRequestTransitionException refused)
         {
-            return Failed(RequestFailureCode.TheTableRefusesTheMove, refused.Message, current: Queued(held));
+            return NotMoved(id, Refusal(RequestFailureCode.TheTableRefusesTheMove, refused.Message, current: Queued(held)));
         }
         catch (RequestNotIdentifiedException refused)
         {
-            return Failed(RequestFailureCode.TheRequestNamesNothing, refused.Message, current: Queued(held));
+            return NotMoved(id, Refusal(RequestFailureCode.TheRequestNamesNothing, refused.Message, current: Queued(held)));
         }
         catch (RequestMoveNotPermittedException refused)
         {
             // No call that reaches here can produce this today, and the reason is measured rather
-            // than assumed: both endpoints require elevation, so the caller is built as an
-            // administrator, and every legal cell into Approved or Declined is a decision cell that
-            // admits one. TheOnlyCallerTheseEndpointsBuildIsAdmittedByEveryMoveTheyCanMake holds
-            // that, and it reds the day a cell in the table stops admitting an administrator. This
-            // arm is what that day answers with instead of a stack trace.
-            return Failed(RequestFailureCode.TheCallerMayNotMakeThisMove, refused.Message, current: Queued(held));
+            // than assumed: every endpoint that reaches this requires elevation, so the caller is
+            // built as an administrator, and every legal cell into Approved or Declined is a
+            // decision cell that admits one.
+            // TheOnlyCallerTheseEndpointsBuildIsAdmittedByEveryMoveTheyCanMake holds that, and it
+            // reds the day a cell in the table stops admitting an administrator. This arm is what
+            // that day answers with instead of a stack trace.
+            return NotMoved(id, Refusal(RequestFailureCode.TheCallerMayNotMakeThisMove, refused.Message, current: Queued(held)));
         }
 
         try
         {
             var written = await _store.ReplaceAsync(moved, revision, cancellationToken).ConfigureAwait(false);
 
-            return Ok(Queued(written));
+            return new DecidedRequest { Id = id, Request = Queued(written) };
         }
         catch (RequestConcurrencyException lost)
         {
             // The window between the read above and this write. It is small and it is real: two
             // administrators clicking within it both pass the revision check and exactly one of
             // them is accepted here.
-            return Failed(
-                RequestFailureCode.MovedSinceItWasRead,
-                "This request moved while the decision was being written, so it was refused rather than applied over the decision that got there first.",
-                current: lost.Current is StoredRequest now ? Queued(now) : null);
+            return NotMoved(
+                id,
+                Refusal(
+                    RequestFailureCode.MovedSinceItWasRead,
+                    "This request moved while the decision was being written, so it was refused rather than applied over the decision that got there first.",
+                    current: lost.Current is StoredRequest now ? Queued(now) : null));
         }
         catch (RequestStoreLoadException)
         {
-            return TheStoreCouldNotBeRead();
+            return NotMoved(id, StoreCouldNotBeRead);
         }
     }
 
@@ -659,9 +827,44 @@ public sealed class RequestsController : RequestsControllerBase
         string message,
         string? field = null,
         QueuedRequest? current = null)
-        => StatusCode(
-            RequestFailure.StatusFor(code),
-            new RequestFailure { Code = code, Message = message, Field = field, Current = current });
+        => Answer(Refusal(code, message, field, current));
+
+    /// <summary>
+    /// One failure, under the status code its class is reported with.
+    /// <para>
+    /// The pairing is <see cref="RequestFailure.StatusFor"/>'s and is read here rather than chosen,
+    /// which is what lets a refusal built inside a decision come back from the single endpoint under
+    /// the same status code it would have had if the endpoint had built it.
+    /// </para>
+    /// </summary>
+    /// <param name="failure">What went wrong.</param>
+    /// <returns>The failure, under its status code.</returns>
+    private ObjectResult Answer(RequestFailure failure)
+        => StatusCode(RequestFailure.StatusFor(failure.Code), failure);
+
+    /// <summary>
+    /// One failure, as the shape every failure of this API comes back in.
+    /// </summary>
+    /// <param name="code">What went wrong.</param>
+    /// <param name="message">The sentence for the person reading it.</param>
+    /// <param name="field">The field that is wrong, where there is one.</param>
+    /// <param name="current">What the store holds now, where the caller may see it.</param>
+    /// <returns>The failure.</returns>
+    private static RequestFailure Refusal(
+        RequestFailureCode code,
+        string message,
+        string? field = null,
+        QueuedRequest? current = null)
+        => new RequestFailure { Code = code, Message = message, Field = field, Current = current };
+
+    /// <summary>
+    /// One request an action did not move, and why.
+    /// </summary>
+    /// <param name="id">The request, as the caller named it.</param>
+    /// <param name="failure">Why it was refused.</param>
+    /// <returns>The entry.</returns>
+    private static DecidedRequest NotMoved(Guid id, RequestFailure failure)
+        => new DecidedRequest { Id = id, Failure = failure };
 
     /// <summary>
     /// A body that cannot be acted on, naming the field that is wrong.
@@ -696,9 +899,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// </summary>
     /// <returns>The failure.</returns>
     private ObjectResult TheStoreCouldNotBeRead()
-        => Failed(
-            RequestFailureCode.TheStoreCouldNotBeRead,
-            "The queue could not be read, so this call was not answered rather than answered with part of it. Nothing was changed. This is a fault on the server rather than anything wrong with the call, and the server log says which file and why.");
+        => Answer(StoreCouldNotBeRead);
 
     /// <summary>
     /// One request as the person waiting for it sees it.
@@ -853,6 +1054,146 @@ public sealed class RequestsController : RequestsControllerBase
         refusal = default;
         return true;
     }
+
+    /// <summary>
+    /// Refuses a decline that carries no usable reason, naming the field that is wrong.
+    /// <para>
+    /// One rule for the decline of one request and the decline of forty. The reason and the note are
+    /// the model's rules and are refused there by throwing; they are checked here as well, ahead of
+    /// the model, so the caller is told which field was wrong. Written once because a second copy is
+    /// the endpoint that ends up one rule behind, and both bodies spell these two fields the same,
+    /// which <c>BothDeclineBodiesSpellTheReasonAndTheNoteTheSameWay</c> holds.
+    /// </para>
+    /// </summary>
+    /// <param name="reason">The reason the caller sent.</param>
+    /// <param name="note">What the caller wants to say about it.</param>
+    /// <param name="refusal">The field and the reason, where the answer is no.</param>
+    /// <returns><see langword="true"/> where the decline can be made.</returns>
+    private static bool Declining(DeclineReason? reason, string? note, out (string Field, string Reason) refusal)
+    {
+        if (reason is not DeclineReason chosen || !Enum.IsDefined(chosen))
+        {
+            refusal = Refused(
+                nameof(DeclineRequestBody.Reason),
+                "A decline carries a reason. Without one the person who asked is told no and nothing else, and what they do next is ask for the same title again.");
+            return false;
+        }
+
+        if (chosen == DeclineReason.Other && string.IsNullOrWhiteSpace(note))
+        {
+            refusal = Refused(
+                nameof(DeclineRequestBody.Note),
+                "A decline for a reason that is not on the list has to say what the reason was. Other with nothing beside it is a decline with no reason, which is the thing a required reason exists to prevent.");
+            return false;
+        }
+
+        if (note is not null && note.Length > MediaRequest.NoteMaximumLength)
+        {
+            refusal = Refused(nameof(DeclineRequestBody.Note), Longer(nameof(DeclineRequestBody.Note), note.Length));
+            return false;
+        }
+
+        refusal = default;
+        return true;
+    }
+
+    /// <summary>
+    /// Refuses a selection that cannot be acted on, and hands back the requests where it can.
+    /// <para>
+    /// <b>The whole selection is refused rather than the part of it that is readable.</b> Every
+    /// check here is about the body rather than about the queue, so it is answered before anything
+    /// is written; acting on the readable half of a body somebody built wrong would leave an
+    /// operator with some of an action done and no way to tell which part was even attempted.
+    /// </para>
+    /// <para>
+    /// A position is named rather than an index, because the message is read by a person looking at
+    /// a body they sent, and the field is the list rather than one entry: an entry of a list is not
+    /// something the body names.
+    /// </para>
+    /// </summary>
+    /// <param name="requests">What the body carried.</param>
+    /// <param name="chosen">The requests and their revisions, where the selection can be acted on.</param>
+    /// <param name="refusal">The field and the reason, where it cannot.</param>
+    /// <returns><see langword="true"/> where the selection can be acted on.</returns>
+    private static bool Chosen(
+        IReadOnlyList<RequestToDecide>? requests,
+        out IReadOnlyList<(Guid Id, long Revision)> chosen,
+        out (string Field, string Reason) refusal)
+    {
+        chosen = [];
+
+        if (requests is null || requests.Count == 0)
+        {
+            refusal = Refused(
+                nameof(ApproveManyBody.Requests),
+                "An action carries the requests it is an action on. An empty one would be answered as having decided everything it was asked to, which is true and says nothing.");
+            return false;
+        }
+
+        if (requests.Count > MaximumPageSize)
+        {
+            refusal = Refused(
+                nameof(ApproveManyBody.Requests),
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "An action carries at most {0} requests, which is the page an operator selects them from. It is refused rather than acted on as far as the cap, because a caller told nothing would read a partly done action as a whole one.",
+                    MaximumPageSize));
+            return false;
+        }
+
+        var picked = new List<(Guid Id, long Revision)>(requests.Count);
+        var seen = new Dictionary<Guid, int>();
+
+        for (var position = 0; position < requests.Count; position++)
+        {
+            var one = requests[position];
+
+            if (one?.Id is not Guid id || id == Guid.Empty)
+            {
+                refusal = Refused(
+                    nameof(ApproveManyBody.Requests),
+                    At(position, "names no request, so there is nothing for this action to decide there."));
+                return false;
+            }
+
+            if (one.Revision is not long revision)
+            {
+                refusal = Refused(
+                    nameof(ApproveManyBody.Requests),
+                    At(position, "carries no revision. A decision made against whatever the store holds by the time it arrives is how two operators deciding one request end with one decision silently lost."));
+                return false;
+            }
+
+            if (seen.TryGetValue(id, out var first))
+            {
+                refusal = Refused(
+                    nameof(ApproveManyBody.Requests),
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        "The same request is in position {0} and position {1}. The second would be refused as having moved since it was read, against a move this same action had just made, so the action is refused instead of answering with a conflict it created itself.",
+                        first + 1,
+                        position + 1));
+                return false;
+            }
+
+            seen.Add(id, position);
+            picked.Add((id, revision));
+        }
+
+        chosen = picked;
+        refusal = default;
+        return true;
+    }
+
+    /// <summary>
+    /// One sentence about the request in one position of a selection, counted the way somebody
+    /// reading their own body counts.
+    /// </summary>
+    /// <param name="position">Where it is in the list, counted from zero.</param>
+    /// <param name="wrong">What is wrong with it.</param>
+    /// <returns>The sentence.</returns>
+    private static string At(int position, string wrong)
+        => string.Format(CultureInfo.InvariantCulture, "The request in position {0} {1}", position + 1, wrong);
 
     /// <summary>
     /// The message for a field that is longer than a request keeps.
