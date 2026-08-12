@@ -99,7 +99,7 @@ public class WantHandoverTests
             .ToArray();
 
         Assert.Equal(
-            ["IRequestStore", "IClock", "IIdentifierSource", "IInstallSettings", "IKnownUsers", "ILogger"],
+            ["IRequestStore", "IClock", "IIdentifierSource", "IInstallSettings", "IKnownUsers", "ILogger", "TimeSpan"],
             taken);
     }
 
@@ -449,6 +449,133 @@ public class WantHandoverTests
     }
 
     /// <summary>
+    /// Every layer beneath the seam, failing one at a time in a way nothing above it names, and no
+    /// exception reaching the caller from any of them.
+    /// <para>
+    /// The refusals the seam decides on by name are proven case by case above, with the exceptions
+    /// that carry them. This is the other half: what arrives that nobody wrote a name for. The
+    /// caller is another plugin serving a user's gesture on a surface this one does not own, so a
+    /// defect here becoming an exception there fails that gesture for a reason nobody on that side
+    /// can act on.
+    /// </para>
+    /// </summary>
+    /// <param name="layer">Which layer beneath the seam fails.</param>
+    /// <returns>A task that completes when the case has been checked.</returns>
+    [Theory]
+    [InlineData("the queue")]
+    [InlineData("the clock")]
+    [InlineData("the identifier source")]
+    [InlineData("the settings")]
+    [InlineData("the server's users")]
+    public async Task NothingLeavesTheSeamWhenALayerBeneathItFails(string layer)
+    {
+        var log = new RecordingLogger();
+
+        var accepted = await SeamOver(layer, log).AcceptAsync(Want(), CancellationToken.None);
+
+        Assert.False(accepted);
+        Assert.Contains(
+            nameof(HandoverRefusal.SomethingBeneathThisSeamFailed),
+            Assert.Single(log.At(LogLevel.Warning)).Message,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// What failed is on the log at error level with the fault itself, so an operator has the thing
+    /// the caller was not told. A refusal the other side cannot read a reason out of is only
+    /// acceptable while the reason reaches somebody.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task WhatFailedBeneathTheSeamReachesTheOperatorEvenThoughTheCallerIsNotTold()
+    {
+        var log = new RecordingLogger();
+
+        Assert.False(await SeamOver("the queue", log).AcceptAsync(Want(), CancellationToken.None));
+
+        var reported = Assert.Single(log.At(LogLevel.Error));
+
+        Assert.Equal(ALayerThatFails.Detail, Assert.IsType<InvalidOperationException>(reported.Exception).Message);
+    }
+
+    /// <summary>
+    /// A call carrying no field set at all is answered rather than raised. It is a defect in the
+    /// caller rather than a want that could not be taken, and it is still answered the same way,
+    /// because the boundary is what it is regardless of who was wrong.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AHandoverCarryingNoFieldSetIsAnsweredRatherThanRaised()
+    {
+        var log = new RecordingLogger();
+
+        Assert.False(await Seam(new InMemoryRequestStore(), log: log).AcceptAsync(null!, CancellationToken.None));
+        Assert.Contains(
+            nameof(HandoverRefusal.NothingWasHandedOver),
+            Assert.Single(log.At(LogLevel.Warning)).Message,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A store that will never answer is given up on rather than waited out, so the handover returns
+    /// whatever the queue is doing.
+    /// <para>
+    /// This is the case a cancellation token does not reach. A token is a request the callee honours
+    /// and the case worth bounding is the one where it cannot: a write holding a lock nothing will
+    /// release leaves a task that never completes however politely it is asked to stop.
+    /// </para>
+    /// <para>
+    /// The bound is passed as nothing here, so the test spends no real time and does not depend on
+    /// how busy the machine is. What it proves is that the seam races the queue rather than awaiting
+    /// it; what the number is on a server is <see cref="WantHandover.DefaultAnswerWithin"/>, and it
+    /// is what the registrator hands over.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AQueueThatNeverAnswersIsRefusedRatherThanWaitedOut()
+    {
+        var log = new RecordingLogger();
+
+        var accepted = await Seam(new StoreThatNeverAnswers(), log: log, answerWithin: TimeSpan.Zero)
+            .AcceptAsync(Want(), CancellationToken.None);
+
+        Assert.False(accepted);
+        Assert.Contains(
+            nameof(HandoverRefusal.TheStoreDidNotAnswerInTime),
+            Assert.Single(log.At(LogLevel.Warning)).Message,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A handover the caller cancelled is answered rather than raised, for the same reason as
+    /// everything else here. No request was made, which is what the one bit says.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task ACancelledHandoverIsAnsweredRatherThanRaised()
+    {
+        using var gone = new CancellationTokenSource();
+
+        await gone.CancelAsync();
+
+        var store = new InMemoryRequestStore();
+
+        Assert.False(await Seam(store).AcceptAsync(Want(), gone.Token));
+        Assert.Empty(await store.GetAllAsync(CancellationToken.None));
+    }
+
+    /// <summary>
+    /// A server hands the seam the bound this plugin ships with, and it is a real one rather than
+    /// none. A bound of nothing would refuse every handover a store did not answer synchronously.
+    /// </summary>
+    [Fact]
+    public void TheBoundAServerGetsIsARealOne()
+    {
+        Assert.True(WantHandover.DefaultAnswerWithin > TimeSpan.Zero);
+    }
+
+    /// <summary>
     /// The field sets that cannot become a request, each with the refusal that names what is wrong.
     /// </summary>
     /// <returns>One case per way of being wrong.</returns>
@@ -484,17 +611,82 @@ public class WantHandoverTests
     /// <param name="settings">What the install is set to, or a fresh install where not given.</param>
     /// <param name="log">Where refusals are written, or a discarded one where not given.</param>
     /// <param name="users">Who the server has, or both people these tests use where not given.</param>
+    /// <param name="answerWithin">
+    /// How long to wait for the queue, or the shipping bound where not given. A test that is not
+    /// about waiting takes the shipping one, so nothing here passes for the wrong reason.
+    /// </param>
     /// <returns>The seam under test.</returns>
     private static WantHandover Seam(
         IRequestStore store,
         IInstallSettings? settings = null,
         RecordingLogger? log = null,
-        IKnownUsers? users = null)
+        IKnownUsers? users = null,
+        TimeSpan? answerWithin = null)
         => new WantHandover(
             store,
             new TestClock(Noon),
             new SequentialIdentifierSource(),
             settings ?? new FakeInstallSettings(),
             users ?? new FakeKnownUsers(Asker, SecondAsker),
-            log ?? new RecordingLogger());
+            log ?? new RecordingLogger(),
+            answerWithin ?? WantHandover.DefaultAnswerWithin);
+
+    /// <summary>
+    /// The seam with one layer beneath it failing and every other layer as it is elsewhere here.
+    /// </summary>
+    /// <param name="layer">Which layer fails.</param>
+    /// <param name="log">Where the refusal is written.</param>
+    /// <returns>The seam under test.</returns>
+    private static WantHandover SeamOver(string layer, RecordingLogger log)
+    {
+        var failing = new ALayerThatFails();
+
+        // An unrecognised name is a case nobody wrote, and it fails here rather than passing as a
+        // handover over five working layers.
+        return layer switch
+        {
+            "the queue" => new WantHandover(
+                failing,
+                new TestClock(Noon),
+                new SequentialIdentifierSource(),
+                new FakeInstallSettings(),
+                new FakeKnownUsers(Asker, SecondAsker),
+                log,
+                WantHandover.DefaultAnswerWithin),
+            "the clock" => new WantHandover(
+                new InMemoryRequestStore(),
+                failing,
+                new SequentialIdentifierSource(),
+                new FakeInstallSettings(),
+                new FakeKnownUsers(Asker, SecondAsker),
+                log,
+                WantHandover.DefaultAnswerWithin),
+            "the identifier source" => new WantHandover(
+                new InMemoryRequestStore(),
+                new TestClock(Noon),
+                failing,
+                new FakeInstallSettings(),
+                new FakeKnownUsers(Asker, SecondAsker),
+                log,
+                WantHandover.DefaultAnswerWithin),
+            "the settings" => new WantHandover(
+                new InMemoryRequestStore(),
+                new TestClock(Noon),
+                new SequentialIdentifierSource(),
+                failing,
+                new FakeKnownUsers(Asker, SecondAsker),
+                log,
+                WantHandover.DefaultAnswerWithin),
+            "the server's users" => new WantHandover(
+                new InMemoryRequestStore(),
+                new TestClock(Noon),
+                new SequentialIdentifierSource(),
+                new FakeInstallSettings(),
+                failing,
+                log,
+                WantHandover.DefaultAnswerWithin),
+
+            _ => throw new ArgumentOutOfRangeException(nameof(layer), layer, "That is not a layer beneath the seam.")
+        };
+    }
 }

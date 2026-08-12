@@ -40,6 +40,54 @@ So a change to `docs/api.md` is not a change to the seam, and a change to the co
 change to the API. Somebody who conflates them will either look for a route that does not exist or
 apply the API's rules to a call that has none of them.
 
+## How each side finds the other
+
+Neither side goes looking. The sibling declares the contract, asks the server's container for every
+implementation of it, and treats none at all as a complete and supported state rather than an error.
+This side's whole job is to be one of those implementations, put there when this plugin loads:
+
+    git grep -n 'AddSingleton<IWantHandover>' -- Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs
+
+That is the registration Jellyfin gives a plugin for exactly this, so there is no discovery
+mechanism here, no probe, and nothing on either side that has to be told the other exists.
+
+**Exactly one implementation is registered, and that is a rule rather than an accident.** Several
+would be a thing the sibling has to define the meaning of, and this plugin should not be what forces
+that question. `ExactlyOneSinkIsRegistered` refuses a second one.
+
+**Registering costs a server with no sibling installed nothing.** That is the ordinary server and
+the one most people run. Nothing here reaches for the other plugin, nothing starts, and a handover
+that never arrives leaves an object nobody asks. `TheSinkWorksOnAServerWithNoSiblingInstalled` is
+that state, asserted while `SiblingIndependenceTests` holds that no sibling assembly is loaded at
+all.
+
+**Being reachable is a different claim and is not made here.** Naming a type means having the type,
+and whether a second plugin in one server process can name this one is #117, which nobody has
+measured on either claimed line. Resolving the sink from inside this assembly, which is what the
+suite does, says the registration is there and says nothing about who else can ask for it.
+
+### Two obligations that come with being a sink
+
+Both are about the caller rather than about this plugin, because the thing on the other end of the
+call is a user's gesture on a surface this plugin does not own.
+
+**Nothing leaves the call except the answer.** No exception crosses the boundary, including one
+raised by something nothing here foresaw, because a defect in this plugin arriving there fails that
+gesture for a reason nobody on that side can act on. The refusals this side can name are in
+`HandoverRefusal`; everything else is caught at the boundary, written to this server's log at error
+level with the fault itself, and answered as the same one bit. A cancelled call answers the same
+way, because no request was made.
+
+**The call does not wait on this side's queue for longer than it gives itself.** A sink that hangs
+stalls the gesture behind it just as surely as one that throws. The bound is
+`WantHandover.DefaultAnswerWithin` and it is raced against the call rather than handed down as a
+cancellation token, because the case worth bounding is the one a token cannot reach: a write holding
+a lock nothing will release leaves a task that never completes however politely it is asked to stop.
+
+Giving up is safe here for the same reason a repeat is safe. The want carries an identifier, the
+other side hands it over again, and a request the abandoned call still managed to write is
+recognised as the repeat it is rather than made twice.
+
 ## Both sides watch the library, and neither tells the other
 
 This plugin decides that a request is fulfilled by watching the server's library for the thing
@@ -223,6 +271,5 @@ the closing condition of the issue beside it.
 - What a request records about having arrived over the seam, and which caller handed it over. The
   contract carries no field naming the caller, so the second half of that is a question for the
   contract rather than for this side. #118.
-- How each side finds the other. #89.
 - What an undone gesture does, which today is nothing, because the contract carries no message for
   it. #68.
