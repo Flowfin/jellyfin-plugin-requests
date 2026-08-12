@@ -39,6 +39,13 @@ public class SiblingIndependenceTests
         // that enumeration lives here rather than beside the library interface it is passed to. It
         // arrives with the server's own libraries and is excluded from the install with them.
         "Jellyfin.Data",
+
+        // The seam refuses a handover naming somebody this server does not have, in #118, and the
+        // only member of the server's user manager that answers on both claimed lines hands back the
+        // user record. Nothing here reads that record: the answer is thrown away and its presence is
+        // the whole result. The reference is the price of asking, it arrives with the server's own
+        // libraries, and it is excluded from the install with them.
+        "Jellyfin.Database.Implementations",
         "MediaBrowser.Common",
         "MediaBrowser.Controller",
         "MediaBrowser.Model",

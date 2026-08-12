@@ -140,6 +140,35 @@ which is neither a leak that has been shown nor a safety anybody has earned. The
 that a caller reads their own requests and never another person's, is enforced at the endpoints in
 `docs/api.md` and not by the store beneath them.
 
+## What this side trusts, and what it checks anyway
+
+The HTTP API takes the requester from the authenticated session and refuses a body that names
+somebody else, so filing a request as another person is not something it declines to do, it is
+something the call has no way to express. The seam is the opposite shape: it carries a user
+identifier, there is no session behind it, and this plugin cannot verify that the person named is
+the person who asked.
+
+**That is a boundary rather than a hole, and the reason is worth stating plainly.** The caller is
+another plugin running inside the same server process. Anything in that process can already read
+this plugin's store, write its files, and do a great deal more than file a request in somebody's
+name. A check here would therefore protect against nothing that is not already possible, and it
+would read afterwards as a check that was made.
+
+**So the sibling's own permission check is the only check on that path, and this side is trusting
+it.** Whoever is evaluating this plugin should read that sentence as it stands: a want that arrives
+over the seam is attributed to whoever the caller says asked for it.
+
+**What this side checks anyway is that the identifier names somebody this server has.** That is a
+different question from whether they asked, and it is the one this side can answer. A handover
+naming a user the server does not have is refused and nothing is stored, because a request against
+a user nobody has is a row no surface can ever show to anyone and a person nothing can ever notify.
+
+    git grep -n 'UserNotOnThisServer' -- Jellyfin.Plugin.Requests/Seam/
+
+The check costs one reference, which is written down in `SiblingIndependenceTests` with the reason:
+the server's user manager answers this question with the user record, and this plugin reads nothing
+out of that record.
+
 ## A field set this side does not understand is refused whole
 
 The contract carries a version. What this side does with one it does not know is a stated rule
@@ -191,8 +220,9 @@ install is refusing and why is the diagnostics view in #63.
 Named here so the absence is read as absence rather than as a decision nobody wrote down. Each is
 the closing condition of the issue beside it.
 
-- The trust position of an in-process handover, and what this side checks before it believes a user
-  identifier it cannot verify. #118.
+- What a request records about having arrived over the seam, and which caller handed it over. The
+  contract carries no field naming the caller, so the second half of that is a question for the
+  contract rather than for this side. #118.
 - How each side finds the other. #89.
 - What an undone gesture does, which today is nothing, because the contract carries no message for
   it. #68.
