@@ -92,6 +92,45 @@ suite cannot say is that a socket was blocked while it ran; what it says instead
 assembly references nothing that could open one, which is the exact reference list in
 `SiblingIndependenceTests` and fails on any addition.
 
+## No read crosses back, and that is a refusal rather than a gap
+
+There is an obvious feature on the other side of this seam that is not going to be built. A browsing
+surface showing that a title has already been asked for would stop a user asking twice, and it reads
+well. It needs the browsing side to read request state out of this one.
+
+The contract is one way. A handover carries a want across and nothing is learned back except that it
+was accepted. A query in the other direction would make each side hold a piece of the other's state,
+which is the arrangement both boards are avoiding and the reason the contract is shaped this way at
+all. So this side offers the seam no way to read request state, and the duplicate case is answered
+where the handover happens instead: the same want arriving twice produces one request, which is
+#116, and the sibling's own repeat handling does the rest on its side.
+
+The user's answer to what happened to their request comes from this plugin's own surface, decided in
+[`docs/surface.md`](surface.md) and reaching the same clients: the channel for a client that renders
+one, the page for a browser. Not from the seam, and not from anything the sibling draws.
+
+### Refusing a read over the seam is not the same as nothing being able to read
+
+The second statement is the wider one and it is false today, so it is written here rather than left
+for somebody to infer from the first.
+
+`IRequestStore` is public, and the plugin registers it into the container the server hands it:
+
+    git grep -n 'AddSingleton<IRequestStore>' -- Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:52:        serviceCollection.AddSingleton<IRequestStore>(provider => new FileRequestStore(
+
+That collection is the server's own, not one this plugin keeps to itself, so the registration sits
+where everything else in the process can be resolved from. What the interface answers is not
+narrowed by who is asking: `GetAllAsync` returns every request in the store and `PageAsync` answers
+a query over all of them.
+
+What this does not say is that another plugin can reach it. Naming a type means having the type, and
+whether a second plugin in one process can name this one is the assembly-loading question #117 asks
+and nobody here has measured. So what is written down is an exposure of unmeasured reachability,
+which is neither a leak that has been shown nor a safety anybody has earned. The rule the API keeps,
+that a caller reads their own requests and never another person's, is enforced at the endpoints in
+`docs/api.md` and not by the store beneath them.
+
 ## What this document does not yet hold
 
 Named here so the absence is read as absence rather than as a decision nobody wrote down. Each is

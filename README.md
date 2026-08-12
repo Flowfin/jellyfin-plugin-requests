@@ -10,12 +10,46 @@ server for a film or a series it does not have, an administrator sees the ask in
 a queue and answers it, and the request keeps its own state and history on the
 server rather than in somebody's chat log.
 
+## What it does not do
+
+Three things this is regularly expected to do and does not. Each was decided
+rather than left out, which is why they are here rather than in an issue nobody
+finds.
+
+It does not fetch media. Approving a request moves a record from one state to
+another and reaches nothing that downloads anything. What makes the film turn up
+is whatever the operator already runs, and this plugin notices it arriving by
+watching the server's own library.
+
+It does not manage a download client. There is no connection to one and none is
+planned. Where an operator runs an external request service, an approved request
+can be handed to that service and the service is what talks to whatever fetches;
+that handover, and the words the two sides have to agree on, are in
+[docs/bridge.md](docs/bridge.md).
+
+It ships no way to find a title the server does not have. On a server with no
+browsing sibling plugin installed there is no gesture on a television client
+that creates a request at all. The reason is that the sibling owns the catalogue
+and this plugin calls no metadata source, and that is refused rather than
+promised: `no-call-to-a-metadata-source` in `tools/opengrep/rules.yaml` refuses
+the server's provider interfaces and the addresses a plugin would otherwise call
+directly, and carries the fixture it is watched refusing.
+
 ## This is not finished
 
-There is no release, no package and nothing to install. Most of the plugin does
-not exist yet: what the tree holds is the scaffolding a Jellyfin plugin starts
-from, with the build retargeted at the two server lines below. Nothing here
-should be pointed at a server you care about.
+One release exists, and no plugin catalogue serves it:
+
+    gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName --jq '.[].tagName'
+    0.1.0.0-stable
+
+[docs/RELEASING.md](docs/RELEASING.md) says the same about itself: a GitHub
+release is the whole output, and nothing feeds a catalogue until a manifest
+generator is added. The archive that release carries is built for the one server
+line `build.yaml` names, so an operator on the other line has nothing to install
+even by hand. The packaged install path has not been tried on any server, on
+either line.
+
+Nothing here should be pointed at a server you care about.
 
 The plan is on the issue tracker, cut into milestones. Each issue says what is
 wrong, what the evidence is and what has to be true for it to be closed.
@@ -23,15 +57,38 @@ wrong, what the evidence is and what has to be true for it to be closed.
 ## Server lines
 
 Two server generations are claimed, and each gets its own package because a
-plugin compiled for one runtime does not load on the other.
+plugin compiled for one runtime does not load on the other. Claimed is not
+published: the section above says which of the two the one release carries.
 
 | Line           | Runtime | Packaging metadata | Oldest server claimed |
 | -------------- | ------- | ------------------ | --------------------- |
 | Jellyfin 10.11 | .NET 9  | `build.yaml`       | 10.11.0.0             |
 | Jellyfin 12.0  | .NET 10 | `build-jf12.yaml`  | 12.0.0.0              |
 
-Those numbers are the `targetAbi` and `framework` fields of the two files named
-in the table, and they are what the project file multi-targets against.
+Those numbers are read out of the two files rather than restated from memory, so
+an edit to either shows up as a difference between this table and what the
+command prints:
+
+    git grep -nE '^(version|targetAbi|framework):' -- build.yaml build-jf12.yaml
+    build-jf12.yaml:13:version: "0.1.0.0"
+    build-jf12.yaml:15:targetAbi: "12.0.0.0"
+    build-jf12.yaml:16:framework: "net10.0"
+    build.yaml:5:version: "0.1.0.0"
+    build.yaml:10:targetAbi: "10.11.0.0"
+    build.yaml:11:framework: "net9.0"
+
+The `framework` of each line is what the project file multi-targets against. The
+`version` both files carry is one number held in one place, and a test refuses a
+disagreement between it and the assembly rather than trusting three copies to be
+edited together:
+
+    git grep -n '<PluginVersion>' -- Directory.Build.props
+    Directory.Build.props:11:        <PluginVersion>0.1.0.0</PluginVersion>
+
+That test is `PluginVersionMatchesThePackagingMetadata` in
+`Jellyfin.Plugin.Requests.Tests/PackagingMetadataTests.cs`, and
+[docs/versioning.md](docs/versioning.md) is where the scheme and what each field
+means to somebody who already has this installed are written down.
 
 An assembly built for each line has been installed on a server of that line and
 reported `Active` by the server itself. The transcript of that run, the images
