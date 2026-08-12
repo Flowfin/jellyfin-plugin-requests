@@ -4,6 +4,7 @@ using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Identity;
+using Jellyfin.Plugin.Requests.Seam;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
 using MediaBrowser.Controller;
@@ -72,6 +73,16 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // service exists before deciding what to do. An adapter, when there is one, replaces this
         // registration and nothing else.
         serviceCollection.AddSingleton<IRequestBackend, NoRequestBackend>();
+
+        // The seam the sibling discover plugin hands a want across. Registered into the server's own
+        // collection because that is where a second plugin in this process would resolve it from;
+        // whether one can name the type at all is #117 and is not decided by registering it.
+        serviceCollection.AddSingleton<IWantHandover>(provider => new WantHandover(
+            provider.GetRequiredService<IRequestStore>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IIdentifierSource>(),
+            provider.GetRequiredService<IInstallSettings>(),
+            provider.GetRequiredService<ILogger<WantHandover>>()));
 
         // The server's library, as the two questions this plugin asks of it. One per server, because
         // the instance subscribes to the library's own events and a second subscription would look
