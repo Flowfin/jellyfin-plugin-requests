@@ -62,6 +62,7 @@ public sealed class WantHandover : IWantHandover
     private readonly IClock _clock;
     private readonly IIdentifierSource _identifiers;
     private readonly IInstallSettings _settings;
+    private readonly IKnownUsers _users;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -71,6 +72,7 @@ public sealed class WantHandover : IWantHandover
     /// <param name="clock">The injected clock, so a request's times are testable.</param>
     /// <param name="identifiers">Where a new request's identifier comes from.</param>
     /// <param name="settings">What this install is set to.</param>
+    /// <param name="users">The server's answer to whether it has the user a want names.</param>
     /// <param name="logger">Where a refusal is written.</param>
     /// <exception cref="ArgumentNullException">Where anything it needs is missing.</exception>
     public WantHandover(
@@ -78,12 +80,14 @@ public sealed class WantHandover : IWantHandover
         IClock clock,
         IIdentifierSource identifiers,
         IInstallSettings settings,
+        IKnownUsers users,
         ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(identifiers);
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(logger);
 
         _store = store;
@@ -91,6 +95,7 @@ public sealed class WantHandover : IWantHandover
         _clock = clock;
         _identifiers = identifiers;
         _settings = settings;
+        _users = users;
         _logger = logger;
     }
 
@@ -118,6 +123,15 @@ public sealed class WantHandover : IWantHandover
         if (want.RequestedByUserId == Guid.Empty)
         {
             return Refused(want, HandoverRefusal.NoUserNamed);
+        }
+
+        // The identifier cannot be verified as the person who actually asked, and this side is in no
+        // position to check that: there is no session on a call from another plugin. What it can
+        // check is that the identifier names somebody, which is the difference between trusting the
+        // caller's permission check and storing a request against a user nobody has.
+        if (!_users.Has(want.RequestedByUserId))
+        {
+            return Refused(want, HandoverRefusal.UserNotOnThisServer);
         }
 
         if (string.IsNullOrWhiteSpace(want.Title))

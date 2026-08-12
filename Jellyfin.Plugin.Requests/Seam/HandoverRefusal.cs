@@ -27,6 +27,13 @@ public enum HandoverRefusal
     NoUserNamed = 1,
 
     /// <summary>
+    /// The user the want named is not a user this server has. The identifier could not be verified
+    /// as belonging to the person who asked, which is the trust position <c>docs/seam.md</c> states,
+    /// but it can be checked against the server's own users and this one is not among them.
+    /// </summary>
+    UserNotOnThisServer = 8,
+
+    /// <summary>
     /// The field set carried no identifier for the want itself, so a repeat of it could never be
     /// recognised as one and every arrival would be a new request.
     /// </summary>

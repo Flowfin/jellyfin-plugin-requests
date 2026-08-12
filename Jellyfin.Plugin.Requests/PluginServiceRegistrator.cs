@@ -77,11 +77,14 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // The seam the sibling discover plugin hands a want across. Registered into the server's own
         // collection because that is where a second plugin in this process would resolve it from;
         // whether one can name the type at all is #117 and is not decided by registering it.
+        serviceCollection.AddSingleton<IKnownUsers, ServerKnownUsers>();
+
         serviceCollection.AddSingleton<IWantHandover>(provider => new WantHandover(
             provider.GetRequiredService<IRequestStore>(),
             provider.GetRequiredService<IClock>(),
             provider.GetRequiredService<IIdentifierSource>(),
             provider.GetRequiredService<IInstallSettings>(),
+            provider.GetRequiredService<IKnownUsers>(),
             provider.GetRequiredService<ILogger<WantHandover>>()));
 
         // The server's library, as the two questions this plugin asks of it. One per server, because

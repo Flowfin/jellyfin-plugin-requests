@@ -99,7 +99,7 @@ public class WantHandoverTests
             .ToArray();
 
         Assert.Equal(
-            ["IRequestStore", "IClock", "IIdentifierSource", "IInstallSettings", "ILogger"],
+            ["IRequestStore", "IClock", "IIdentifierSource", "IInstallSettings", "IKnownUsers", "ILogger"],
             taken);
     }
 
@@ -406,6 +406,49 @@ public class WantHandoverTests
     }
 
     /// <summary>
+    /// A handover naming somebody this server does not have is refused. The identifier cannot be
+    /// verified as the person who actually asked, and nothing here pretends otherwise; what it can
+    /// be checked against is the server's own users, and a request stored against a user nobody has
+    /// is one no surface can ever show to anybody.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AHandoverNamingAUserTheServerDoesNotHaveIsRefused()
+    {
+        var store = new InMemoryRequestStore();
+        var log = new RecordingLogger();
+
+        var accepted = await Seam(store, log: log, users: FakeKnownUsers.Nobody())
+            .AcceptAsync(Want(), CancellationToken.None);
+
+        Assert.False(accepted);
+        Assert.Empty(await store.GetAllAsync(CancellationToken.None));
+        Assert.Contains(
+            nameof(HandoverRefusal.UserNotOnThisServer),
+            Assert.Single(log.At(LogLevel.Warning)).Message,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The server is asked about the user the want names and not about anybody else. A check that
+    /// passed for the wrong person would be worse than none, because it reads afterwards as a check
+    /// that was made.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task TheUserAskedAboutIsTheOneTheWantNames()
+    {
+        var store = new InMemoryRequestStore();
+
+        var accepted = await Seam(store, users: new FakeKnownUsers(SecondAsker))
+            .AcceptAsync(Want(), CancellationToken.None);
+
+        Assert.False(accepted);
+        Assert.True(await Seam(store, users: new FakeKnownUsers(SecondAsker))
+            .AcceptAsync(Want() with { RequestedByUserId = SecondAsker }, CancellationToken.None));
+    }
+
+    /// <summary>
     /// The field sets that cannot become a request, each with the refusal that names what is wrong.
     /// </summary>
     /// <returns>One case per way of being wrong.</returns>
@@ -440,15 +483,18 @@ public class WantHandoverTests
     /// <param name="store">Where requests are kept.</param>
     /// <param name="settings">What the install is set to, or a fresh install where not given.</param>
     /// <param name="log">Where refusals are written, or a discarded one where not given.</param>
+    /// <param name="users">Who the server has, or both people these tests use where not given.</param>
     /// <returns>The seam under test.</returns>
     private static WantHandover Seam(
         IRequestStore store,
         IInstallSettings? settings = null,
-        RecordingLogger? log = null)
+        RecordingLogger? log = null,
+        IKnownUsers? users = null)
         => new WantHandover(
             store,
             new TestClock(Noon),
             new SequentialIdentifierSource(),
             settings ?? new FakeInstallSettings(),
+            users ?? new FakeKnownUsers(Asker, SecondAsker),
             log ?? new RecordingLogger());
 }
