@@ -29,6 +29,15 @@ namespace Jellyfin.Plugin.Requests.Seam;
 /// caller's own code path for something that is an ordinary answer here.
 /// </para>
 /// <para>
+/// <b>That holds for what nothing here foresaw as well, and for waiting.</b> The refusals below are
+/// the ones this side can name; the boundary catches everything else and answers the same one bit,
+/// so a defect in this plugin cannot become an exception on a surface it does not own. Waiting is
+/// the other half of the same promise: a call into the queue is raced against
+/// <see cref="DefaultAnswerWithin"/> and refused where the queue has not answered by then, because a
+/// sink that hangs stalls the gesture behind it just as surely as one that throws. Both are safe to
+/// do because a want carries an identifier and the other side hands it over again.
+/// </para>
+/// <para>
 /// <b>Whether an ask joins an existing request is not decided here.</b> It is
 /// <see cref="RequestIntake"/>'s, which is the same object the HTTP endpoint asks, so two users
 /// wanting the same film produce one request with both of them recorded however each of them asked.
@@ -57,6 +66,18 @@ public sealed class WantHandover : IWantHandover
     /// </summary>
     public const int KnownContractVersion = 1;
 
+    /// <summary>
+    /// How long this side waits for the queue before it answers without it.
+    /// <para>
+    /// The number is deliberately larger than any write this store makes and far smaller than a
+    /// person's patience on the surface the other plugin draws. What it is really bounding is the
+    /// case no timeout on the store itself can bound, which is a store that has stopped answering
+    /// rather than one that is slow, and the cost of being wrong about it is one want handed over
+    /// again rather than one want lost.
+    /// </para>
+    /// </summary>
+    public static readonly TimeSpan DefaultAnswerWithin = TimeSpan.FromSeconds(5);
+
     private readonly IRequestStore _store;
     private readonly RequestIntake _intake;
     private readonly IClock _clock;
@@ -64,6 +85,7 @@ public sealed class WantHandover : IWantHandover
     private readonly IInstallSettings _settings;
     private readonly IKnownUsers _users;
     private readonly ILogger _logger;
+    private readonly TimeSpan _answerWithin;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WantHandover"/> class.
@@ -74,14 +96,21 @@ public sealed class WantHandover : IWantHandover
     /// <param name="settings">What this install is set to.</param>
     /// <param name="users">The server's answer to whether it has the user a want names.</param>
     /// <param name="logger">Where a refusal is written.</param>
+    /// <param name="answerWithin">
+    /// How long to wait for the queue before answering without it. A server passes
+    /// <see cref="DefaultAnswerWithin"/>; it is a parameter so the bound can be proven rather than
+    /// waited out.
+    /// </param>
     /// <exception cref="ArgumentNullException">Where anything it needs is missing.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Where the bound is negative.</exception>
     public WantHandover(
         IRequestStore store,
         IClock clock,
         IIdentifierSource identifiers,
         IInstallSettings settings,
         IKnownUsers users,
-        ILogger logger)
+        ILogger logger,
+        TimeSpan answerWithin)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(clock);
@@ -89,6 +118,7 @@ public sealed class WantHandover : IWantHandover
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentOutOfRangeException.ThrowIfLessThan(answerWithin, TimeSpan.Zero);
 
         _store = store;
         _intake = new RequestIntake(store);
@@ -97,14 +127,57 @@ public sealed class WantHandover : IWantHandover
         _settings = settings;
         _users = users;
         _logger = logger;
+        _answerWithin = answerWithin;
     }
 
     /// <inheritdoc />
-    /// <exception cref="ArgumentNullException">Where there is no want to accept.</exception>
     public async Task<bool> AcceptAsync(HandedOverWant want, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(want);
+        if (want is null)
+        {
+            _logger.LogWarning(
+                "A handover crossed the seam carrying no field set at all, so there was nothing to make a request of: {Refusal}.",
+                HandoverRefusal.NothingWasHandedOver);
 
+            return false;
+        }
+
+        try
+        {
+            return await TakeAsync(want, cancellationToken).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // Do not catch general exception types
+        catch (Exception reason)
+#pragma warning restore CA1031
+        {
+            // Nothing at all leaves this call. The caller is another plugin, and the thing it is
+            // serving is a user's gesture on a surface this plugin does not own, so a fault of this
+            // plugin's arriving there is that user's gesture failing for a reason nobody on that
+            // side can act on. Every ordinary outcome is refused by name above; this catches what
+            // nothing here foresaw, including a cancellation, which is one more way of saying no
+            // request was made.
+            _logger.LogError(
+                reason,
+                "A want handed over the seam ran into something nothing here expected, so it was refused. The other side calls it {WantId}.",
+                want.WantId);
+
+            return Refused(want, HandoverRefusal.SomethingBeneathThisSeamFailed);
+        }
+    }
+
+    /// <summary>
+    /// The handover itself, with every refusal it can decide on by name.
+    /// <para>
+    /// It is separate from <see cref="AcceptAsync"/> so that the boundary is one place rather than a
+    /// promise made again at every return. What leaves here may throw; what leaves the method above
+    /// may not.
+    /// </para>
+    /// </summary>
+    /// <param name="want">The field set the contract fixes.</param>
+    /// <param name="cancellationToken">Cancels the handover.</param>
+    /// <returns>Whether a request for this want now exists.</returns>
+    private async Task<bool> TakeAsync(HandedOverWant want, CancellationToken cancellationToken)
+    {
         // The version is read before any other field. A field set whose version this side does not
         // know is refused whole rather than read for the fields it recognises: reading what is
         // recognised and ignoring the rest makes a version that changed the meaning of a field
@@ -160,18 +233,24 @@ public sealed class WantHandover : IWantHandover
             return Refused(want, HandoverRefusal.KindNotAccepted);
         }
 
-        StoredRequest? absorbed;
+        Answer<StoredRequest?> lookup;
 
         try
         {
-            absorbed = await _store.FindByWantAsync(want.WantId, cancellationToken).ConfigureAwait(false);
+            lookup = await WithinTheBoundAsync(
+                _store.FindByWantAsync(want.WantId, cancellationToken)).ConfigureAwait(false);
         }
         catch (RequestStoreLoadException)
         {
             return Refused(want, HandoverRefusal.TheStoreCouldNotBeReached);
         }
 
-        if (absorbed is StoredRequest already)
+        if (!lookup.InTime)
+        {
+            return Refused(want, HandoverRefusal.TheStoreDidNotAnswerInTime);
+        }
+
+        if (lookup.Value is StoredRequest already)
         {
             // The same want again, which is the ordinary case rather than a defect: the other side
             // hands one over after a refresh that recreated the item, after a restart, and after a
@@ -204,11 +283,12 @@ public sealed class WantHandover : IWantHandover
             WantIds = [want.WantId]
         };
 
-        IntakeResult intake;
+        Answer<IntakeResult> intake;
 
         try
         {
-            intake = await _intake.AskAsync(incoming, cancellationToken).ConfigureAwait(false);
+            intake = await WithinTheBoundAsync(
+                _intake.AskAsync(incoming, cancellationToken)).ConfigureAwait(false);
         }
         catch (RequestStoreLoadException)
         {
@@ -225,16 +305,63 @@ public sealed class WantHandover : IWantHandover
             return Refused(want, HandoverRefusal.TheStoreCouldNotBeReached);
         }
 
+        if (!intake.InTime)
+        {
+            return Refused(want, HandoverRefusal.TheStoreDidNotAnswerInTime);
+        }
+
         if (_logger.IsEnabled(LogLevel.Debug))
         {
             _logger.LogDebug(
                 "The want {WantId} handed over the seam is request {RequestId}, which the handover {Outcome}.",
                 want.WantId,
-                intake.Request.Request.Id,
-                intake.Outcome);
+                intake.Value.Request.Request.Id,
+                intake.Value.Outcome);
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Waits for one call into the queue and gives up on it after <see cref="_answerWithin"/>.
+    /// <para>
+    /// <b>Why this is not a cancellation token handed down.</b> A token is a request the callee
+    /// honours, and the case worth bounding is the one where it does not: a write holding a lock
+    /// nothing releases, or a disk that has stopped answering, leaves a task that never completes
+    /// however politely it is asked to. Racing the call is the only shape that returns whatever the
+    /// thing underneath is doing, which is what this side promised the surface it does not own.
+    /// </para>
+    /// <para>
+    /// <b>The abandoned call is left running and its fault is swallowed.</b> Stopping it is not
+    /// available, and a fault nobody reads would otherwise arrive later as an unobserved exception
+    /// on an unrelated thread. What it might still write is safe to have written: a want carries an
+    /// identifier, the other side hands the same one over again, and a request made by the
+    /// abandoned call is recognised as the repeat it is rather than made twice.
+    /// </para>
+    /// </summary>
+    /// <typeparam name="T">What the call answers with.</typeparam>
+    /// <param name="work">The call already started.</param>
+    /// <returns>The answer, or a note that none arrived in time.</returns>
+    private async Task<Answer<T>> WithinTheBoundAsync<T>(Task<T> work)
+    {
+        using var finished = new CancellationTokenSource();
+
+        var bound = Task.Delay(_answerWithin, finished.Token);
+
+        if (!ReferenceEquals(await Task.WhenAny(work, bound).ConfigureAwait(false), work))
+        {
+            _ = work.ContinueWith(
+                static abandoned => _ = abandoned.Exception,
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default);
+
+            return new Answer<T>(false, default!);
+        }
+
+        await finished.CancelAsync().ConfigureAwait(false);
+
+        return new Answer<T>(true, await work.ConfigureAwait(false));
     }
 
     /// <summary>
@@ -284,4 +411,12 @@ public sealed class WantHandover : IWantHandover
 
         return false;
     }
+
+    /// <summary>
+    /// What one bounded call into the queue came back with.
+    /// </summary>
+    /// <typeparam name="T">What the call answers with.</typeparam>
+    /// <param name="InTime">Whether it answered before this side stopped waiting.</param>
+    /// <param name="Value">What it answered, where it did.</param>
+    private readonly record struct Answer<T>(bool InTime, T Value);
 }

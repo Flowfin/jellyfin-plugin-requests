@@ -63,5 +63,26 @@ public enum HandoverRefusal
     /// What this install is set to is something the plugin cannot run on, so no want can be judged
     /// against it. That is a fault on this server rather than anything the other side sent.
     /// </summary>
-    ThisInstallCannotRun = 6
+    ThisInstallCannotRun = 6,
+
+    /// <summary>
+    /// Nothing arrived to make a request of. The call carried no field set at all, which is a defect
+    /// in the caller rather than a want that could not be taken, and it is answered the same way
+    /// because the alternative is an exception crossing a plugin boundary.
+    /// </summary>
+    NothingWasHandedOver = 9,
+
+    /// <summary>
+    /// The queue was still deciding when this side ran out of the time it gives itself. The want is
+    /// not lost by it: the other side hands the same identifier over again and the repeat is
+    /// recognised, which is the whole reason this side is allowed to stop waiting.
+    /// </summary>
+    TheStoreDidNotAnswerInTime = 10,
+
+    /// <summary>
+    /// Something under this seam failed in a way nothing here expected. It is a refusal rather than
+    /// an exception for the same reason every other entry is, and what actually went wrong is on
+    /// this server's log at error level with the fault itself.
+    /// </summary>
+    SomethingBeneathThisSeamFailed = 11
 }

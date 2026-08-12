@@ -85,7 +85,8 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<IIdentifierSource>(),
             provider.GetRequiredService<IInstallSettings>(),
             provider.GetRequiredService<IKnownUsers>(),
-            provider.GetRequiredService<ILogger<WantHandover>>()));
+            provider.GetRequiredService<ILogger<WantHandover>>(),
+            WantHandover.DefaultAnswerWithin));
 
         // The server's library, as the two questions this plugin asks of it. One per server, because
         // the instance subscribes to the library's own events and a second subscription would look

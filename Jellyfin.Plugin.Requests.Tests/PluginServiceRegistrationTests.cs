@@ -1,7 +1,14 @@
+using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
+using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
+using Jellyfin.Plugin.Requests.Model;
+using Jellyfin.Plugin.Requests.Seam;
+using Jellyfin.Plugin.Requests.Storage;
+using Jellyfin.Plugin.Requests.Tests.Doubles;
 using Jellyfin.Plugin.Requests.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -20,6 +27,8 @@ namespace Jellyfin.Plugin.Requests.Tests;
     Justification = "xUnit discovers tests on public classes only, so internal would silently run nothing.")]
 public class PluginServiceRegistrationTests
 {
+    private static readonly Guid Asker = new Guid("11111111-1111-1111-1111-111111111111");
+
     /// <summary>
     /// A server asking for the clock gets the machine's clock, and a server asking for the
     /// identifier source gets the framework's generator. Those are the defaults nothing should have
@@ -78,6 +87,72 @@ public class PluginServiceRegistrationTests
             provider.GetRequiredService<IIdentifierSource>());
     }
 
+    /// <summary>
+    /// A server holds the seam the sibling discover plugin would resolve, and it is this plugin's
+    /// implementation rather than something the container built by accident.
+    /// <para>
+    /// This is the registration half of being a sink. Whether a second plugin in one process can
+    /// name the type at all is the assembly-loading question in #117 and is not answered by
+    /// resolving it from inside this assembly, which is why the sentence above says what it says.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ServerGetsTheSeamTheSiblingWouldResolve()
+    {
+        using var provider = RegisteredWithTheServerStoodInFor(new InMemoryRequestStore());
+
+        Assert.IsType<WantHandover>(provider.GetRequiredService<IWantHandover>());
+    }
+
+    /// <summary>
+    /// One sink and no more. The sibling has to define what several implementations of its contract
+    /// mean, and this plugin should not be the reason it has to: a second registration here would
+    /// hand it two sinks that both believe they own the queue.
+    /// </summary>
+    [Fact]
+    public void ExactlyOneSinkIsRegistered()
+    {
+        var services = new ServiceCollection();
+
+        new PluginServiceRegistrator().RegisterServices(services, null!);
+
+        Assert.Single(services, service => service.ServiceType == typeof(IWantHandover));
+    }
+
+    /// <summary>
+    /// Registering the sink is harmless on the ordinary server, which is one with no sibling
+    /// installed. Nothing here reaches for the other plugin, nothing starts, and a handover that
+    /// never arrives costs the server the object and nothing else.
+    /// <para>
+    /// That no sibling assembly is loaded while this runs is asserted in
+    /// <c>SiblingIndependenceTests</c>, so what is added here is that the registration produces a
+    /// working sink in that state rather than one waiting for something absent.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task TheSinkWorksOnAServerWithNoSiblingInstalled()
+    {
+        var store = new InMemoryRequestStore();
+
+        using var provider = RegisteredWithTheServerStoodInFor(store);
+
+        var accepted = await provider.GetRequiredService<IWantHandover>().AcceptAsync(
+            new HandedOverWant
+            {
+                ContractVersion = WantHandover.KnownContractVersion,
+                WantId = new Guid("44444444-4444-4444-4444-444444444444"),
+                RequestedByUserId = Asker,
+                Kind = RequestedItemKind.Movie,
+                Title = "Solaris",
+                Year = 1972
+            },
+            CancellationToken.None);
+
+        Assert.True(accepted);
+        Assert.Single(await store.GetAllAsync(CancellationToken.None));
+    }
+
     private static ServiceProvider Registered()
     {
         var services = new ServiceCollection();
@@ -86,6 +161,35 @@ public class PluginServiceRegistrationTests
         // so the suite has nothing to build here. If a registration ever needs it, this line stops
         // compiling or throws, which is the signal to give the suite a host double.
         new PluginServiceRegistrator().RegisterServices(services, null!);
+
+        return services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    /// The registration as it ships, with the four things behind it that only a running server has.
+    /// <para>
+    /// Each of the four is stood in for because reaching the real one from a test would read
+    /// something other than the registration. The logger factory and the user manager come from the
+    /// server's own container and are not in this collection at all. The store and the settings both
+    /// reach the plugin instance, which is a static the host sets while loading and which any test
+    /// running beside this one replaces, so a test resolving them would fail for a reason nobody
+    /// caused; <c>ServerInstallSettings</c> says so about itself where it takes its second
+    /// constructor. What is left over the four is the seam's own registration, which is what these
+    /// tests are about.
+    /// </para>
+    /// </summary>
+    /// <param name="store">The queue the sink writes into.</param>
+    /// <returns>A provider the sink can be resolved from.</returns>
+    private static ServiceProvider RegisteredWithTheServerStoodInFor(IRequestStore store)
+    {
+        var services = new ServiceCollection();
+
+        new PluginServiceRegistrator().RegisterServices(services, null!);
+
+        services.AddLogging();
+        services.AddSingleton(store);
+        services.AddSingleton<IInstallSettings>(new FakeInstallSettings());
+        services.AddSingleton<IKnownUsers>(new FakeKnownUsers(Asker));
 
         return services.BuildServiceProvider();
     }
