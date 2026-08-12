@@ -188,6 +188,38 @@ which is neither a leak that has been shown nor a safety anybody has earned. The
 that a caller reads their own requests and never another person's, is enforced at the endpoints in
 `docs/api.md` and not by the store beneath them.
 
+## What happens to the wants recorded before this plugin was installed
+
+The sibling records every want locally whether or not anything accepted it, so a server that ran it
+first already has a list of people who asked for things. Installing this plugin has to mean
+something for them, or they ask again, or worse, they believe they already have.
+
+**The replay is the sibling's to initiate and this side needs no new message for it.** That follows
+from the contract rather than from a preference: it is one way, so this side cannot pull that list
+and cannot even ask whether one exists. What the other side does is hand each recorded want over
+with the same call a live one arrives on, which is why nothing here is added for it and why nothing
+here can tell a replay from a first arrival at the moment it happens.
+
+**What this side owes against that is that a replay is safe to run, and safe to run again.** Both
+are the want identifier doing its job under another name. Replaying a want that already became a
+request creates nothing, and a replay that stopped halfway and was started again from the beginning
+finishes the set without making the part that landed a second time. The second is the one worth
+naming: a replay of somebody's whole history ends halfway often, because a server restarted or
+somebody closed a browser, and a replay that can only be run once is one nobody can safely start.
+
+    git grep -n 'TheWholeSetReplayedTwiceIsTheQueueItMadeTheFirstTime\|AReplayThatStoppedHalfwayIsSafeToRunAgainFromTheStart' -- Jellyfin.Plugin.Requests.Tests/Seam/WantHandoverTests.cs
+
+**What is not answered, and it is the rest of #93.** An adopted request is not distinguishable from
+one that arrived live. A request carries no history entry when it is made, and
+`RequestHistoryEntry` has no field that could say how the ask reached this side:
+
+    git grep -n 'public required RequestState From\|public Guid? ByUserId' -- Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs
+
+So an operator who finds a sudden queue cannot see where it came from. What a request records about
+having arrived over the seam is the entry below that belongs to #118, and it has to be settled there
+rather than added afterwards, because the history is append-only and entries written without it
+cannot be corrected.
+
 ## What this side trusts, and what it checks anyway
 
 The HTTP API takes the requester from the authenticated session and refuses a body that names

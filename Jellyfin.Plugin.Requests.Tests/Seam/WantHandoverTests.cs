@@ -371,6 +371,109 @@ public class WantHandoverTests
     }
 
     /// <summary>
+    /// The whole set the sibling recorded before this plugin was installed, replayed twice, is the
+    /// queue it produced the first time and no second copy of it.
+    /// <para>
+    /// On a server that ran the browsing plugin first there is a list of people who already asked for
+    /// things, and installing this plugin has to mean something for them or they ask again. The
+    /// contract is one way and this side cannot pull that list, so the replay is the sibling's to
+    /// initiate and it uses the same call a live handover uses. What this side owes against it is
+    /// that a replay is safe to run, and that a replay that was interrupted is safe to run again.
+    /// </para>
+    /// <para>
+    /// A whole set replayed is a stronger statement than one want handed over twice, which is what
+    /// the tests above make. The set carries the shapes that go wrong together rather than alone:
+    /// two people wanting one film, a want with no provider identifiers for the identity rule to
+    /// compare, and a second kind. Revisions are asserted rather than counts, because a second pass
+    /// that rewrote every request in place would leave the count unmoved.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task TheWholeSetReplayedTwiceIsTheQueueItMadeTheFirstTime()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+        var recorded = WhatTheSiblingRecordedBefore();
+
+        foreach (var want in recorded)
+        {
+            Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+        }
+
+        var afterTheFirstPass = await store.GetAllAsync(CancellationToken.None);
+
+        foreach (var want in recorded)
+        {
+            Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+        }
+
+        var afterTheSecond = await store.GetAllAsync(CancellationToken.None);
+
+        Assert.Equal(
+            afterTheFirstPass.Select(held => (held.Request.Id, held.Revision)),
+            afterTheSecond.Select(held => (held.Request.Id, held.Revision)));
+
+        // The set is four wants and three of them name one film between two people, so what a
+        // correct first pass produces is three requests. Asserting it here means the comparison
+        // above cannot pass by both passes having produced nothing.
+        Assert.Equal(3, afterTheFirstPass.Count);
+        Assert.Equal(
+            [.. recorded.Select(want => want.WantId).Order()],
+            [.. afterTheSecond.SelectMany(held => held.Request.WantIds).Order()]);
+    }
+
+    /// <summary>
+    /// A replay that stopped halfway and was run again from the start finishes the set, and the part
+    /// that had already landed is not made a second time.
+    /// <para>
+    /// That is the ordinary way a replay of somebody's whole history ends: the server was restarted,
+    /// the other side gave up on a refusal, or somebody closed a browser. A replay that can only be
+    /// run once is one nobody can safely start.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AReplayThatStoppedHalfwayIsSafeToRunAgainFromTheStart()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+        var recorded = WhatTheSiblingRecordedBefore();
+
+        foreach (var want in recorded.Take(2))
+        {
+            Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+        }
+
+        var whatLandedBeforeItStopped = await store.GetAllAsync(CancellationToken.None);
+
+        foreach (var want in recorded)
+        {
+            Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+        }
+
+        var held = await store.GetAllAsync(CancellationToken.None);
+
+        // What the interrupted pass had already made is still the same request rather than a second
+        // one beside it. The prefix carries the want with no provider identifiers on purpose: that
+        // is the one the identity rule cannot answer, so it is the one whose second arrival becomes
+        // a second request where nothing recognises the want itself.
+        //
+        // Revisions are not asserted here and are asserted in the whole-set case. A completing pass
+        // is allowed to write to a request that already existed, because the wants it carries that
+        // had not landed yet include one that joins it.
+        foreach (var landed in whatLandedBeforeItStopped)
+        {
+            Assert.Single(held, request => request.Request.Id == landed.Request.Id);
+        }
+
+        Assert.Equal(3, held.Count);
+        Assert.Equal(
+            [.. recorded.Select(want => want.WantId).Order()],
+            [.. held.SelectMany(request => request.Request.WantIds).Order()]);
+    }
+
+    /// <summary>
     /// The check survives a restart, because what it reads is on the disk rather than in memory. The
     /// store is closed and a second one is opened over the same directory, which is what a server
     /// stopping and starting does to it.
@@ -587,6 +690,43 @@ public class WantHandoverTests
             { Want() with { Title = "   " }, HandoverRefusal.NoTitle },
             { Want() with { Kind = (RequestedItemKind)9 }, HandoverRefusal.KindNotRecognised }
         };
+
+    /// <summary>
+    /// What the sibling had already recorded on a server that ran it before this plugin arrived.
+    /// <para>
+    /// Four wants, chosen for the shapes that go wrong together. Two people want one film, so the
+    /// identity rule joins the second onto the first and a replay has two chances to make it twice.
+    /// One want carries no provider identifiers, which is the case the identity rule cannot answer
+    /// and the want identifier has to. One is a series rather than a film.
+    /// </para>
+    /// </summary>
+    /// <returns>The set, in the order the other side would replay it.</returns>
+    private static HandedOverWant[] WhatTheSiblingRecordedBefore()
+        =>
+        [
+            Want(),
+            Want() with
+            {
+                WantId = new Guid("55555555-5555-5555-5555-555555555555"),
+                Title = "Le Samouraï",
+                Year = 1967,
+                ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal)
+            },
+            Want() with
+            {
+                WantId = new Guid("44444444-4444-4444-4444-444444444444"),
+                RequestedByUserId = SecondAsker
+            },
+            Want() with
+            {
+                WantId = new Guid("66666666-6666-6666-6666-666666666666"),
+                RequestedByUserId = SecondAsker,
+                Kind = RequestedItemKind.Series,
+                Title = "Das Boot",
+                Year = 1985,
+                ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tvdb"] = "78804" }
+            }
+        ];
 
     /// <summary>
     /// A want as the contract carries one, which every case here starts from and breaks in one way.
