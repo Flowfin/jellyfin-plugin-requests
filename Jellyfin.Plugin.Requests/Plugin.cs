@@ -43,6 +43,33 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// </summary>
     public static Plugin? Instance { get; private set; }
 
+    /// <inheritdoc />
+    /// <exception cref="InvalidConfigurationException">
+    /// Where the settings that arrived are ones this plugin cannot run on. The save is refused
+    /// before anything is written, so the file on disk still holds the configuration that was
+    /// working, and an operator who typed a number by mistake has not lost the one they had.
+    /// <para>
+    /// The dashboard is not the only way a configuration arrives, so this is half of the check
+    /// rather than the whole of it. <see cref="ServerInstallSettings"/> is the other half, on the
+    /// read, and both call <see cref="ConfigurationRules"/> so the page and the file cannot be
+    /// judged by two different lists.
+    /// </para>
+    /// </exception>
+    public override void UpdateConfiguration(BasePluginConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        // Only this plugin's own shape is judged. Anything else is a caller handing the wrong type
+        // to the wrong plugin, which the base class already answers, and a second answer here would
+        // be this plugin deciding what that failure looks like.
+        if (configuration is PluginConfiguration settings)
+        {
+            ConfigurationRules.RefuseWhatCannotWork(settings);
+        }
+
+        base.UpdateConfiguration(configuration);
+    }
+
     /// <summary>
     /// The pages this plugin puts in the dashboard, and the two files they share.
     /// <para>

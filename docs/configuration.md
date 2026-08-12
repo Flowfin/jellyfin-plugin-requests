@@ -27,7 +27,8 @@ without this page moving with it, and again if the page cannot reach one of them
 recognise in a library. Accepting a kind nothing can match would leave a person waiting on a request
 that no fulfilment check can ever answer, so the accepted set and the recognised set are the same
 set. Which kinds ship at 1.0 was decided on #113. Turning both off leaves nothing anybody can ask
-for, which is a configuration that cannot work rather than a strict one; refusing it is #96.
+for, which is a configuration that cannot work rather than a strict one, and it is refused rather
+than saved.
 
 A kind is a setting of its own rather than an entry in a list. A third kind then has to move this
 page, the class and the settings form together, instead of arriving as an appended value that
@@ -55,6 +56,30 @@ requests are answered can keep asking.
 
 Where the quota is enforced is #114, and that is not built yet either. **Nothing refuses an
 eleventh open request today.**
+
+## What is refused
+
+A plugin configuration is an XML file on the server, and the dashboard is not the only way one
+arrives: an operator can edit that file, and a restore can put an older one back. So the rules below
+are read at both moments a configuration reaches this plugin, from the same list, in
+[`ConfigurationRules`](../Jellyfin.Plugin.Requests/Configuration/ConfigurationRules.cs).
+
+| Setting                      | Refused when | Because                                                                                        |
+| ---------------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
+| OpenRequestsPerUser          | below 1      | nobody may have a request open, so every ask is refused by an install that still offers itself |
+| AcceptsMovies, AcceptsSeries | both off     | there is nothing anybody can ask for                                                           |
+| FinishedRequestRetentionDays | below 30     | the history is removed while people are still asking about it                                  |
+
+**Nothing is corrected on the way in.** A quota of zero is not raised to one and a retention of five
+days is not raised to thirty. An install running a value it substituted does something other than
+what its own settings page shows, and there is nothing an operator can read that tells them which of
+the two is true. The refusal keeps the value they typed and says which field it is about.
+
+On a save, the refusal reaches the dashboard and the file on disk is not touched, so a number typed
+by mistake does not cost the configuration that was working. On a read, whatever asked what this
+install is set to is refused instead of being answered, and the sentence lands in the server's log
+naming the field. That is the honest limit of the second half: it is a log line rather than a banner
+on a page, and a page that says what is wrong with an install is #63.
 
 ## A fresh install
 
