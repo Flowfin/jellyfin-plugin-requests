@@ -287,6 +287,57 @@ public sealed class ErrorSurfaceTests
                     CancellationToken.None)
                 .ConfigureAwait(true)));
 
+        // The actions on several requests, and only the refusals that are the call's own. A refusal
+        // about one request inside such an action is built by the same code that builds it for the
+        // single decision, in RequestsController.DecideAsync, so its message is one of the ones
+        // already walked above; what is new here is the refusals of a body carrying a selection.
+        Add("POST Requests/Approve with an empty selection", elevated: true, Of(
+            await ControllerFor(store, Operator)
+                .ApproveManyAsync(new ApproveManyBody(), CancellationToken.None)
+                .ConfigureAwait(true)));
+
+        Add("POST Requests/Approve with an entry naming no request", elevated: true, Of(
+            await ControllerFor(store, Operator)
+                .ApproveManyAsync(
+                    new ApproveManyBody { Requests = [new RequestToDecide { Revision = open.Revision }] },
+                    CancellationToken.None)
+                .ConfigureAwait(true)));
+
+        Add("POST Requests/Approve with an entry carrying no revision", elevated: true, Of(
+            await ControllerFor(store, Operator)
+                .ApproveManyAsync(
+                    new ApproveManyBody { Requests = [new RequestToDecide { Id = open.Request.Id }] },
+                    CancellationToken.None)
+                .ConfigureAwait(true)));
+
+        Add("POST Requests/Approve naming one request twice", elevated: true, Of(
+            await ControllerFor(store, Operator)
+                .ApproveManyAsync(
+                    new ApproveManyBody
+                    {
+                        Requests =
+                        [
+                            new RequestToDecide { Id = open.Request.Id, Revision = open.Revision },
+                            new RequestToDecide { Id = open.Request.Id, Revision = open.Revision }
+                        ]
+                    },
+                    CancellationToken.None)
+                .ConfigureAwait(true)));
+
+        Add("POST Requests/Approve from a call naming no person", elevated: true, Of(
+            await ControllerFor(store, caller: null)
+                .ApproveManyAsync(
+                    new ApproveManyBody { Requests = [new RequestToDecide { Id = open.Request.Id, Revision = open.Revision }] },
+                    CancellationToken.None)
+                .ConfigureAwait(true)));
+
+        Add("POST Requests/Decline with no reason", elevated: true, Of(
+            await ControllerFor(store, Operator)
+                .DeclineManyAsync(
+                    new DeclineManyBody { Requests = [new RequestToDecide { Id = open.Request.Id, Revision = open.Revision }] },
+                    CancellationToken.None)
+                .ConfigureAwait(true)));
+
         return refusals;
 
         void Add(string what, bool elevated, (int Status, RequestFailure Failure) answered)

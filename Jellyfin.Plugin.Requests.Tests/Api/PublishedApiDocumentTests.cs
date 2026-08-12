@@ -97,6 +97,20 @@ public sealed class PublishedApiDocumentTests
             + " (body@Body:CreateRequestBody)"
             + " -> 200:CreatedRequest, 201:CreatedRequest, 400:RequestFailure, 403:RequestFailure, 503:RequestFailure",
 
+        // Saying yes to several at once. Three codes where the single decision publishes six, and
+        // the three that are missing are the point: a request that is not there, one that moved and
+        // a store that could not be read are answers about one request, and they come back inside
+        // the entry for that request rather than as the status of a call that may already have
+        // written some of the others.
+        "POST MediaRequests/v1/Requests/Approve"
+            + " (body@Body:ApproveManyBody)"
+            + " -> 200:DecidedRequests, 400:RequestFailure, 403:RequestFailure",
+
+        // Saying no to several at once, for one reason.
+        "POST MediaRequests/v1/Requests/Decline"
+            + " (body@Body:DeclineManyBody)"
+            + " -> 200:DecidedRequests, 400:RequestFailure, 403:RequestFailure",
+
         // Saying yes.
         "POST MediaRequests/v1/Requests/{id}/Approve"
             + " (body@Body:ApproveRequestBody, id@Path:Guid)"
@@ -249,6 +263,8 @@ public sealed class PublishedApiDocumentTests
         const string Queue = "GET MediaRequests/v1/Requests/Queue";
         const string Approve = "POST MediaRequests/v1/Requests/{id}/Approve";
         const string Decline = "POST MediaRequests/v1/Requests/{id}/Decline";
+        const string ApproveMany = "POST MediaRequests/v1/Requests/Approve";
+        const string DeclineMany = "POST MediaRequests/v1/Requests/Decline";
 
         // What this install allows. One call and one status: it reads no store, refuses nothing and
         // has no failure to walk, which is why it publishes one code where every other endpoint
@@ -293,6 +309,23 @@ public sealed class PublishedApiDocumentTests
         Saw(Decline, await ControllerFor(store, Operator).DeclineAsync(absent, new DeclineRequestBody { Revision = 1, Reason = DeclineReason.NotWanted }, CancellationToken.None).ConfigureAwait(true));
         Saw(Decline, await ControllerFor(store, Operator).DeclineAsync(toApprove.Request.Id, new DeclineRequestBody { Revision = toApprove.Revision + 7, Reason = DeclineReason.NotWanted }, CancellationToken.None).ConfigureAwait(true));
         Saw(Decline, await ControllerFor(unreadable, Operator).DeclineAsync(toApprove.Request.Id, new DeclineRequestBody { Revision = 1, Reason = DeclineReason.NotWanted }, CancellationToken.None).ConfigureAwait(true));
+
+        // The two actions on several requests. Three statuses each and no more, and the third call
+        // in each pair is the one worth reading: a store that cannot be read answers 200 here,
+        // because by the time one request is refused another may already be written and a status
+        // saying the call failed would be saying nothing happened while something had.
+        var toApproveTogether = await store.AddAsync(AnAsk(), CancellationToken.None).ConfigureAwait(true);
+        var toDeclineTogether = await store.AddAsync(AnAsk(), CancellationToken.None).ConfigureAwait(true);
+
+        Saw(ApproveMany, await ControllerFor(store, Operator).ApproveManyAsync(new ApproveManyBody { Requests = [Choosing(toApproveTogether)] }, CancellationToken.None).ConfigureAwait(true));
+        Saw(ApproveMany, await ControllerFor(store, Operator).ApproveManyAsync(new ApproveManyBody(), CancellationToken.None).ConfigureAwait(true));
+        Saw(ApproveMany, await ControllerFor(store, caller: null).ApproveManyAsync(new ApproveManyBody { Requests = [Choosing(toApproveTogether)] }, CancellationToken.None).ConfigureAwait(true));
+        Saw(ApproveMany, await ControllerFor(unreadable, Operator).ApproveManyAsync(new ApproveManyBody { Requests = [Choosing(toApproveTogether)] }, CancellationToken.None).ConfigureAwait(true));
+
+        Saw(DeclineMany, await ControllerFor(store, Operator).DeclineManyAsync(new DeclineManyBody { Requests = [Choosing(toDeclineTogether)], Reason = DeclineReason.NotWanted }, CancellationToken.None).ConfigureAwait(true));
+        Saw(DeclineMany, await ControllerFor(store, Operator).DeclineManyAsync(new DeclineManyBody { Requests = [Choosing(toDeclineTogether)] }, CancellationToken.None).ConfigureAwait(true));
+        Saw(DeclineMany, await ControllerFor(store, caller: null).DeclineManyAsync(new DeclineManyBody { Requests = [Choosing(toDeclineTogether)], Reason = DeclineReason.NotWanted }, CancellationToken.None).ConfigureAwait(true));
+        Saw(DeclineMany, await ControllerFor(unreadable, Operator).DeclineManyAsync(new DeclineManyBody { Requests = [Choosing(toDeclineTogether)], Reason = DeclineReason.NotWanted }, CancellationToken.None).ConfigureAwait(true));
 
         return answered;
 
@@ -468,6 +501,15 @@ public sealed class PublishedApiDocumentTests
         DisplayYear = 1974,
         ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "603" }
     };
+
+    /// <summary>
+    /// One request as a caller chooses it off a page of the queue, for the actions that carry
+    /// several.
+    /// </summary>
+    /// <param name="stored">What the store holds.</param>
+    /// <returns>The entry.</returns>
+    private static RequestToDecide Choosing(StoredRequest stored)
+        => new RequestToDecide { Id = stored.Request.Id, Revision = stored.Revision };
 
     /// <summary>
     /// A body asking for a film.

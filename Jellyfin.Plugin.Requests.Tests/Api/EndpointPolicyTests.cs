@@ -60,6 +60,11 @@ public sealed class EndpointPolicyTests
         // such call in the model, which is a permission decided in two places.
         "RequestsController.ApproveAsync POST Requests/{id}/Approve -> RequiresElevation",
 
+        // Saying yes to several at once. The same policy as saying yes to one, because it is the
+        // same decision made more times: an action reachable by a signed-in user would be refused
+        // once per request in the model, which is a permission decided in two places.
+        "RequestsController.ApproveManyAsync POST Requests/Approve -> RequiresElevation",
+
         // Asking for something. An authenticated user, because a request has to be attributable to
         // somebody and a caller with no session names nobody.
         "RequestsController.CreateAsync POST Requests -> DefaultAuthorization",
@@ -67,6 +72,9 @@ public sealed class EndpointPolicyTests
         // Saying no. The same policy as an approval, and the decline reason is something a user
         // reads rather than writes.
         "RequestsController.DeclineAsync POST Requests/{id}/Decline -> RequiresElevation",
+
+        // Saying no to several at once, for one reason.
+        "RequestsController.DeclineManyAsync POST Requests/Decline -> RequiresElevation",
 
         // One person's own requests. The same policy as asking, and the narrowing is the read
         // rather than the policy: this endpoint has nothing wider than the caller's own requests to
