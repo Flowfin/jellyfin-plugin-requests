@@ -76,6 +76,52 @@ history, and the person it belongs to is told something untrue about their own r
 Case is ignored when a word is looked up, because two adapters written against one service will spell
 one word two ways and both mean what the service meant. Nothing else is normalised.
 
+## Whose name a request carries over there
+
+The external service has its own users, and something has to decide whose name a submitted request
+arrives under. Three shapes were available and the decision on #113 is the first of them.
+
+| Shape                             | Chosen          | What it costs                                                                                                                              |
+| --------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| A mapping an operator keeps       | yes             | somebody has to keep it current, and a person who is not in it is not attributed                                                           |
+| One shared account for everything | as the fallback | that side cannot tell who asked, so its own queue reads as though the plugin asked for everything                                          |
+| Matching by the person's name     | no              | it is wrong the first time two people have similar names, and it is wrong in the direction that attributes one person's request to another |
+
+**Matching by name is not built, rather than built and switched off.** The lookup in
+[`BackendAccounts`](../Jellyfin.Plugin.Requests/Bridge/BackendAccounts.cs) takes a Jellyfin user
+identifier and there is no other way in, which `NothingIsResolvedFromWhatAPersonIsCalled` refuses a
+change to. The failure it stands against is one nobody notices from this side: the queue here stays
+correct while somebody over there is credited with a request that is not theirs, and the first sign
+of it is that person seeing it.
+
+**The mapping is empty on a fresh install.** That is the shipping answer and not a state on the way
+to one. An operator who configures a bridge and writes no rows has every request arrive over there
+under the service's own account, so the service is told that a request was made and not by whom.
+Attribution is turned on one person at a time, by writing a row, and writing the row is what says
+that person's account name may leave.
+
+Where the table is kept and how it is edited arrives with the adapter that reads it, in #82. Nothing
+on this side reads it today, so a settings field for it now would be somewhere to type something
+nothing uses.
+
+### What leaves the server when a bridge is configured
+
+Nothing leaves any server today, because the only bridge in this tree is the one with nothing behind
+it and it makes no call. What the shape above allows to leave, once an adapter exists, is this:
+
+- **The account name the operator wrote**, for a person who has a row. It is that operator's own
+  string for that service, passed through as they typed it.
+- **Nothing at all about a person who has no row.** No Jellyfin user name, no Jellyfin user
+  identifier, and no electronic mail address. The request arrives under the service's own account.
+
+The account record carries the operator's string and nothing else, and
+`TheAccountCarriesNothingButWhatTheOperatorTyped` refuses a field added to it later. That matters
+because a field holding a display name would start sending it on the next submission and would read
+as an improvement in the diff.
+
+What a request itself carries to the service, as opposed to whose name it carries, is #82's, and it
+is not decided here.
+
 ## What needs a bridge
 
 Nothing does, and that is a claim the suite refuses to let drift rather than a sentence somebody
