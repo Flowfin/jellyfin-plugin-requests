@@ -63,6 +63,10 @@ internal sealed class StoreThatMovesARequestUnderTheWrite : IRequestStore
         => _inner.FindByProviderIdentifierAsync(kind, provider, value, cancellationToken);
 
     /// <inheritdoc />
+    public Task<StoredRequest?> FindByWantAsync(Guid wantId, CancellationToken cancellationToken)
+        => _inner.FindByWantAsync(wantId, cancellationToken);
+
+    /// <inheritdoc />
     public Task<RequestPage> PageAsync(RequestQuery query, CancellationToken cancellationToken)
         => _inner.PageAsync(query, cancellationToken);
 

@@ -82,6 +82,25 @@ internal sealed class InMemoryRequestStore : IRequestStore
     }
 
     /// <inheritdoc />
+    public Task<StoredRequest?> FindByWantAsync(Guid wantId, CancellationToken cancellationToken)
+    {
+        if (wantId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "A want identifier that names nothing cannot be looked up, because it is not one any request can have absorbed.",
+                nameof(wantId));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            return Task.FromResult<StoredRequest?>(
+                _held.Values.Cast<StoredRequest?>().FirstOrDefault(stored => stored!.Value.Request.WantIds.Contains(wantId)));
+        }
+    }
+
+    /// <inheritdoc />
     public Task<RequestPage> PageAsync(RequestQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);

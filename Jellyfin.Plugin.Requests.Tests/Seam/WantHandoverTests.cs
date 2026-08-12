@@ -271,12 +271,148 @@ public class WantHandoverTests
     }
 
     /// <summary>
+    /// The same want handed over three times is one request. That is the sequence the other side
+    /// actually produces: a refresh recreated the item, the server restarted, the user undid the
+    /// gesture and did it again, and each of those hands the same identifier across.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task TheSameWantHandedOverThreeTimesIsOneRequest()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+        var want = Want();
+
+        Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+        Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+        Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None));
+
+        Assert.Equal([want.WantId], made.Request.WantIds);
+        Assert.Equal(1, made.Revision);
+    }
+
+    /// <summary>
+    /// A repeat is recognised by the want alone, with nothing else to go on. A want carrying no
+    /// provider identifiers has no identity for the identity rule to compare, so this is the case
+    /// where the two rules are visibly different things rather than one written twice.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task ARepeatIsCaughtEvenWhereThereAreNoIdentifiersToCompare()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+        var want = Want() with { ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) };
+
+        Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+        Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+
+        Assert.Single(await store.GetAllAsync(CancellationToken.None));
+    }
+
+    /// <summary>
+    /// A want whose request was already answered is still a want that has been taken. Letting a
+    /// declined request be the one thing that lets a repeat through would make a refusal the way to
+    /// acquire something twice.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AWantWhoseRequestWasDeclinedDoesNotComeBackAsANewOne()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+        var want = Want();
+
+        Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None));
+
+        await store.ReplaceAsync(
+            made.Request with { State = RequestState.Declined },
+            made.Revision,
+            CancellationToken.None);
+
+        Assert.True(await handover.AcceptAsync(want, CancellationToken.None));
+
+        var held = Assert.Single(await store.GetAllAsync(CancellationToken.None));
+
+        Assert.Equal(RequestState.Declined, held.Request.State);
+    }
+
+    /// <summary>
+    /// One request absorbs the wants of everybody who asked. Two people wanting the same film are
+    /// two wants on the other side, and each of them has to be recognisable afterwards or the second
+    /// person's repeat creates the request the first person is already waiting for.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task ARequestKeepsEveryWantItAbsorbed()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+
+        var first = Want();
+        var second = Want() with
+        {
+            WantId = new Guid("44444444-4444-4444-4444-444444444444"),
+            RequestedByUserId = SecondAsker
+        };
+
+        Assert.True(await handover.AcceptAsync(first, CancellationToken.None));
+        Assert.True(await handover.AcceptAsync(second, CancellationToken.None));
+        Assert.True(await handover.AcceptAsync(second, CancellationToken.None));
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None));
+
+        Assert.Equal([first.WantId, second.WantId], made.Request.WantIds);
+        Assert.Equal([SecondAsker], made.Request.JoinedByUserIds);
+    }
+
+    /// <summary>
+    /// The check survives a restart, because what it reads is on the disk rather than in memory. The
+    /// store is closed and a second one is opened over the same directory, which is what a server
+    /// stopping and starting does to it.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task TheSameWantAfterARestartIsStillTheSameWant()
+    {
+        var directory = TestRunDirectory.CreateSubdirectory();
+        var want = Want();
+
+        try
+        {
+            using (var before = new FileRequestStore(directory, new RecordingLogger()))
+            {
+                Assert.True(await Seam(before).AcceptAsync(want, CancellationToken.None));
+                Assert.Single(await before.GetAllAsync(CancellationToken.None));
+            }
+
+            using var after = new FileRequestStore(directory, new RecordingLogger());
+
+            Assert.True(await Seam(after).AcceptAsync(want, CancellationToken.None));
+
+            var held = Assert.Single(await after.GetAllAsync(CancellationToken.None));
+
+            Assert.Equal([want.WantId], held.Request.WantIds);
+            Assert.Equal(1, held.Revision);
+        }
+        finally
+        {
+            TestRunDirectory.Remove(directory);
+        }
+    }
+
+    /// <summary>
     /// The field sets that cannot become a request, each with the refusal that names what is wrong.
     /// </summary>
     /// <returns>One case per way of being wrong.</returns>
     public static TheoryData<HandedOverWant, HandoverRefusal> FieldSetsThatCannotBecomeARequest()
         => new TheoryData<HandedOverWant, HandoverRefusal>
         {
+            { Want() with { WantId = Guid.Empty }, HandoverRefusal.NoWantNamed },
             { Want() with { RequestedByUserId = Guid.Empty }, HandoverRefusal.NoUserNamed },
             { Want() with { Title = "   " }, HandoverRefusal.NoTitle },
             { Want() with { Kind = (RequestedItemKind)9 }, HandoverRefusal.KindNotRecognised }

@@ -39,7 +39,8 @@ public class MediaRequestTests
         "Seasons",
         "State",
         "StateChangedAt",
-        "StateChangedByUserId"
+        "StateChangedByUserId",
+        "WantIds"
     ];
 
     /// <summary>
@@ -123,6 +124,30 @@ public class MediaRequestTests
         Assert.Null(request.AvailabilityCheckedAt);
         Assert.Null(request.StateChangedByUserId);
         Assert.Empty(request.ProviderIds);
+    }
+
+    /// <summary>
+    /// A want named twice on one request is refused. These are the key a repeat of the same want is
+    /// recognised by, and a request that recorded one want as two facts is a record that cannot be
+    /// counted or reasoned about afterwards.
+    /// </summary>
+    [Fact]
+    public void AWantNamedTwiceOnOneRequestIsRefused()
+    {
+        var want = Guid.NewGuid();
+
+        Assert.Throws<ArgumentException>(() => ARequest() with { WantIds = [want, want] });
+    }
+
+    /// <summary>
+    /// A want identifier that names nothing is refused rather than stored. It would match nothing on
+    /// the way back in, so keeping it would be a request claiming to have absorbed a want that no
+    /// lookup can ever find.
+    /// </summary>
+    [Fact]
+    public void AWantIdentifierThatNamesNothingIsRefused()
+    {
+        Assert.Throws<ArgumentException>(() => ARequest() with { WantIds = [Guid.Empty] });
     }
 
     /// <summary>

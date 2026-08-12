@@ -103,14 +103,29 @@ public sealed class RequestIntake
                 return new IntakeResult(added, IntakeOutcome.Created);
             }
 
-            if (existing.Request.WasAskedForBy(ask.RequestedByUserId))
+            var alreadyWaiting = existing.Request.WasAskedForBy(ask.RequestedByUserId);
+
+            // Wants the existing request has not absorbed yet. Empty for every ask that arrived over
+            // the HTTP endpoint, because a person typing a title carries none, so nothing below this
+            // changes what that endpoint does.
+            var unabsorbed = ask.WantIds
+                .Where(wantId => !existing.Request.WantIds.Contains(wantId))
+                .ToArray();
+
+            if (alreadyWaiting && unabsorbed.Length == 0)
             {
                 return new IntakeResult(existing, IntakeOutcome.AlreadyWaiting);
             }
 
+            // A want is written even where the person is already waiting, because the want is what a
+            // repeat is recognised by and one that was never recorded is one that arrives again as
+            // something new. That is the only case where this writes without adding anybody.
             var joined = existing.Request with
             {
-                JoinedByUserIds = [.. existing.Request.JoinedByUserIds, ask.RequestedByUserId]
+                JoinedByUserIds = alreadyWaiting
+                    ? existing.Request.JoinedByUserIds
+                    : [.. existing.Request.JoinedByUserIds, ask.RequestedByUserId],
+                WantIds = [.. existing.Request.WantIds, .. unabsorbed]
             };
 
             try
@@ -119,7 +134,7 @@ public sealed class RequestIntake
                     .ReplaceAsync(joined, existing.Revision, cancellationToken)
                     .ConfigureAwait(false);
 
-                return new IntakeResult(written, IntakeOutcome.Joined);
+                return new IntakeResult(written, alreadyWaiting ? IntakeOutcome.AlreadyWaiting : IntakeOutcome.Joined);
             }
             catch (RequestConcurrencyException) when (attempt < JoinAttempts)
             {

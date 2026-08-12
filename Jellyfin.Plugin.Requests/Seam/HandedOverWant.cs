@@ -46,10 +46,10 @@ public sealed record HandedOverWant
     /// Gets the sibling's own identifier for this want, which is stable across a refresh that
     /// recreated the item and across a restart.
     /// <para>
-    /// It is carried through to the log line a refusal leaves, so an operator asked about a want by
-    /// the other side's identifier can find what this side did with it. Storing it, so that the same
-    /// want arriving again is recognised as the same want whatever else changed, is #116 and is not
-    /// done here.
+    /// It is stored on the request it becomes, which is what makes a repeat recognisable as one
+    /// whatever else changed and across a restart, and it is carried through to the log line a
+    /// refusal leaves, so an operator asked about a want by the other side's identifier can find
+    /// what this side did with it.
     /// </para>
     /// </summary>
     public required Guid WantId { get; init; }

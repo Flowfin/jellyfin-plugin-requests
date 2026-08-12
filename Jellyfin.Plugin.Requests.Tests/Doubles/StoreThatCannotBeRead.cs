@@ -48,6 +48,9 @@ internal sealed class StoreThatCannotBeRead : IRequestStore
         => throw Unreadable();
 
     /// <inheritdoc />
+    public Task<StoredRequest?> FindByWantAsync(Guid wantId, CancellationToken cancellationToken) => throw Unreadable();
+
+    /// <inheritdoc />
     public Task<RequestPage> PageAsync(RequestQuery query, CancellationToken cancellationToken) => throw Unreadable();
 
     /// <inheritdoc />

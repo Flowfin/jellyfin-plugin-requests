@@ -32,9 +32,15 @@ namespace Jellyfin.Plugin.Requests.Seam;
 /// <b>Whether an ask joins an existing request is not decided here.</b> It is
 /// <see cref="RequestIntake"/>'s, which is the same object the HTTP endpoint asks, so two users
 /// wanting the same film produce one request with both of them recorded however each of them asked.
-/// The one thing this seam does not yet do is recognise the same want arriving twice by the
-/// sibling's own identifier for it, which is #116: today a repeat is caught by the identity rule
-/// over the provider identifiers, and a want carrying none has no identity to be caught by.
+/// </para>
+/// <para>
+/// <b>The same want twice is one request, and that is a separate rule from the one above.</b> The
+/// want identifier is an idempotency key: the other side derives it from the title and the user and
+/// hands it over again after a refresh that recreated the item, after a restart, and after a gesture
+/// undone and redone. It is looked up before anything is built, over everything the store holds and
+/// in every state, so a want whose request was declined is still a want that has been taken. The
+/// identity rule cannot stand in for this, because it compares provider identifiers and a want
+/// carrying none is different from every other want including another copy of itself.
 /// </para>
 /// </summary>
 public sealed class WantHandover : IWantHandover
@@ -51,6 +57,7 @@ public sealed class WantHandover : IWantHandover
     /// </summary>
     public const int KnownContractVersion = 1;
 
+    private readonly IRequestStore _store;
     private readonly RequestIntake _intake;
     private readonly IClock _clock;
     private readonly IIdentifierSource _identifiers;
@@ -79,6 +86,7 @@ public sealed class WantHandover : IWantHandover
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(logger);
 
+        _store = store;
         _intake = new RequestIntake(store);
         _clock = clock;
         _identifiers = identifiers;
@@ -100,6 +108,11 @@ public sealed class WantHandover : IWantHandover
         if (want.ContractVersion != KnownContractVersion)
         {
             return Refused(want, HandoverRefusal.ContractVersionNotKnown);
+        }
+
+        if (want.WantId == Guid.Empty)
+        {
+            return Refused(want, HandoverRefusal.NoWantNamed);
         }
 
         if (want.RequestedByUserId == Guid.Empty)
@@ -133,6 +146,35 @@ public sealed class WantHandover : IWantHandover
             return Refused(want, HandoverRefusal.KindNotAccepted);
         }
 
+        StoredRequest? absorbed;
+
+        try
+        {
+            absorbed = await _store.FindByWantAsync(want.WantId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestStoreLoadException)
+        {
+            return Refused(want, HandoverRefusal.TheStoreCouldNotBeReached);
+        }
+
+        if (absorbed is StoredRequest already)
+        {
+            // The same want again, which is the ordinary case rather than a defect: the other side
+            // hands one over after a refresh that recreated the item, after a restart, and after a
+            // gesture undone and redone. It is accepted, because a request for it exists, and
+            // nothing is written, because it is already recorded. Whatever state that request is in
+            // counts, including declined: a want that was answered has still been taken.
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug(
+                    "The want {WantId} was handed over again and is already request {RequestId}, so nothing was made.",
+                    want.WantId,
+                    already.Request.Id);
+            }
+
+            return true;
+        }
+
         var asked = _clock.UtcNow;
 
         var incoming = new MediaRequest
@@ -144,7 +186,8 @@ public sealed class WantHandover : IWantHandover
             Kind = want.Kind,
             DisplayTitle = want.Title,
             DisplayYear = want.Year,
-            ProviderIds = want.ProviderIds
+            ProviderIds = want.ProviderIds,
+            WantIds = [want.WantId]
         };
 
         IntakeResult intake;

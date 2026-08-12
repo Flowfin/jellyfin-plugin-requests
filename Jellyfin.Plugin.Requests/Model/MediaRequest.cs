@@ -50,6 +50,7 @@ public sealed record MediaRequest
     private readonly string? _requesterNote;
     private readonly string? _declineNote;
     private readonly IReadOnlyList<int> _seasons = [];
+    private readonly IReadOnlyList<Guid> _wantIds = [];
 
     /// <summary>
     /// Gets this request's own identifier, which is not the identifier of anything it refers to.
@@ -141,6 +142,31 @@ public sealed record MediaRequest
     /// </para>
     /// </summary>
     public IReadOnlyList<Guid> JoinedByUserIds { get; init; } = [];
+
+    /// <summary>
+    /// Gets the sibling discover plugin's own identifiers for the wants this request absorbed,
+    /// oldest first. Empty on a request nobody handed over, which is every request a person typed.
+    /// <para>
+    /// <b>This is an idempotency key and not a second identity.</b> Whether two asks are the same
+    /// thing is <see cref="RequestIdentity"/>'s answer, over the provider identifiers and the
+    /// seasons. This answers a narrower question: has this exact want already been taken. The other
+    /// side derives one identifier per title and user and hands it over again after a refresh that
+    /// recreated the item, after a restart, and after a user undid and redid the gesture, so
+    /// without it each of those is another acquisition of something somebody is already waiting for.
+    /// </para>
+    /// <para>
+    /// A list rather than one value, because one request absorbs several wants: two people wanting
+    /// the same film are two wants on the other side and one request here, in #38.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Where a want is named twice, or where one of them names nothing.
+    /// </exception>
+    public IReadOnlyList<Guid> WantIds
+    {
+        get => _wantIds;
+        init => _wantIds = WantSet(value);
+    }
 
     /// <summary>
     /// Gets where the request stands. Defaults to <see cref="RequestState.Open"/>, because a
@@ -260,6 +286,42 @@ public sealed record MediaRequest
     /// <returns><see langword="true"/> where that person asked for this.</returns>
     public bool WasAskedForBy(Guid userId)
         => RequestedByUserId == userId || JoinedByUserIds.Contains(userId);
+
+    /// <summary>
+    /// Refuses a want list that is not a set of wants. A want named twice is a caller's mistake
+    /// being stored as a fact, and an empty identifier names nothing, so both are refused rather
+    /// than tidied: the whole point of these is that they are the key a repeat is recognised by,
+    /// and a key quietly cleaned up is one nobody can rely on.
+    /// <para>
+    /// The order is the order the wants were absorbed and is kept, so the first is the want the
+    /// request was made for.
+    /// </para>
+    /// </summary>
+    /// <param name="wantIds">The wants as they arrived.</param>
+    /// <returns>The same wants.</returns>
+    private static IReadOnlyList<Guid> WantSet(IReadOnlyList<Guid>? wantIds)
+    {
+        if (wantIds is null || wantIds.Count == 0)
+        {
+            return [];
+        }
+
+        if (wantIds.Any(wantId => wantId == Guid.Empty))
+        {
+            throw new ArgumentException(
+                "A want identifier that names nothing is refused, because these are what a repeat of the same want is recognised by.",
+                nameof(wantIds));
+        }
+
+        if (wantIds.Distinct().Count() != wantIds.Count)
+        {
+            throw new ArgumentException(
+                "The same want is named twice, and a want absorbed twice is one fact recorded as two.",
+                nameof(wantIds));
+        }
+
+        return [.. wantIds];
+    }
 
     /// <summary>
     /// Refuses a season list that is not a set of seasons. A repeat is a caller's mistake being
