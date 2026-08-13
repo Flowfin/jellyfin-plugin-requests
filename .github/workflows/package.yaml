@@ -1,0 +1,216 @@
+# The package build, one job per claimed server line, on every pull request.
+#
+# Packaging breaks quietly. The archive is built by a tool that reads the
+# metadata at the repository root, and a change that makes it unbuildable, or
+# that adds a runtime dependency the metadata does not name, compiles clean and
+# passes every test. Before this, the first run of that tool on any change was
+# the release, where the tag is already spent and a bad archive is a version
+# people can install.
+#
+# The lines are not listed here. They are read out of the packaging files at the
+# repository root, one file per package, the same way the floor build reads
+# them, so adding a line is adding a file and not editing two workflows.
+#
+# THE PACKAGING TOOL READS `build.yaml` BY NAME. It takes the first of several
+# file names it recognises and there is no argument that points it at another,
+# so the metadata for the line being packaged is put at that name before the
+# tool runs. The checkout is this run's own and nothing is pushed from it, which
+# is what makes that safe here and would not make it safe anywhere a tree is
+# kept.
+#
+# THIS IS NOT A REQUIRED CHECK. The required set is a repository setting rather
+# than a file in this tree, #30 is where it is written down and applied, so a
+# red job here does not by itself hold a merge today.
+#
+# What this does not do is install the package on a server. That needs a
+# container engine, which docs/testing.md keeps out of the ordinary suite, and
+# it is a deliberate run whose output goes in that document beside the others.
+name: Package
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+
+# Explicit deny-all at workflow level; each job grants only what it needs.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-lines:
+    # Named apart from the floor build's job of the same shape on purpose. A
+    # required check is a string the ruleset compares to the name a check run
+    # reports, so two jobs reporting one name are two things a ruleset cannot
+    # tell apart, and `lines` is already in the set docs/quality-parity.md names.
+    name: package-lines
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes via git, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Read the claimed lines out of the packaging metadata
+        id: read
+        # One entry per packaging file, with that file's own runtime and the
+        # version it declares. A file that declares neither fails here rather
+        # than producing a job that packages against whatever it finds.
+        run: |
+          set -euo pipefail
+          entries=$(for f in build*.yaml; do
+            framework=$(sed -n 's/^framework: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$f")
+            abi=$(sed -n 's/^targetAbi: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$f")
+            if [ -z "$framework" ] || [ -z "$abi" ]; then
+              echo "::error file=$f::packaging metadata declares no framework or no targetAbi"
+              exit 1
+            fi
+            jq -nc --arg metadata "$f" --arg framework "$framework" --arg abi "$abi" \
+              '{metadata: $metadata, framework: $framework, abi: $abi}'
+          done | jq -sc .)
+          if [ "$(printf '%s' "$entries" | jq 'length')" -eq 0 ]; then
+            echo "::error::no packaging metadata found at the repository root"
+            exit 1
+          fi
+          printf '%s' "$entries" | jq .
+          echo "matrix=$entries" >> "$GITHUB_OUTPUT"
+
+  package:
+    name: package ${{ matrix.abi }}
+    needs: package-lines
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    strategy:
+      # One line failing must not hide the result of the other.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.package-lines.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          # Both SDKs, because which one this job needs is decided by the
+          # packaging file it was handed and not by this file.
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Put this line's metadata where the packaging tool reads it
+        env:
+          METADATA: ${{ matrix.metadata }}
+        run: |
+          set -euo pipefail
+          if [ "${METADATA}" != "build.yaml" ]; then
+            cp "${METADATA}" build.yaml
+          fi
+          # The tool takes the first name it recognises and build.yaml is last in
+          # that list, so anything else at the root would be packaged instead of
+          # the file this job was handed.
+          for other in jprm.yaml .jprm.yaml .ci/jprm.yaml .github/jprm.yaml .gitlab/jprm.yaml meta.yaml; do
+            if [ -f "${other}" ]; then
+              echo "::error::${other} exists and the packaging tool reads it in preference to build.yaml."
+              exit 1
+            fi
+          done
+          sed -n 's/^\(name\|version\|targetAbi\|framework\):.*/&/p' build.yaml
+
+      - name: Restore against the committed lock file
+        # The packaging tool calls dotnet itself and passes no restore
+        # arguments, so without this the graph the package is compiled from is
+        # whatever the feed served at that minute.
+        run: dotnet restore Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj --locked-mode
+
+      - name: Check the artifact list names every file the host does not provide
+        env:
+          FRAMEWORK: ${{ matrix.framework }}
+        # Derived from a publish rather than asserted. The plugin excludes the
+        # runtime assets of the server's own packages, so what a publish leaves
+        # behind is this plugin's assembly and whatever else the build decided
+        # to copy: a dependency the host does not carry appears there and
+        # nowhere else until a user meets it as a missing assembly on first use.
+        #
+        # Compared as assemblies, because those are what fail that way. The
+        # symbols, the dependency manifest and the documentation file are not
+        # named in the list and are not runtime inputs.
+        run: |
+          set -euo pipefail
+          published="${RUNNER_TEMP}/published"
+          rm -rf "${published}"
+          dotnet publish Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj \
+            --configuration Release --framework "${FRAMEWORK}" --no-restore --output "${published}"
+
+          find "${published}" -maxdepth 1 -name '*.dll' -printf '%f\n' | sort > "${RUNNER_TEMP}/published.txt"
+          sed -n '/^artifacts:/,/^[a-z]/p' build.yaml \
+            | sed -n 's/^- *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | sort > "${RUNNER_TEMP}/named.txt"
+
+          echo "published assemblies:"; cat "${RUNNER_TEMP}/published.txt"
+          echo "named in artifacts:"; cat "${RUNNER_TEMP}/named.txt"
+
+          if ! missing=$(comm -23 "${RUNNER_TEMP}/published.txt" "${RUNNER_TEMP}/named.txt"); then
+            echo "::error::the two lists could not be compared"
+            exit 1
+          fi
+          if [ -n "${missing}" ]; then
+            echo "::error::${missing} is published and not named in the artifacts list of build.yaml. A plugin whose package leaves out an assembly it needs installs and throws on first use."
+            exit 1
+          fi
+
+          if ! surplus=$(comm -13 "${RUNNER_TEMP}/published.txt" "${RUNNER_TEMP}/named.txt"); then
+            echo "::error::the two lists could not be compared"
+            exit 1
+          fi
+          if [ -n "${surplus}" ]; then
+            echo "::error::${surplus} is named in the artifacts list and is not published. The packaging step copies each named file and fails on one that is not there."
+            exit 1
+          fi
+
+      - name: Build the plugin package
+        id: jprm
+        # No version input: the tool reads it from the metadata this job put in
+        # place, which is the same file every other check here reads.
+        uses: oddstr13/jellyfin-plugin-repository-manager@9497a0a499416cc572ed2e07a391d9f943a37b4d # v1.1.1
+        with:
+          dotnet-target: ${{ matrix.framework }}
+
+      - name: Check the package and its metadata are both there
+        env:
+          ARTIFACT: ${{ steps.jprm.outputs.artifact }}
+        run: |
+          set -euo pipefail
+          for file in "${ARTIFACT}" "${ARTIFACT}.meta.json"; do
+            if [ ! -f "${file}" ]; then
+              echo "::error::the packaging step did not produce ${file}."
+              exit 1
+            fi
+          done
+          ls -l "${ARTIFACT}" "${ARTIFACT}.meta.json"
+          unzip -l "${ARTIFACT}"
+
+      - name: Keep the package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          # One name per line, so the two packages of one run do not overwrite
+          # each other and each can be downloaded and installed by hand.
+          name: package-${{ matrix.abi }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            ${{ steps.jprm.outputs.artifact }}
+            ${{ steps.jprm.outputs.artifact }}.meta.json
