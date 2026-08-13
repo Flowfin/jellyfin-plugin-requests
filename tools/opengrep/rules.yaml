@@ -375,23 +375,39 @@ rules:
         - "Jellyfin.Plugin.Requests/**/*.cs"
         - "tools/opengrep/fixtures/policy/**/*.cs"
 
-  # Invariant (api, #51): a policy is named rather than left to the default.
-  # Decided in docs/api.md. A bare `[Authorize]` reads as though it decided
-  # something and decides almost nothing: it admits every signed-in person, which
-  # on a family server is the whole household, and it says nothing about which of
-  # them may read a queue. The named policies are the server's own, so an
-  # endpoint under one is reachable by exactly the people the server already
-  # says may do that thing. The attribute with a policy is a longer token
-  # sequence and is not matched by this.
-  - id: authorize-names-a-policy
+  # Invariant (api, #51): a policy this plugin names is one the server registers,
+  # and the way that is held is that the name comes from the server's own
+  # constant rather than from a string here. Decided in docs/api.md.
+  #
+  # This rule replaced one that said the opposite, and the reason is measured
+  # rather than argued. The rule here refused a bare `[Authorize]` and asked for
+  # a named policy instead, on the reading that a name is always narrower than
+  # the default. That is false for the one case it mattered in: the server
+  # registers no name for "any signed-in person" and builds the requirement into
+  # its unnamed default policy, so the name written here for it,
+  # `DefaultAuthorization`, was a name nothing registers. An endpoint under an
+  # unregistered policy does not admit fewer people, it throws inside the
+  # authorisation middleware, and every endpoint this plugin serves answered 500
+  # to every caller on both claimed lines. docs/api.md carries the run.
+  #
+  # So the shape refused is the string, in either direction: a name that is
+  # correct today is still a name nothing checks, and the constants are in
+  # MediaBrowser.Common, which this plugin already references. Taking the name
+  # from there makes a policy the server does not register a compile error. An
+  # endpoint open to any signed-in caller carries `[Authorize]` with nothing
+  # after it, which is what the server's own controllers carry for the same
+  # thing, and no-anonymous-endpoint is what keeps that from sliding to open.
+  - id: policy-is-named-by-the-servers-own-constant
     languages: [generic]
     severity: ERROR
     message: >-
-      Name the policy. A bare [Authorize] admits every signed-in caller and says
-      nothing about which of them may reach this endpoint (#51). Write
-      [Authorize(Policy = ...)] with one of the server's named policies.
+      Do not write a policy name as a string. Take it from Policies in
+      MediaBrowser.Common, so a name the server does not register is a compile
+      error rather than an endpoint that answers 500 to everybody (#51). An
+      endpoint open to any signed-in person carries [Authorize] and no policy,
+      which is the server's default.
     patterns:
-      - pattern: '[Authorize]'
+      - pattern: '[Authorize(Policy = "...")]'
     paths:
       include:
         - "Jellyfin.Plugin.Requests/**/*.cs"

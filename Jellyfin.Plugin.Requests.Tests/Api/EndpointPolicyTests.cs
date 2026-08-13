@@ -15,9 +15,19 @@ namespace Jellyfin.Plugin.Requests.Tests.Api;
 /// Who may reach each endpoint, held against the built assembly.
 /// <para>
 /// The invariant lint holds two rules over the source text, and they are not this check. They refuse
-/// the two ways a policy is taken away: an anonymous endpoint, and an <c>[Authorize]</c> that names
-/// no policy. Neither can see an endpoint that simply never carried an attribute, because a rule
-/// about text cannot refuse the absence of a line. That is what this reads the assembly for.
+/// an anonymous endpoint, and a policy written as a string rather than taken from the constant the
+/// server holds it in. Neither can see an endpoint that simply never carried an attribute, because a
+/// rule about text cannot refuse the absence of a line. That is what this reads the assembly for.
+/// </para>
+/// <para>
+/// <b>An endpoint open to any signed-in caller names no policy, and the empty cell below is that
+/// rather than an omission.</b> The server registers no name for "any signed-in person" and builds
+/// the requirement into its unnamed default policy, so what an endpoint can carry is the default or
+/// a name the server registers. This plugin named <c>DefaultAuthorization</c> for it, which the
+/// server registers on neither claimed line, and every endpoint answered 500 to every caller;
+/// <c>docs/api.md</c> carries the measurement and the repair. So the leg below asks that the
+/// attribute be there and that the policy be the one written down, where the default is written down
+/// as itself.
 /// </para>
 /// <para>
 /// What no test here can say is what the server does with a policy. The server evaluates it and
@@ -53,7 +63,7 @@ public sealed class EndpointPolicyTests
         // What this install is and what it allows. A signed-in person, because nothing this plugin
         // answers is safe to hand a caller the server has not authenticated, and because the kinds
         // an install accepts is a fact about somebody's server rather than about this version.
-        "CapabilitiesController.CapabilitiesAsync GET Capabilities -> DefaultAuthorization",
+        "CapabilitiesController.CapabilitiesAsync GET Capabilities -> (the server's default)",
 
         // Saying yes. A decision is an administrator's, in the transition table and here, and the
         // two answers have to agree: an endpoint reachable by a signed-in user would refuse every
@@ -67,7 +77,7 @@ public sealed class EndpointPolicyTests
 
         // Asking for something. An authenticated user, because a request has to be attributable to
         // somebody and a caller with no session names nobody.
-        "RequestsController.CreateAsync POST Requests -> DefaultAuthorization",
+        "RequestsController.CreateAsync POST Requests -> (the server's default)",
 
         // Saying no. The same policy as an approval, and the decline reason is something a user
         // reads rather than writes.
@@ -79,7 +89,7 @@ public sealed class EndpointPolicyTests
         // One person's own requests. The same policy as asking, and the narrowing is the read
         // rather than the policy: this endpoint has nothing wider than the caller's own requests to
         // return.
-        "RequestsController.MineAsync GET Requests -> DefaultAuthorization",
+        "RequestsController.MineAsync GET Requests -> (the server's default)",
 
         // The whole queue, which is every person's requests and who asked for each. An
         // administrator, and it is the only read here that needs one.
@@ -87,8 +97,7 @@ public sealed class EndpointPolicyTests
     ];
 
     /// <summary>
-    /// Every endpoint carries a policy of its own, named, and the set is exactly the one written
-    /// above.
+    /// Every endpoint carries a policy of its own and the set is exactly the one written above.
     /// </summary>
     [Fact]
     public void EveryEndpointCarriesThePolicyWrittenDownForIt()
@@ -105,18 +114,23 @@ public sealed class EndpointPolicyTests
     /// <summary>
     /// No endpoint relies on the attribute the controller carries.
     /// <para>
-    /// An endpoint with no policy of its own is reachable under whatever its class happens to
+    /// An endpoint with no attribute of its own is reachable under whatever its class happens to
     /// declare on the day it is added, and a class attribute is edited by somebody who is not
     /// reading the endpoint. This is the leg that catches the endpoint added with no attribute at
     /// all, which is what neither the lint nor a per-endpoint refusal test can see.
+    /// </para>
+    /// <para>
+    /// It asks for the attribute rather than for a policy name on it, and that is narrower than it
+    /// was: an endpoint open to any signed-in caller carries the server's default policy, which is
+    /// spelled by naming none. Which policy each one carries is the leg above, against the list, so
+    /// nothing moved from being checked to being assumed.
     /// </para>
     /// </summary>
     [Fact]
     public void NoEndpointInheritsItsPolicyFromTheControllerItSitsOn()
     {
         var inherited = Actions()
-            .Where(action => !action.Method.GetCustomAttributes<AuthorizeAttribute>(inherit: false)
-                .Any(attribute => !string.IsNullOrWhiteSpace(attribute.Policy)))
+            .Where(action => !action.Method.GetCustomAttributes<AuthorizeAttribute>(inherit: false).Any())
             .Select(action => Named(action.Type, action.Method))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
@@ -143,16 +157,15 @@ public sealed class EndpointPolicyTests
     }
 
     /// <summary>
-    /// The controller carries a policy too, so the floor under every endpoint is a signed-in caller
-    /// rather than whatever the framework defaults to. The endpoints do not rely on it, which is the
-    /// leg above; this is that it is there.
+    /// The controller carries the attribute too, so the floor under every endpoint is a signed-in
+    /// caller rather than an open route. The endpoints do not rely on it, which is the leg above;
+    /// this is that it is there.
     /// </summary>
     [Fact]
     public void TheControllerItselfCarriesAPolicy()
     {
         var controllers = Controllers()
-            .Where(type => !type.GetCustomAttributes<AuthorizeAttribute>(inherit: true)
-                .Any(attribute => !string.IsNullOrWhiteSpace(attribute.Policy)))
+            .Where(type => !type.GetCustomAttributes<AuthorizeAttribute>(inherit: true).Any())
             .Select(type => type.FullName ?? type.Name)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
@@ -196,7 +209,7 @@ public sealed class EndpointPolicyTests
                 string.Join(
                     "+",
                     action.Method.GetCustomAttributes<AuthorizeAttribute>(inherit: false)
-                        .Select(attribute => attribute.Policy ?? "(none)")
+                        .Select(attribute => attribute.Policy ?? "(the server's default)")
                         .OrderBy(policy => policy, StringComparer.Ordinal))))
             .OrderBy(line => line, StringComparer.Ordinal)];
 

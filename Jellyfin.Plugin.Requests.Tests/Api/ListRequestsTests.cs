@@ -437,14 +437,19 @@ public sealed class ListRequestsTests
             ["RequiresElevation"],
             queue.GetCustomAttributes<AuthorizeAttribute>(inherit: false).Select(attribute => attribute.Policy));
 
+        // No policy on the endpoint a user reaches, which is the server's default policy rather than
+        // a missing one: the server registers no name for "any signed-in person", so naming one is
+        // how this plugin came to answer 500 to every caller. The attribute is there, which is the
+        // difference between the default and nothing at all, and EndpointPolicyTests holds that for
+        // every endpoint rather than for these two.
         Assert.Equal(
-            ["DefaultAuthorization"],
+            new string?[] { null },
             mine.GetCustomAttributes<AuthorizeAttribute>(inherit: false).Select(attribute => attribute.Policy));
 
-        // The controller's own policy is the floor under both, so an endpoint that ever lost its own
-        // attribute would still need a signed-in caller rather than being open.
+        // The controller's own attribute is the floor under both, so an endpoint that ever lost its
+        // own would still need a signed-in caller rather than being open.
         Assert.Equal(
-            ["DefaultAuthorization"],
+            new string?[] { null },
             typeof(RequestsController).GetCustomAttributes<AuthorizeAttribute>(inherit: false).Select(attribute => attribute.Policy));
     }
 

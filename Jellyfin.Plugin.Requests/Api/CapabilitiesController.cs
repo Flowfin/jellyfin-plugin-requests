@@ -30,7 +30,7 @@ namespace Jellyfin.Plugin.Requests.Api;
 /// dependencies and every store test a capability to carry.
 /// </para>
 /// </summary>
-[Authorize(Policy = AuthenticatedUserPolicy)]
+[Authorize]
 public sealed class CapabilitiesController : RequestsControllerBase
 {
     private readonly IInstallSettings _settings;
@@ -61,7 +61,7 @@ public sealed class CapabilitiesController : RequestsControllerBase
     /// those has an answer before anybody has configured anything.
     /// </returns>
     [HttpGet("Capabilities")]
-    [Authorize(Policy = AuthenticatedUserPolicy)]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<InstallCapabilities>> CapabilitiesAsync(CancellationToken cancellationToken)
     {
