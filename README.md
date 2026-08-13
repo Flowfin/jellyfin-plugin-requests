@@ -131,7 +131,17 @@ both, and a machine with only the .NET 9 SDK has not been tried.
 GPL-3.0. The full text is in [LICENSE](LICENSE), and it is the authority for the
 terms, the warranty disclaimer and the limitation of liability.
 
-Jellyfin plugins are linked against GPLv3 server code, so a plugin distributed
-to others has to be under the GPLv3 or a permissive license compatible with it.
+A plugin is compiled against the server's libraries and ships as an assembly
+that links them, so the terms those libraries carry reach the compiled result
+whatever the source says. The packages this one compiles against declare
+GPL-3.0-only, which is what makes GPL-3.0 the licence here rather than a
+preference:
+
+    grep -h '<license type' ~/.nuget/packages/jellyfin.controller/*/jellyfin.controller.nuspec | sort -u
+        <license type="expression">GPL-3.0-only</license>
+
+The server's own repository carries GPL-2.0 in its licence file, so those two do
+not agree, and [docs/catalogue.md](docs/catalogue.md) is where both are measured
+and where what follows from them is written out.
 
 See [NOTICE.md](NOTICE.md) for the intended-use notice.

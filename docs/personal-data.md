@@ -1,0 +1,218 @@
+# What this plugin holds about a person
+
+A request record says that a named person asked for a named title on a date. That is more revealing
+than most of what a media server holds, and an operator running this for other people has to be able
+to answer for it without reading the source.
+
+This page is the account. It collects what other issues on this board decided rather than deciding
+anything itself, and each section says where the decision lives. Where something is not decided or
+not built, this page says so in those words instead of describing an intention as a behaviour.
+
+## Every field that can name a person
+
+The record is one type, and everything below is a property of it or of an entry in its history. The
+identifiers are derived rather than listed from memory:
+
+    git grep -nE 'public (required )?(Guid|Guid\?|IReadOnlyList<Guid>) ' -- Jellyfin.Plugin.Requests/Model/
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:60:    public required Guid Id { get; init; }
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:67:    public required Guid RequestedByUserId { get; init; }
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:144:    public IReadOnlyList<Guid> JoinedByUserIds { get; init; } = [];
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:165:    public IReadOnlyList<Guid> WantIds
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:189:    public Guid? StateChangedByUserId { get; init; }
+    Jellyfin.Plugin.Requests/Model/RequestCaller.cs:52:    public Guid? UserId { get; }
+    Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs:44:    public Guid? ByUserId { get; init; }
+
+Four of those seven name a person. What each one is, and what it is for:
+
+| Field                               | Who it names                                         | Where it is written |
+| ----------------------------------- | ---------------------------------------------------- | ------------------- |
+| `MediaRequest.RequestedByUserId`    | the person who asked                                 | the queue file      |
+| `MediaRequest.JoinedByUserIds`      | everybody else who asked for the same title          | the queue file      |
+| `MediaRequest.StateChangedByUserId` | whoever last moved it, usually an operator           | the queue file      |
+| `RequestHistoryEntry.ByUserId`      | whoever made that one move, for every move ever made | the queue file      |
+
+The other three name nothing about a person. `MediaRequest.Id` and `MediaRequest.WantIds` are this
+plugin's own identifier for a request and the browsing sibling's identifiers for the asks it handed
+over. `RequestCaller.UserId` is who is making the call being handled right now, and it is an argument
+passed between methods rather than a stored field: what reaches the disk is the record above, and the
+store writes that record whole.
+
+    git grep -n 'public MediaRequest? Request' -- Jellyfin.Plugin.Requests/Storage/PersistedRequest.cs
+    Jellyfin.Plugin.Requests/Storage/PersistedRequest.cs:29:    public MediaRequest? Request { get; init; }
+
+**A person is held as the server's user identifier and never as a name.** No field carries a user
+name, a display name, an email address or an external account. Whoever the identifier belongs to is a
+question the server answers, and this plugin does not copy the answer into its own file.
+
+### Two fields carry free text somebody typed
+
+    git grep -nE 'public string\? (RequesterNote|DeclineNote)' -- Jellyfin.Plugin.Requests/Model/MediaRequest.cs
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:209:    public string? RequesterNote
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:242:    public string? DeclineNote
+
+`RequesterNote` is what the person asking wrote, and `DeclineNote` is what the operator wrote back.
+Both are bounded in length and neither is bounded in content. Anybody can write a name, an address or
+anything else into one, and nothing in this plugin reads them for that or could. They are listed here
+because a document about personal data that only lists the identifiers would be describing the fields
+that are easy to reason about.
+
+### What is stored beside a person is the revealing part
+
+`DisplayTitle`, `DisplayYear`, `ProviderIds`, `Kind` and `Seasons` say what was asked for.
+`RequestedAt`, `StateChangedAt` and every `At` in the history say when. None of them names anybody,
+and all of them sit on the same record as the identifier of the person who asked. What the file holds
+is therefore not a list of titles and not a list of people, it is a list of who wanted what, and
+when.
+
+## Where it is
+
+Two files, both under the server's own data directory, and the table of them is in
+[storage.md](storage.md) under "What is on the disk, and where". This page does not repeat the paths,
+because two copies of a path are two answers the day one of them moves.
+
+Everything above is in the queue file. The settings file holds no person at all, which is the whole
+of that class rather than a sample:
+
+    git grep -nE '^    public (const )?(int|bool) ' -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:52:    public const int MinimumRetentionDays = 30;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:67:    public int OpenRequestsPerUser { get; set; } = 10;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:72:    public bool AcceptsMovies { get; set; } = true;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:83:    public bool AcceptsSeries { get; set; } = true;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:99:    public int FinishedRequestRetentionDays { get; set; } = 365;
+
+Three numbers, one of them the floor under another, and two switches. Nothing there is about
+anybody.
+
+## Who on the machine can read it
+
+**This plugin sets no permission on either file.** Nothing in it asks for one:
+
+    git grep -n 'UnixFileMode\|SetUnixFileMode\|FileSecurity\|SetAccessControl' -- Jellyfin.Plugin.Requests/ ; echo "exit=$?"
+    exit=1
+
+So the queue is readable by whoever can read the server's data directory, under whatever the server
+process and the operating system give a file created there. An operator who wants it narrower
+narrows the directory, and that is a property of their installation rather than something this plugin
+can promise.
+
+**Anything running inside the server process can read it too**, and that is not a defect this plugin
+could repair. It is the same boundary the seam is written against, and the section below says what
+follows from it.
+
+**What was not measured.** No permission was read off a running server on either claimed line.
+Whether a container image, a package or a manual install leaves that directory readable to other
+accounts on the machine is a fact about the installation, and no run on this board has asked one.
+
+## How long it is kept
+
+`FinishedRequestRetentionDays` is a setting, 365 by default, with a floor of 30.
+[configuration.md](configuration.md) carries the number, the reason it is a field and the reason the
+floor exists, and this page does not restate the argument.
+
+**Nothing removes anything today.** The setting is read where it is validated and nowhere else:
+
+    git grep -ln 'FinishedRequestRetentionDays' -- Jellyfin.Plugin.Requests/
+    Jellyfin.Plugin.Requests/Configuration/ConfigurationRules.cs
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
+    Jellyfin.Plugin.Requests/Configuration/configPage.html
+
+The class that declares it, the rule that refuses a value under the floor, and the field on the
+settings page. There is no sweep, no scheduled task and no code path that deletes a finished request,
+so a server running this plugin keeps every request forever, whatever the number says. What builds
+the thing that enforces it is #49.
+
+An operator answering for this today should read the number as a plan and the file as the fact.
+
+## What happens when a Jellyfin user is deleted
+
+**Nothing.** No part of this plugin is told that a user was removed, and nothing looks:
+
+    git grep -n 'IUserManager' -- Jellyfin.Plugin.Requests/
+    Jellyfin.Plugin.Requests/Seam/ServerKnownUsers.cs:15:    private readonly IUserManager _users;
+    Jellyfin.Plugin.Requests/Seam/ServerKnownUsers.cs:22:    public ServerKnownUsers(IUserManager users)
+
+That one reference asks whether a user exists when a want arrives over the seam. It is a question
+about the present, not a subscription to a deletion, and nothing in this plugin acts on an account
+going away.
+
+So a request record outlives the account it names. The identifier stays in the file, in up to four
+places for one deleted person: their own requests, requests they joined that somebody else asked for,
+and every decision they made as an operator, which is written into the record and into its history.
+
+**What the rule should be is open, and it is open for a reason rather than by neglect.** The history
+a decision is written into is append-only and a lint rule refuses any other writer, so stripping an
+identifier out of past entries is not a small change to make while implementing a sweep. #49 holds
+the question and states the three answers that are available, each of which leaves something
+different behind. This page cannot state a behaviour that has not been decided, and describing the
+current absence as a retention choice would be exactly that.
+
+## What leaves the server
+
+**Nothing leaves the server today.** The plugin makes no outbound call of any kind:
+
+    git grep -n 'HttpClient\|IHttpClientFactory\|WebRequest' -- Jellyfin.Plugin.Requests/ ; echo "exit=$?"
+    exit=1
+
+The bridge to an external request service has exactly one implementation in this tree, and it is the
+one for a server that has no backend:
+
+    git grep -n ': IRequestBackend' -- Jellyfin.Plugin.Requests/
+    Jellyfin.Plugin.Requests/Bridge/NoRequestBackend.cs:23:public sealed class NoRequestBackend : IRequestBackend
+
+There is no metadata lookup either. This plugin calls no metadata source at all, which is a lint rule
+rather than a habit:
+
+    git grep -n 'id: no-call-to-a-metadata-source' -- tools/opengrep/rules.yaml
+    tools/opengrep/rules.yaml:479:  - id: no-call-to-a-metadata-source
+
+And nothing reports anything to this project, at any setting, by design and with no opt-in. That is
+recorded in [notifications.md](notifications.md) with the decision behind it.
+
+Three paths would carry something outward once they are built, and each is named here so that an
+operator can find out what turning one on would mean before it exists:
+
+| Path                | Issue | What would leave                                            | Off until         |
+| ------------------- | ----- | ----------------------------------------------------------- | ----------------- |
+| The bridge          | #82   | a title, and an external account for the person who asked   | a backend is set  |
+| The outbound sink   | #78   | a payload naming a person and a title, to an address chosen | an address is set |
+| The session message | #76   | nothing off the machine, a message to a dashboard session   | not decided yet   |
+
+The bridge names a person to the external service by an account the operator wrote into a table, and
+never by their name. That is the decision in [bridge.md](bridge.md), and the table is empty on a
+fresh install, so a bridge configured and nothing else sends no attribution at all. The activity log
+in #75 is the fourth path and it is not in the table because it writes into the server's own log,
+which does not leave the machine.
+
+**None of the three is built.** The rows say what each one is for, not what it does.
+
+## What arrives from another plugin, and what this side trusts
+
+A request can arrive from the browsing sibling instead of from a person using the API, and that path
+has no session behind it. It carries a user identifier that this plugin cannot verify.
+
+**The sibling's own permission check is the only check on that path, and this side is trusting it.** A
+want that arrives over the seam is attributed to whoever the caller says asked for it. Anybody
+evaluating this plugin should read that as it stands rather than as a check that is implied
+somewhere.
+
+That is a boundary rather than a hole. The caller is another plugin inside the same server process,
+which can already read this plugin's file and write it, so a check here would refuse nothing that is
+not already possible and would read afterwards as protection.
+
+What this side does check is that the identifier names somebody the server has, and a handover naming
+a user it does not have is refused with nothing stored.
+[seam.md](seam.md) carries the same conclusion at length, in the section on what this side trusts and
+what it checks anyway, and #118 is where it was stated.
+
+## What this page does not say
+
+**It states no legal position.** What a given operator has to do under the law they run under depends
+on where they are and who their users are, and this page is an account of what the software holds so
+that somebody who has to answer that question can.
+
+**Nothing here was measured on a running server.** Every command above reads this repository. File
+permissions on a real install, and what a real queue holds after a year, are not in it.
+
+**It carries no list of the request states or of the transitions.** Those are in
+[lifecycle.md](lifecycle.md), printed from the code that decides them, and a copy here would drift
+against it.
