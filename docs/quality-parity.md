@@ -66,10 +66,12 @@ lint:
     Reject Trojan Source Unicode
     zizmor
 
-Two of the thirteen have no counterpart running here at all, and both are the
-packaging contexts, #108 and #109. It was four until the hygiene job landed under
-#26 and three until the invariant lint landed under #28. The rest run and are not
-required, and the section below is the set that says which of them should be.
+One of the thirteen has no counterpart running here at all, and it is the bill of
+materials, #109. It was four until the hygiene job landed under #26, three until
+the invariant lint landed under #28, and two until the package build landed under
+#108, which is `package-lines` and one `package` job per claimed line rather than
+the single context the other board has. The rest run and are not required, and
+the section below is the set that says which of them should be.
 
 ## The set to require
 
@@ -150,7 +152,11 @@ merge.
 - `ABI floor build` there is `lines`, `floor 10.11.0.0` and `floor 12.0.0.0`
   here, because the claimed lines are read out of the packaging files rather
   than listed in a job, so a line is a file and not a name in a ruleset.
-- `Package (JPRM) / Build package` has no counterpart running here; #108.
+- `Package (JPRM) / Build package` there is `package-lines`, `package 10.11.0.0`
+  and `package 12.0.0.0` here, for the same reason the floor build is three
+  contexts: the lines are read out of the packaging files rather than listed in a
+  job. They are not in the set above, because the set is what #30 applies and
+  this pair arrived after it was written down.
 - `Package (JPRM) / Generate SBOM` has no counterpart running here; #109.
 - `CodeQL` there is required and is not here, because it is the code-scanning
   tab's check rather than a job, and the three `Analyze` legs are required
