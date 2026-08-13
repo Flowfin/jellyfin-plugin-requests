@@ -71,6 +71,31 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     }
 
     /// <summary>
+    /// What an uninstall removes, which is nothing this plugin wrote.
+    /// <para>
+    /// Two files are on the disk and both are the operator's own: the queue is what people asked
+    /// for and the settings are what the operator chose. Deleting either here is a delete with no
+    /// undo, no copy and no warning, taken on a click somebody may have made by mistake.
+    /// </para>
+    /// <para>
+    /// <b>Nothing says which kind of uninstall this is.</b> The server calls this with no argument,
+    /// so a removal meant to be final and one that is a step in putting the plugin back are the
+    /// same call, and this side cannot tell them apart. A decision that is right for one of them
+    /// and destroys data on the other is not a decision, it is a coin toss on somebody else's
+    /// queue.
+    /// </para>
+    /// <para>
+    /// The other half of the answer is not code. What stays, and the command that removes it, are
+    /// in <c>docs/configuration.md</c>, because a plugin that leaves data behind and does not say
+    /// so is the reason people distrust uninstalling anything.
+    /// </para>
+    /// </summary>
+    public override void OnUninstalling()
+    {
+        base.OnUninstalling();
+    }
+
+    /// <summary>
     /// The pages this plugin puts in the dashboard, and the two files they share.
     /// <para>
     /// Two pages rather than one, because an operator opens the queue every day and the settings
