@@ -83,6 +83,7 @@
                                 <th scope="col">Requester</th>
                                 <th scope="col">In the library</th>
                                 <th scope="col">Note</th>
+                                <th scope="col">Decision</th>
                             </tr>
                         </thead>
                         <tbody class="requestsQueueRows"></tbody>
@@ -129,6 +130,20 @@
                     };
 
                     var kinds = { Movie: "Film", Series: "Series" };
+
+                    /*
+                     * The reasons a request can be declined for, as the model fixes them. An
+                     * operator sees the words rather than the value, and a reason this page has no
+                     * word for is shown as it came rather than dropped.
+                     */
+                    var reasons = {
+                        Other: "Another reason",
+                        AlreadyInTheLibrary: "Already in the library",
+                        AlreadyRequested: "Already asked for",
+                        CannotBeObtained: "Cannot be obtained",
+                        NotWanted: "Not wanted",
+                        NoRoomForIt: "No room for it",
+                    };
 
                     /*
                      * What the library holds of what was asked for. `Unknown` is a fourth answer
@@ -224,6 +239,21 @@
                         return request.AvailabilityCheckedAt ? answer + ", checked " + moment(request.AvailabilityCheckedAt) : answer;
                     }
 
+                    /*
+                     * What was decided, where anything was. The reason is one of a fixed set and the
+                     * note beside it is an operator's own sentence, which is the second of the two
+                     * pieces of writing on this page that a person typed.
+                     */
+                    function decided(request) {
+                        if (!request.DeclineReason) {
+                            return "";
+                        }
+
+                        var reason = reasons[request.DeclineReason] || request.DeclineReason;
+
+                        return request.DeclineNote ? reason + ", " + request.DeclineNote : reason;
+                    }
+
                     function draw(answer) {
                         var drawn = document.createDocumentFragment();
 
@@ -238,6 +268,7 @@
                             cell(row, request.RequestedByUserId);
                             cell(row, held(request));
                             cell(row, request.RequesterNote || "");
+                            cell(row, decided(request));
 
                             drawn.appendChild(row);
                         });

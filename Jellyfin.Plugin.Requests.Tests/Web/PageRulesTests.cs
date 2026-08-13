@@ -60,6 +60,13 @@ public class PageRulesTests
     ];
 
     /// <summary>
+    /// The fields of a request that carry a sentence somebody typed. A note is the requester's own
+    /// words and the second is what an operator wrote when they said no, and both are shown to
+    /// somebody who did not write them.
+    /// </summary>
+    private static readonly string[] TextAPersonTyped = ["RequesterNote", "DeclineNote"];
+
+    /// <summary>
     /// Nothing this plugin embeds turns a string into markup.
     /// <para>
     /// The count of assets read is asserted as well as the offenders, because the failure that
@@ -81,6 +88,47 @@ public class PageRulesTests
 
         Assert.NotEmpty(assets);
         Assert.Empty(offenders);
+    }
+
+    /// <summary>
+    /// The writing people did reaches the queue only through the one place that puts a string in as
+    /// text.
+    /// <para>
+    /// The leg above refuses the sinks wherever they are written. This one is the other direction:
+    /// it reads the code that draws a row and requires every field of a request to leave it through
+    /// that single call, so a field drawn some new way has to pass here before the sink list has
+    /// ever heard of it. The two pieces of writing this is for are the requester's note and the
+    /// sentence an operator writes with a decline, and both are asserted to be drawn at all, since
+    /// a rule about how a thing is rendered proves nothing over a page that renders it nowhere.
+    /// </para>
+    /// <para>
+    /// The bound is the same one this class carries throughout: this reads the page, it does not
+    /// run it.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheWritingPeopleDidReachesTheQueueOnlyAsText()
+    {
+        var body = Queue();
+
+        var writer = Between(body, "function cell(", "\n                    }");
+        Assert.Contains("target.textContent = text;", writer, StringComparison.Ordinal);
+
+        var drawing = Between(body, "function draw(", "\n                    }");
+
+        var straightIn = drawing
+            .Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.Contains("request.", StringComparison.Ordinal))
+            .Where(line => !line.StartsWith("cell(row, ", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.Empty(straightIn);
+
+        foreach (var typed in TextAPersonTyped)
+        {
+            Assert.Contains(typed, body, StringComparison.Ordinal);
+        }
     }
 
     /// <summary>
@@ -111,6 +159,32 @@ public class PageRulesTests
 
         Assert.NotEmpty(registered);
         Assert.Empty(unread);
+    }
+
+    /// <summary>
+    /// The queue page, which is the one that draws what people wrote.
+    /// </summary>
+    /// <returns>The page as the assembly carries it.</returns>
+    private static string Queue()
+        => Assets().Single(asset => asset.Name.EndsWith("Web.queue.html", StringComparison.Ordinal)).Body;
+
+    /// <summary>
+    /// One block of the page, from a marker to the end of what it opens.
+    /// </summary>
+    /// <param name="body">The page.</param>
+    /// <param name="opens">What the block starts with.</param>
+    /// <param name="closes">What ends it.</param>
+    /// <returns>The block, without either marker.</returns>
+    private static string Between(string body, string opens, string closes)
+    {
+        var at = body.IndexOf(opens, StringComparison.Ordinal);
+        Assert.True(at >= 0, "The page carries nothing beginning " + opens);
+
+        var start = at + opens.Length;
+        var end = body.IndexOf(closes, start, StringComparison.Ordinal);
+        Assert.True(end >= 0, "What begins " + opens + " is never closed.");
+
+        return body[start..end];
     }
 
     /// <summary>
