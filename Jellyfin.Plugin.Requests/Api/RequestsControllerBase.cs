@@ -19,6 +19,18 @@ namespace Jellyfin.Plugin.Requests.Api;
 /// in the invariant lint: a second route attribute anywhere else, and a method template beginning
 /// with a slash, which silently replaces the controller's route rather than extending it.
 /// </para>
+/// <para>
+/// <b>A policy is either one the server registers a name for, taken from the server's own constant,
+/// or it is the server's default.</b> The names it registers are <c>Policies</c> in
+/// <c>MediaBrowser.Common</c>, an assembly this plugin already references, so an endpoint naming one
+/// of them cannot name a policy that does not exist. There is no registered name for "any signed-in
+/// person": the server builds that requirement into the unnamed default policy, so an endpoint open
+/// to any signed-in caller carries <c>[Authorize]</c> with nothing after it, which is what the
+/// server's own controllers carry for the same thing. A policy written here as a string is refused
+/// by <c>policy-is-named-by-the-servers-own-constant</c> in the invariant lint: a name the server
+/// does not register does not make an endpoint narrower, it makes the endpoint answer 500 to
+/// everybody, which is what this plugin shipped until <c>docs/api.md</c> recorded the repair.
+/// </para>
 /// </summary>
 [ApiController]
 [Route(RoutePrefix)]
@@ -49,23 +61,4 @@ public abstract class RequestsControllerBase : ControllerBase
     /// </para>
     /// </summary>
     public const string RoutePrefix = "MediaRequests/" + VersionSegment;
-
-    /// <summary>
-    /// The server's policy for a call that has to come from a signed-in user. Named as a literal
-    /// because the constant that holds it lives in the server's own web assembly, which a plugin
-    /// does not reference; the string is the contract either way.
-    /// <para>
-    /// It is here rather than on one controller because there is more than one, and a second copy of
-    /// the literal beside the second controller would be a second spelling of a contract this
-    /// repository does not own.
-    /// </para>
-    /// </summary>
-    protected const string AuthenticatedUserPolicy = "DefaultAuthorization";
-
-    /// <summary>
-    /// The server's policy for a call that has to come from an administrator, named as a literal for
-    /// the same reason as the one above. It is what the server's own dashboard endpoints carry, so an
-    /// endpoint under it is reachable by exactly the people who can already administer the server.
-    /// </summary>
-    protected const string AdministratorPolicy = "RequiresElevation";
 }

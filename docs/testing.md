@@ -94,8 +94,10 @@ and it is the same refusal as installing into a real server above rather than a 
 
 What replaces it is two things, on two sides of the endpoint. `EndpointPolicyTests` reads the built
 assembly and refuses an endpoint whose policy is not the one written down for it, an endpoint with
-no policy of its own, and an anonymous one; `no-anonymous-endpoint` and `authorize-names-a-policy`
-refuse the two source shapes that take a policy away. That is the half about which policy an
+no attribute of its own, and an anonymous one; `no-anonymous-endpoint` and
+`policy-is-named-by-the-servers-own-constant` refuse the two source shapes that take a policy away,
+which are an endpoint reachable with no session and a policy written here as a string rather than
+taken from the constant the server registers it under. That is the half about which policy an
 endpoint is under. The other half is that the endpoint a caller without elevation can reach has
 nothing wider than that caller's own requests to return, which `ListRequestsTests` asks under every
 combination of filter, order and page. Neither is the server turning somebody away, and neither

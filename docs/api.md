@@ -426,20 +426,21 @@ and would otherwise match nothing, and an empty page reads exactly like an empty
 
 ## Who may reach what
 
-Every endpoint carries a policy of its own, and the controller carries one as the floor under all of
-them. An endpoint with no policy of its own is reachable under whatever its class happens to declare
-on the day it is added, and a class attribute is edited by somebody who is not reading the endpoint.
+Every endpoint carries an authorisation attribute of its own, and the controller carries one as the
+floor under all of them. An endpoint with none of its own is reachable under whatever its class
+happens to declare on the day it is added, and a class attribute is edited by somebody who is not
+reading the endpoint.
 
-| Endpoint                     | Policy                 | Who that is          |
-| ---------------------------- | ---------------------- | -------------------- |
-| `GET Capabilities`           | `DefaultAuthorization` | any signed-in person |
-| `POST Requests`              | `DefaultAuthorization` | any signed-in person |
-| `GET Requests`               | `DefaultAuthorization` | any signed-in person |
-| `GET Requests/Queue`         | `RequiresElevation`    | an administrator     |
-| `POST Requests/{id}/Approve` | `RequiresElevation`    | an administrator     |
-| `POST Requests/{id}/Decline` | `RequiresElevation`    | an administrator     |
-| `POST Requests/Approve`      | `RequiresElevation`    | an administrator     |
-| `POST Requests/Decline`      | `RequiresElevation`    | an administrator     |
+| Endpoint                     | Policy                       | Who that is          |
+| ---------------------------- | ---------------------------- | -------------------- |
+| `GET Capabilities`           | the server's default         | any signed-in person |
+| `POST Requests`              | the server's default         | any signed-in person |
+| `GET Requests`               | the server's default         | any signed-in person |
+| `GET Requests/Queue`         | `Policies.RequiresElevation` | an administrator     |
+| `POST Requests/{id}/Approve` | `Policies.RequiresElevation` | an administrator     |
+| `POST Requests/{id}/Decline` | `Policies.RequiresElevation` | an administrator     |
+| `POST Requests/Approve`      | `Policies.RequiresElevation` | an administrator     |
+| `POST Requests/Decline`      | `Policies.RequiresElevation` | an administrator     |
 
 The four decisions carry the same policy as the queue, and that is the endpoint agreeing with the
 model rather than deciding anything: every cell of the table these two can reach admits an
@@ -452,18 +453,54 @@ reds if the table stops agreeing.
 queue is a list of who asked for what, so there is no answer this plugin gives that is safe to hand a
 caller the server has not authenticated.
 
-The policies are the server's own, named as literals because the constants that hold them live in the
-server's web assembly and a plugin does not reference it. The string is the contract either way.
+### The name in the middle column, and the defect it is the repair for
+
+The policies are the server's own and the name comes from the server's own constant, `Policies` in
+`MediaBrowser.Common`, which this plugin already references. There is no registered name for "any
+signed-in person": the server builds that requirement into its unnamed default policy, so the three
+endpoints open to anybody with a session carry `[Authorize]` with nothing after it, which is what the
+server's own controllers carry for the same thing.
+
+This table said `DefaultAuthorization` in those three rows and the controllers carried it as a
+string, and **every endpoint this plugin serves answered 500 to every caller, on both claimed
+lines**. A policy name the server does not register does not admit fewer people; it throws inside the
+authorisation middleware before the endpoint is reached. The run that measured it is in the pull
+request for #58, on `jellyfin/jellyfin:10.11.11` and on `jellyfin/jellyfin:12.0-rc4`:
+
+    [ERR] Jellyfin.Api.Middleware.ExceptionMiddleware: Error processing request. URL GET /MediaRequests/v1/Requests/Queue.
+    System.InvalidOperationException: The AuthorizationPolicy named: 'DefaultAuthorization' was not found.
+
+That the name is absent from the server assembly of each line is readable without a server, from the
+package each target compiles against:
+
+    tr -d '\000' < ~/.nuget/packages/jellyfin.common/10.11.11/lib/net9.0/MediaBrowser.Common.dll \
+        | grep -oE 'DefaultAuthorization|RequiresElevation' | sort | uniq -c
+          3 RequiresElevation
+    tr -d '\000' < ~/.nuget/packages/jellyfin.common/12.0.0-rc4/lib/net10.0/MediaBrowser.Common.dll \
+        | grep -oE 'DefaultAuthorization|RequiresElevation' | sort | uniq -c
+          3 RequiresElevation
+
+So the string is where the defect lived, rather than the particular name that was in it: a name
+written here is a name nothing checks, and one taken from the constant is a compile error the day it
+stops existing.
 
 What holds this. `EndpointPolicyTests` reads the built assembly and refuses an endpoint whose policy
-is not the one written down for it, an endpoint carrying no policy of its own, and an anonymous one.
-The invariant lint refuses the two source shapes that take a policy away: `no-anonymous-endpoint` and
-`authorize-names-a-policy`, the second of which is about a bare `[Authorize]`, which reads as though
-it decided something and admits every signed-in person on the server.
+is not the one written down for it, an endpoint carrying no attribute of its own, and an anonymous
+one. The invariant lint refuses the two source shapes that take a policy away:
+`no-anonymous-endpoint`, and `policy-is-named-by-the-servers-own-constant`, which is about a policy
+written as a string.
+
+What is weaker than before, said rather than left to be discovered: an endpoint carrying the default
+policy and an endpoint whose author meant to name one and did not are the same bytes, so no check
+here tells them apart. What is checked is that the attribute is there and that the policy is the one
+this table names, the default included.
 
 What none of that holds is the server turning a caller away, which is the server's own evaluation of
 the policy and needs a running one. `docs/testing.md` carries that as a refused test with what
-replaces it.
+replaces it. **That applies to the repair above as well: no run on a server records these endpoints
+answering anything other than 500.** What is measured is that the name they used exists on neither
+line and that the name they use now exists on both. The first-load procedure in `docs/testing.md` is
+where a run against a server would go, and it has not been made since this changed.
 
 The rule underneath the table is narrower than the table. **A user sees their own requests in full
 and learns nothing at all about anybody else's**, which is what `GET Requests` returns and why its

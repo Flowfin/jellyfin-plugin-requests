@@ -9,6 +9,7 @@ using Jellyfin.Plugin.Requests.Intake;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
+using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -44,16 +45,20 @@ namespace Jellyfin.Plugin.Requests.Api;
 /// endpoint that carried none would be reachable by whatever the class happens to declare on the day
 /// it is added, and a class attribute is edited by somebody who is not reading the endpoint. Which
 /// policy each one carries, and what a caller may see under it, is <c>docs/api.md</c>; that the
-/// attribute is there at all is refused by <c>EndpointPolicyTests</c> over the built assembly and by
-/// two rules in the invariant lint over the source.
+/// attribute is there at all is refused by <c>EndpointPolicyTests</c> over the built assembly, which
+/// is the only place it can be: the two rules in the invariant lint refuse the two ways one is taken
+/// away, and a rule about text cannot see a line nobody wrote.
 /// </para>
 /// <para>
 /// Two policies are used here and no endpoint is anonymous. Creating a request and reading one's own
 /// need an authenticated user, because a request has to be attributable to somebody to exist at all
-/// and a caller with no session has no "own". Reading the whole queue needs an administrator.
+/// and a caller with no session has no "own"; the server registers no name for that and builds it
+/// into its default policy, so those endpoints carry <c>[Authorize]</c> with nothing after it.
+/// Reading the whole queue and every decision need an administrator, which the server does name, so
+/// those carry its own constant.
 /// </para>
 /// </summary>
-[Authorize(Policy = AuthenticatedUserPolicy)]
+[Authorize]
 public sealed class RequestsController : RequestsControllerBase
 {
     /// <summary>
@@ -129,7 +134,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// here is the smallest thing that names the field that was wrong.
     /// </returns>
     [HttpPost("Requests")]
-    [Authorize(Policy = AuthenticatedUserPolicy)]
+    [Authorize]
     [ProducesResponseType<CreatedRequest>(StatusCodes.Status201Created)]
     [ProducesResponseType<CreatedRequest>(StatusCodes.Status200OK)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
@@ -218,7 +223,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// <param name="cancellationToken">Cancels the call.</param>
     /// <returns>The page, and how many of the caller's requests matched.</returns>
     [HttpGet("Requests")]
-    [Authorize(Policy = AuthenticatedUserPolicy)]
+    [Authorize]
     [ProducesResponseType<RequestsPage<MyRequest>>(StatusCodes.Status200OK)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
@@ -293,7 +298,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// <param name="cancellationToken">Cancels the call.</param>
     /// <returns>The page, and how many requests matched.</returns>
     [HttpGet("Requests/Queue")]
-    [Authorize(Policy = AdministratorPolicy)]
+    [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType<RequestsPage<QueuedRequest>>(StatusCodes.Status200OK)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status503ServiceUnavailable)]
@@ -348,7 +353,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// <see cref="RequestFailure"/> rather than obeyed.
     /// </returns>
     [HttpPost("Requests/{id}/Approve")]
-    [Authorize(Policy = AdministratorPolicy)]
+    [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType<QueuedRequest>(StatusCodes.Status200OK)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
@@ -396,7 +401,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// The request as the queue now holds it, at its new revision, or the refusal.
     /// </returns>
     [HttpPost("Requests/{id}/Decline")]
-    [Authorize(Policy = AdministratorPolicy)]
+    [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType<QueuedRequest>(StatusCodes.Status200OK)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
@@ -449,7 +454,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// <param name="cancellationToken">Cancels the call.</param>
     /// <returns>One entry per request, in the order they were sent.</returns>
     [HttpPost("Requests/Approve")]
-    [Authorize(Policy = AdministratorPolicy)]
+    [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType<DecidedRequests>(StatusCodes.Status200OK)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
@@ -482,7 +487,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// <param name="cancellationToken">Cancels the call.</param>
     /// <returns>One entry per request, in the order they were sent.</returns>
     [HttpPost("Requests/Decline")]
-    [Authorize(Policy = AdministratorPolicy)]
+    [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType<DecidedRequests>(StatusCodes.Status200OK)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
