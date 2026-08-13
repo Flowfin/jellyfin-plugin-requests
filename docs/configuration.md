@@ -105,3 +105,53 @@ They land with the paths, in #79.
 **A bridge address and a credential.** The only bridge in this tree is the one for a server that has
 none. A field for an address would be somewhere to type something nothing reads. #82 brings the
 adapter, and #85 decides where a credential is kept and what may honestly be claimed about it.
+
+## What an uninstall leaves behind
+
+**This plugin removes nothing when it is uninstalled.** Both files it wrote stay where they are, and
+they are the two rows of the table under "What is on the disk, and where" in
+[storage.md](storage.md).
+
+The reason is that neither file is the plugin's. The queue is what people asked for and the settings
+are what an operator chose, and there is no copy of either. The call the server makes carries
+nothing that says which kind of uninstall this is, so a removal meant to be final and one that is a
+step in putting the plugin back arrive here identically. Deleting on both is a queue lost to a click
+somebody may have made by mistake, and there is no undo.
+
+That is a decision with a cost, and the cost is the rest of this section. What is in those files is
+personal: a request says a named person asked for a named title on a date. An operator who is
+finished with this plugin should be able to remove that in one step, without knowing anything about
+how the plugin works.
+
+### Removing what is left
+
+Both paths are relative to the server's data directory. Where that directory is differs by
+installation and by operating system, and this document does not name it, for the reason
+[storage.md](storage.md) gives: the server is the authority for its own paths. Run these from
+inside it, with the server stopped.
+
+On Linux and macOS:
+
+    rm -rf ./plugins/Jellyfin.Plugin.Requests
+    rm -f ./plugin-configurations/Jellyfin.Plugin.Requests.xml
+
+On Windows, in PowerShell:
+
+    Remove-Item -Recurse -Force .\plugins\Jellyfin.Plugin.Requests
+    Remove-Item -Force .\plugin-configurations\Jellyfin.Plugin.Requests.xml
+
+The first removes the queue and any write that was in flight; the second removes the settings. After
+both, nothing this plugin wrote is on the disk.
+
+`WhatTheDocumentedCommandRemovesIsWhatIsActuallyLeft` reads those two paths off the host rather than
+out of this document and requires them to appear here, so a data folder or a configuration file that
+moves reds the suite instead of leaving an operator running a command that deletes nothing.
+
+### What is not said here
+
+**Nothing measured what the server itself removes.** The paragraphs above are about what this plugin
+does when it is told it is going away, which is what `AnUninstallRemovesNothingThisPluginWrote`
+holds. Whether the server deletes the directory it installed the plugin into, or anything beside it,
+is the server's own behaviour on a running install, and no run on this board has asked it. The
+commands above are written so that they are right either way: a path that is already gone is a
+command that removes nothing.
