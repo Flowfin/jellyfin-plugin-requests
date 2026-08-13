@@ -5,7 +5,7 @@
         <title>Requests</title>
     </head>
     <body>
-        <div id="RequestsQueuePage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-button">
+        <div id="RequestsQueuePage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-button,emby-select">
             <div data-role="content">
                 <div class="content-primary">
                     <div class="requestsShell"></div>
@@ -15,24 +15,132 @@
                     <p class="requestsMessage" role="status"></p>
 
                     <!--
-                        The rows an operator works through, with the filter, the sort and the paging
-                        that make a long queue usable, are #60, and acting on them is #61 and #62.
-                        This page is the shell those are built into.
+                        Every narrowing here is a parameter of the queue endpoint and none of it is
+                        done in this page. The server holds the whole queue, so it is the only side
+                        that can filter, order and slice one read; a page that fetched everything and
+                        did the same work again would be asking a household server to send a decade
+                        of requests so that a browser could throw away all but fifty of them.
 
-                        Nothing here reads the queue yet, and that is not only because the rows are
-                        somebody else's issue. Every endpoint this plugin serves answers 500 on a
-                        real server today, because the policy the controller names is not one the
-                        server registers; the run that measured it is in this change's pull request
-                        and the repair is #51's. A page shipped now with a call in it would show an
-                        operator an error every time they opened it.
+                        What the rows show is the list in docs/queue.md, less the two items that
+                        document names as absent from the answer this endpoint gives. Acting on a row
+                        is #61 and #62, and the panel beside the queue is #63.
                     -->
-                    <p>The queue view is not built yet.</p>
+                    <div class="requestsQueueControls">
+                        <label class="requestsQueueControl" for="RequestsQueueState">
+                            <span>State</span>
+                            <select is="emby-select" id="RequestsQueueState">
+                                <option value="Open" selected>Open</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Declined">Declined</option>
+                                <option value="Fulfilled">Fulfilled</option>
+                                <option value="Failed">Failed</option>
+                                <option value="">Every state</option>
+                            </select>
+                        </label>
+
+                        <label class="requestsQueueControl" for="RequestsQueueKind">
+                            <span>Kind</span>
+                            <select is="emby-select" id="RequestsQueueKind">
+                                <option value="" selected>Every kind</option>
+                                <option value="Movie">Film</option>
+                                <option value="Series">Series</option>
+                            </select>
+                        </label>
+
+                        <label class="requestsQueueControl" for="RequestsQueueOrder">
+                            <span>Ordered by</span>
+                            <select is="emby-select" id="RequestsQueueOrder">
+                                <option value="RequestedAt" selected>When it was asked for</option>
+                                <option value="StateChangedAt">When it last moved</option>
+                                <option value="DisplayTitle">Title</option>
+                            </select>
+                        </label>
+
+                        <label class="requestsQueueControl" for="RequestsQueueDescending">
+                            <span>Direction</span>
+                            <!--
+                                Ascending and descending rather than oldest and newest, because the
+                                same control also runs the title order and "oldest title" is not a
+                                thing. Ascending on the order above it is the oldest first, which is
+                                what this page opens on.
+                            -->
+                            <select is="emby-select" id="RequestsQueueDescending">
+                                <option value="false" selected>Ascending</option>
+                                <option value="true">Descending</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <table class="requestsQueueTable">
+                        <caption class="requestsQueueSummary" aria-live="polite"></caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Title</th>
+                                <th scope="col">Kind</th>
+                                <th scope="col">State</th>
+                                <th scope="col">Asked for</th>
+                                <th scope="col">Last moved</th>
+                                <th scope="col">Requester</th>
+                                <th scope="col">In the library</th>
+                                <th scope="col">Note</th>
+                            </tr>
+                        </thead>
+                        <tbody class="requestsQueueRows"></tbody>
+                    </table>
+
+                    <div class="requestsQueuePager">
+                        <button is="emby-button" type="button" class="raised" id="RequestsQueuePrevious">Previous page</button>
+                        <button is="emby-button" type="button" class="raised" id="RequestsQueueNext">Next page</button>
+                    </div>
                 </div>
             </div>
 
             <script type="text/javascript">
                 (function () {
                     var page = document.querySelector("#RequestsQueuePage");
+
+                    /*
+                     * Every part of the question this page asks, named exactly as the queue endpoint
+                     * names it. The four with a control are read from that control; the two without
+                     * are the bounds below. Anything the endpoint does not declare cannot be added
+                     * here without the suite naming it, which is what keeps a control that quietly
+                     * does its own work out of this page.
+                     */
+                    var asked = ["state", "kind", "order", "descending", "skip", "take"];
+
+                    /*
+                     * Where the page starts and how many rows it holds. Fifty is the endpoint's own
+                     * page size, so the browser is handed one screen of a queue whatever the queue
+                     * holds, and the pager moves this rather than growing it.
+                     */
+                    var bounds = { skip: 0, take: 50 };
+
+                    var rows = page.querySelector(".requestsQueueRows");
+                    var summary = page.querySelector(".requestsQueueSummary");
+                    var previous = page.querySelector("#RequestsQueuePrevious");
+                    var next = page.querySelector("#RequestsQueueNext");
+
+                    var states = {
+                        Open: "Open",
+                        Approved: "Approved",
+                        Declined: "Declined",
+                        Fulfilled: "Fulfilled",
+                        Failed: "Failed",
+                    };
+
+                    var kinds = { Movie: "Film", Series: "Series" };
+
+                    /*
+                     * What the library holds of what was asked for. `Unknown` is a fourth answer
+                     * rather than a missing one, so it says that nothing has looked rather than
+                     * leaving the cell blank for an operator to read as "no".
+                     */
+                    var availability = {
+                        Unknown: "Not checked",
+                        Absent: "No",
+                        Partial: "In part",
+                        Present: "Yes",
+                    };
 
                     // Loaded through the same endpoint the dashboard fetches this page from, because
                     // an embedded resource is reachable only under a name the plugin registered.
@@ -52,6 +160,145 @@
                         });
                     }
 
+                    /*
+                     * The control that answers one part of the question, or nothing where that part
+                     * is the page bounds rather than something an operator chose.
+                     */
+                    function control(name) {
+                        return page.querySelector("#RequestsQueue" + name.charAt(0).toUpperCase() + name.substring(1));
+                    }
+
+                    /*
+                     * The question, as the endpoint's own parameters. An empty control is left out
+                     * rather than sent empty, because a filter naming no value is the queue not
+                     * narrowed and the endpoint reads an absent parameter as exactly that.
+                     */
+                    function question() {
+                        var sent = {};
+
+                        asked.forEach(function (name) {
+                            var from = control(name);
+                            var value = from ? from.value : String(bounds[name]);
+
+                            if (value !== "") {
+                                sent[name] = value;
+                            }
+                        });
+
+                        return sent;
+                    }
+
+                    /*
+                     * One cell. `textContent` rather than any of the ways of writing markup: a title
+                     * and a note are things a person typed, and a dashboard that renders them as
+                     * markup is a scripting hole reachable by anybody who can file a request.
+                     */
+                    function cell(row, text) {
+                        var target = document.createElement("td");
+                        target.textContent = text;
+                        row.appendChild(target);
+                        return target;
+                    }
+
+                    function moment(value) {
+                        return value ? new Date(value).toLocaleString() : "";
+                    }
+
+                    function title(request) {
+                        var written = request.DisplayTitle;
+
+                        if (request.DisplayYear) {
+                            written = written + " (" + request.DisplayYear + ")";
+                        }
+
+                        if (request.Seasons && request.Seasons.length) {
+                            written = written + ", seasons " + request.Seasons.join(", ");
+                        }
+
+                        return written;
+                    }
+
+                    function held(request) {
+                        var answer = availability[request.Availability] || request.Availability;
+
+                        return request.AvailabilityCheckedAt ? answer + ", checked " + moment(request.AvailabilityCheckedAt) : answer;
+                    }
+
+                    function draw(answer) {
+                        var drawn = document.createDocumentFragment();
+
+                        answer.Requests.forEach(function (request) {
+                            var row = document.createElement("tr");
+
+                            cell(row, title(request));
+                            cell(row, kinds[request.Kind] || request.Kind);
+                            cell(row, states[request.State] || request.State);
+                            cell(row, moment(request.RequestedAt));
+                            cell(row, moment(request.StateChangedAt));
+                            cell(row, request.RequestedByUserId);
+                            cell(row, held(request));
+                            cell(row, request.RequesterNote || "");
+
+                            drawn.appendChild(row);
+                        });
+
+                        rows.replaceChildren(drawn);
+
+                        var first = answer.MatchCount === 0 ? 0 : answer.Skip + 1;
+                        var last = answer.Skip + answer.Requests.length;
+
+                        summary.textContent = first + " to " + last + " of " + answer.MatchCount;
+
+                        previous.disabled = answer.Skip <= 0;
+                        next.disabled = last >= answer.MatchCount;
+                    }
+
+                    function read() {
+                        Dashboard.showLoadingMsg();
+                        RequestsShell.say(page, "");
+
+                        return RequestsShell.get("Requests/Queue", question())
+                            .then(function (answer) {
+                                draw(answer);
+                                Dashboard.hideLoadingMsg();
+                            })
+                            .catch(function () {
+                                RequestsShell.say(page, "The queue could not be read. The server said nothing this page can act on.");
+                                Dashboard.hideLoadingMsg();
+                            });
+                    }
+
+                    /*
+                     * A narrowing starts the queue again from the top. Keeping the offset across a
+                     * change of filter is how an operator lands on an empty page and reads it as an
+                     * empty queue.
+                     */
+                    function narrowed() {
+                        bounds.skip = 0;
+                        read();
+                    }
+
+                    function step(by) {
+                        bounds.skip = Math.max(0, bounds.skip + by * bounds.take);
+                        read();
+                    }
+
+                    asked.forEach(function (name) {
+                        var from = control(name);
+
+                        if (from) {
+                            from.addEventListener("change", narrowed);
+                        }
+                    });
+
+                    previous.addEventListener("click", function () {
+                        step(-1);
+                    });
+
+                    next.addEventListener("click", function () {
+                        step(1);
+                    });
+
                     page.addEventListener("pageshow", function () {
                         Dashboard.showLoadingMsg();
 
@@ -59,6 +306,7 @@
                             .then(function () {
                                 RequestsShell.attach(page, "RequestsQueue");
                                 Dashboard.hideLoadingMsg();
+                                read();
                             })
                             .catch(function () {
                                 Dashboard.hideLoadingMsg();
