@@ -157,6 +157,47 @@ public class WantHandoverTests
     }
 
     /// <summary>
+    /// A want for somebody already at their quota is refused, and nothing is written.
+    /// <para>
+    /// The seam is the second way a request is made, and a way in that is not bound by the limit is
+    /// the way around it. Nothing here re-checks the quota: what this holds is that the one place it
+    /// is applied is under this path too, which is what makes the limit a property of the plugin
+    /// rather than of one endpoint.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AWantForSomebodyAtTheirQuotaIsRefusedAndSaysSo()
+    {
+        var store = new InMemoryRequestStore();
+        var log = new RecordingLogger();
+        var settings = new FakeInstallSettings(new PluginConfiguration { OpenRequestsPerUser = 1 });
+
+        await store.AddAsync(
+            new MediaRequest
+            {
+                Id = new Guid("44444444-4444-4444-4444-444444444444"),
+                RequestedByUserId = Asker,
+                RequestedAt = Noon,
+                StateChangedAt = Noon,
+                Kind = RequestedItemKind.Movie,
+                DisplayTitle = "Solaris",
+                DisplayYear = 1972,
+                ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "593" }
+            },
+            CancellationToken.None);
+
+        var accepted = await Seam(store, settings, log).AcceptAsync(Want(), CancellationToken.None);
+
+        Assert.False(accepted);
+        Assert.Single(await store.GetAllAsync(CancellationToken.None));
+        Assert.Contains(
+            nameof(HandoverRefusal.TheyAreAtTheirQuota),
+            Assert.Single(log.At(LogLevel.Warning)).Message,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// A kind this install is set not to accept is refused, and the refusal names itself in the log.
     /// The setting is read on every handover rather than held, so an operator turning a kind off
     /// means the next want of that kind.

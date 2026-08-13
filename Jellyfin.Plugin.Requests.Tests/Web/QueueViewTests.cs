@@ -222,7 +222,8 @@ public sealed class QueueViewTests
             store,
             new TestClock(asked),
             _identifiers,
-            new FakeCallerIdentity(new Guid("c1000000-0000-0000-0000-0000000000ad")));
+            new FakeCallerIdentity(new Guid("c1000000-0000-0000-0000-0000000000ad")),
+            new FakeInstallSettings());
 
         var answered = await controller.QueueAsync(
             [Enum.Parse<RequestState>(SelectedValueOf(body, "RequestsQueueState"), false)],

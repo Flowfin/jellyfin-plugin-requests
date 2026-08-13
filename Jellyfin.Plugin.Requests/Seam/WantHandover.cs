@@ -121,7 +121,7 @@ public sealed class WantHandover : IWantHandover
         ArgumentOutOfRangeException.ThrowIfLessThan(answerWithin, TimeSpan.Zero);
 
         _store = store;
-        _intake = new RequestIntake(store);
+        _intake = new RequestIntake(store, settings);
         _clock = clock;
         _identifiers = identifiers;
         _settings = settings;
@@ -288,13 +288,19 @@ public sealed class WantHandover : IWantHandover
         try
         {
             intake = await WithinTheBoundAsync(
-                _intake.AskAsync(incoming, cancellationToken)).ConfigureAwait(false);
+                _intake.AskAsync(incoming, RequestCaller.User(want.RequestedByUserId), cancellationToken)).ConfigureAwait(false);
         }
         catch (RequestStoreLoadException)
         {
             // The store says which file and why in its own log line. What is added here is which
             // want was lost because of it, so the two can be put together.
             return Refused(want, HandoverRefusal.TheStoreCouldNotBeReached);
+        }
+        catch (RequestQuotaReachedException)
+        {
+            // The numbers are not carried across: the contract answers whether the want was taken
+            // and nothing else, and an operator who needs to know why reads the refusal in the log.
+            return Refused(want, HandoverRefusal.TheyAreAtTheirQuota);
         }
         catch (RequestConcurrencyException)
         {

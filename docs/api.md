@@ -219,6 +219,21 @@ A body that cannot become a request is refused with `400` and the field that is 
 client can put the message beside the box somebody typed in rather than having to read English to
 work out which one. The shape is the one every failure of this API comes back in, below.
 
+**How many things one person may be waiting for is bounded, and this is where the bound is applied.**
+Somebody already waiting for as many open or approved requests as the install allows is refused with
+`409` and `TheyAreAtTheirQuota`, carrying how many they hold and what the limit is. It is a `409`
+rather than a `403` because nothing about the call is wrong and the same call works as soon as one of
+the things they asked for is answered. Joining somebody else's request counts, because it is one more
+thing they are waiting for; asking again for something they are already on writes nothing and is
+therefore never refused for this. A finished request frees the place, so the setting is a bound on
+what is open rather than a lifetime allowance. Which requests count and what the limit is are
+`OpenRequestsPerUser` in [configuration.md](configuration.md).
+
+Reading the setting is also a way this call can fail. Where the stored configuration is something the
+plugin cannot run on, the install is refused on the read rather than corrected, so the ask answers
+`503` and `ThisInstallCannotRun` and nothing is written. That is a fault on the server, the log says
+which setting, and the message here does not.
+
 ## Reading your own requests
 
     GET MediaRequests/v1/Requests
@@ -369,16 +384,18 @@ seen before still parses and still says which class it is. What that costs is tw
 absent most of the time, which is cheaper than a client reading five shapes, four of them from an
 example rather than from a contract.
 
-| Code                          | Status | What happened                                              |
-| ----------------------------- | ------ | ---------------------------------------------------------- |
-| `InvalidBody`                 | `400`  | The body cannot become what it is for. `field` says where. |
-| `NoUserOnTheCall`             | `403`  | Authenticated, and no person behind it.                    |
-| `NoSuchRequest`               | `404`  | The store holds no request with that identifier.           |
-| `MovedSinceItWasRead`         | `409`  | Somebody moved it between the read and this call.          |
-| `TheTableRefusesTheMove`      | `409`  | The transition table has no such move from where it is.    |
-| `TheRequestNamesNothing`      | `409`  | It carries no identifier, so only a decline is available.  |
-| `TheCallerMayNotMakeThisMove` | `403`  | The table allows the move and does not admit this caller.  |
-| `TheStoreCouldNotBeRead`      | `503`  | The queue could not be read. Nothing was changed.          |
+| Code                          | Status | What happened                                                 |
+| ----------------------------- | ------ | ------------------------------------------------------------- |
+| `InvalidBody`                 | `400`  | The body cannot become what it is for. `field` says where.    |
+| `NoUserOnTheCall`             | `403`  | Authenticated, and no person behind it.                       |
+| `NoSuchRequest`               | `404`  | The store holds no request with that identifier.              |
+| `MovedSinceItWasRead`         | `409`  | Somebody moved it between the read and this call.             |
+| `TheTableRefusesTheMove`      | `409`  | The transition table has no such move from where it is.       |
+| `TheRequestNamesNothing`      | `409`  | It carries no identifier, so only a decline is available.     |
+| `TheCallerMayNotMakeThisMove` | `403`  | The table allows the move and does not admit this caller.     |
+| `TheStoreCouldNotBeRead`      | `503`  | The queue could not be read. Nothing was changed.             |
+| `TheyAreAtTheirQuota`         | `409`  | They are waiting for as many requests as this install allows. |
+| `ThisInstallCannotRun`        | `503`  | The settings are something the plugin cannot run on.          |
 
 Each code has exactly one status code, decided in one place, so a client may branch on either and
 never find them disagreeing. A client that does not know a code falls back on the status, which is
@@ -391,6 +408,10 @@ request has to be attributable to somebody to exist at all.
 `TheStoreCouldNotBeRead` is `503` rather than `500`. A store that cannot be read is usually a disk or
 a file rather than this plugin being broken, and telling an operator to try again is the true
 statement. Nothing was changed when it is answered.
+
+`ThisInstallCannotRun` is `503` for the same reason and is the same answer the seam gives a sibling
+plugin for the same cause. The call was fine, this server is set to something that cannot be honoured,
+and an operator changing one field makes the identical call work.
 
 **Nothing in a message names a person, a path on the server disk, or an exception.** The three are
 one rule with three shapes: a user identifier tells a caller about somebody else, a path tells

@@ -84,5 +84,13 @@ public enum HandoverRefusal
     /// an exception for the same reason every other entry is, and what actually went wrong is on
     /// this server's log at error level with the fault itself.
     /// </summary>
-    SomethingBeneathThisSeamFailed = 11
+    SomethingBeneathThisSeamFailed = 11,
+
+    /// <summary>
+    /// The person the want names is already waiting for as many open or approved requests as this
+    /// install allows. A want arriving over the seam is somebody asking for something, so it is
+    /// bound by the same quota as an ask over the endpoint; a path that was not would be the way
+    /// around the limit rather than a second way to ask.
+    /// </summary>
+    TheyAreAtTheirQuota = 12
 }

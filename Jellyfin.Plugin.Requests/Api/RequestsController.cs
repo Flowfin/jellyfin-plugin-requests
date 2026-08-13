@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Intake;
 using Jellyfin.Plugin.Requests.Model;
@@ -104,11 +105,16 @@ public sealed class RequestsController : RequestsControllerBase
     /// <param name="clock">The injected clock, so a request's times are testable.</param>
     /// <param name="identifiers">Where a new request's identifier comes from.</param>
     /// <param name="callers">The server's answer to who is calling.</param>
+    /// <param name="settings">
+    /// What this install is set to. The intake reads the quota out of it on every ask, so the
+    /// endpoint cannot ask without one.
+    /// </param>
     public RequestsController(
         IRequestStore store,
         IClock clock,
         IIdentifierSource identifiers,
-        ICallerIdentity callers)
+        ICallerIdentity callers,
+        IInstallSettings settings)
     {
         _store = store;
         _clock = clock;
@@ -116,10 +122,9 @@ public sealed class RequestsController : RequestsControllerBase
         _callers = callers;
 
         // Built here rather than injected, because it is this controller's use of the store rather
-        // than a fifth thing the server has to supply. CatalogueSplitTests counts what this
-        // controller is constructed from, and a request intake that arrived as a dependency would
-        // read as one.
-        _intake = new RequestIntake(store);
+        // than a sixth thing the server has to supply. CatalogueSplitTests reads the list this
+        // constructor takes, and a request intake that arrived as a dependency would read as one.
+        _intake = new RequestIntake(store, settings);
     }
 
     /// <summary>
@@ -139,6 +144,7 @@ public sealed class RequestsController : RequestsControllerBase
     [ProducesResponseType<CreatedRequest>(StatusCodes.Status200OK)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<RequestFailure>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<CreatedRequest>> CreateAsync(
         [FromBody] CreateRequestBody body,
@@ -184,11 +190,32 @@ public sealed class RequestsController : RequestsControllerBase
 
         try
         {
-            answer = await AskAsync(incoming, cancellationToken).ConfigureAwait(false);
+            answer = await AskAsync(incoming, RequestCaller.User(asker), cancellationToken).ConfigureAwait(false);
         }
         catch (RequestStoreLoadException)
         {
             return TheStoreCouldNotBeRead();
+        }
+        catch (RequestQuotaReachedException atTheirQuota)
+        {
+            // The numbers are the caller's own and say nothing about anybody else's queue, which is
+            // why they may be reported: how many things this person is waiting for is something they
+            // can already read off their own page.
+            return Failed(
+                RequestFailureCode.TheyAreAtTheirQuota,
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "You are waiting for {0} requests and this server allows {1} at once. One of them has to be answered before you can ask for something else.",
+                    atTheirQuota.Held,
+                    atTheirQuota.Limit));
+        }
+        catch (InvalidConfigurationException)
+        {
+            // Nothing from the exception reaches the caller. It names the settings that are wrong,
+            // which is the operator's business and not the asker's, and the server log carries it.
+            return Failed(
+                RequestFailureCode.ThisInstallCannotRun,
+                "This server is set to something the plugin cannot run on, so nothing can be asked for until an operator corrects it. The server log says which setting.");
         }
 
         // 201 with no Location header, on purpose. Nothing reads one request back yet, so a
@@ -1210,11 +1237,19 @@ public sealed class RequestsController : RequestsControllerBase
     /// </para>
     /// </summary>
     /// <param name="incoming">The ask, as a request that does not exist yet.</param>
+    /// <param name="caller">
+    /// Who is asking. This endpoint hands in an ordinary user whoever they are, because the server
+    /// tells it which person is calling and not whether that person administers this server, and a
+    /// caller built as an administrator on a guess would exempt somebody from the quota on one.
+    /// </param>
     /// <param name="cancellationToken">Cancels the call.</param>
     /// <returns>What the caller is now waiting for and what asking did.</returns>
-    private async Task<CreatedRequest> AskAsync(MediaRequest incoming, CancellationToken cancellationToken)
+    private async Task<CreatedRequest> AskAsync(
+        MediaRequest incoming,
+        RequestCaller caller,
+        CancellationToken cancellationToken)
     {
-        var intake = await _intake.AskAsync(incoming, cancellationToken).ConfigureAwait(false);
+        var intake = await _intake.AskAsync(incoming, caller, cancellationToken).ConfigureAwait(false);
 
         return new CreatedRequest
         {
