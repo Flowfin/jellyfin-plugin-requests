@@ -100,15 +100,14 @@ var RequestsShell = {
      * reachable without a session: the client is what holds the token and adds the header, and a bare
      * fetch would be a second place that has to know how this server authenticates.
      *
-     * No page calls this yet. Every endpoint answers 500 on a real server today, because the policy
-     * the controller names is not one the server registers; that is #51's and it is measured rather
-     * than supposed. This is here so the pages that read the queue are written against one helper
-     * rather than each growing its own.
+     * The question goes in `asked` and is turned into a query string by the client rather than by
+     * the caller. A page that built its own would be a second place that has to know how a value is
+     * escaped, and the queue's filters carry text somebody typed.
      */
-    get: function (path) {
+    get: function (path, asked) {
         return ApiClient.ajax({
             type: "GET",
-            url: ApiClient.getUrl(RequestsShell.apiBase + "/" + path),
+            url: ApiClient.getUrl(RequestsShell.apiBase + "/" + path, asked),
             dataType: "json",
         });
     },

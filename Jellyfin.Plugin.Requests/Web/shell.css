@@ -50,3 +50,49 @@
 .requestsMessage:empty {
     display: none;
 }
+
+/*
+ * The narrowings, laid out in a row that wraps rather than in a fixed grid. An operator on a narrow
+ * screen gets the same controls in one column instead of a row that scrolls sideways.
+ */
+.requestsQueueControls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1em;
+    align-items: flex-end;
+    margin-bottom: 1em;
+}
+
+.requestsQueueControl {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+}
+
+.requestsQueueTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+/*
+ * The count sits above the rows and is read out when it changes, so somebody who moved a page hears
+ * where they are rather than having to go looking for the number.
+ */
+.requestsQueueSummary {
+    text-align: left;
+    padding-bottom: 0.5em;
+}
+
+.requestsQueueTable th,
+.requestsQueueTable td {
+    text-align: left;
+    padding: 0.4em 0.6em;
+    border-bottom: 1px solid rgba(127, 127, 127, 0.4);
+    vertical-align: top;
+}
+
+.requestsQueuePager {
+    display: flex;
+    gap: 0.5em;
+    margin-top: 1em;
+}
