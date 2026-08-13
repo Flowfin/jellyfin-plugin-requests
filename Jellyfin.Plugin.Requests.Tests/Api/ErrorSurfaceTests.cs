@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Api;
+using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
@@ -51,7 +52,9 @@ public sealed class ErrorSurfaceTests
         (RequestFailureCode.TheTableRefusesTheMove, 409),
         (RequestFailureCode.TheRequestNamesNothing, 409),
         (RequestFailureCode.TheCallerMayNotMakeThisMove, 403),
-        (RequestFailureCode.TheStoreCouldNotBeRead, 503)
+        (RequestFailureCode.TheStoreCouldNotBeRead, 503),
+        (RequestFailureCode.TheyAreAtTheirQuota, 409),
+        (RequestFailureCode.ThisInstallCannotRun, 503)
     ];
 
     private readonly SequentialIdentifierSource _identifiers = new SequentialIdentifierSource();
@@ -236,6 +239,19 @@ public sealed class ErrorSurfaceTests
                 .CreateAsync(AFilm(), CancellationToken.None)
                 .ConfigureAwait(true)));
 
+        // The asker already has the one request this install allows, which is the request added at
+        // the top of this method. A quota of one rather than ten keeps the fixture to the request
+        // that is already there instead of nine more that prove nothing extra.
+        Add("POST Requests from somebody at their quota", elevated: false, Of(
+            await ControllerFor(store, Asker, new FakeInstallSettings(new PluginConfiguration { OpenRequestsPerUser = 1 }))
+                .CreateAsync(AFilm(), CancellationToken.None)
+                .ConfigureAwait(true)));
+
+        Add("POST Requests on an install the plugin cannot run on", elevated: false, Of(
+            await ControllerFor(store, Asker, new InstallSettingsThatCannotBeRead())
+                .CreateAsync(AFilm(), CancellationToken.None)
+                .ConfigureAwait(true)));
+
         Add("GET Requests with a page larger than the cap", elevated: false, Of(
             await ControllerFor(store, Asker)
                 .MineAsync(take: RequestsController.MaximumPageSize + 1, cancellationToken: CancellationToken.None)
@@ -364,7 +380,18 @@ public sealed class ErrorSurfaceTests
     /// <param name="caller">Who the server says is calling.</param>
     /// <returns>The controller under test.</returns>
     private RequestsController ControllerFor(IRequestStore store, Guid? caller)
-        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller));
+        => ControllerFor(store, caller, new FakeInstallSettings());
+
+    /// <summary>
+    /// A controller over one store, one caller and one install, for the two refusals that are about
+    /// what this server is set to rather than about the call.
+    /// </summary>
+    /// <param name="store">Where requests are kept.</param>
+    /// <param name="caller">Who the server says is calling.</param>
+    /// <param name="settings">What this install is set to.</param>
+    /// <returns>The controller under test.</returns>
+    private RequestsController ControllerFor(IRequestStore store, Guid? caller, IInstallSettings settings)
+        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), settings);
 
     /// <summary>
     /// A second request in the store, so one of them can be moved out of the way.

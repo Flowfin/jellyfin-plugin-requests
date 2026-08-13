@@ -79,11 +79,21 @@ public sealed record RequestFailure
 
         RequestFailureCode.TheCallerMayNotMakeThisMove => StatusCodes.Status403Forbidden,
 
+        // A conflict as well, and for the reason the three above are: the call is well formed and
+        // the state of this person's queue refuses it. A 403 would say they may not ask, which is
+        // not true tomorrow, or after an operator answers one of the things they are waiting for.
+        RequestFailureCode.TheyAreAtTheirQuota => StatusCodes.Status409Conflict,
+
         // Nothing is wrong with the call and the answer is not available. A 500 would say this
         // plugin broke, which is one of the two possibilities and not the likely one: a store that
         // cannot be read is usually a disk or a file, and telling an operator to try again later is
         // the true statement.
         RequestFailureCode.TheStoreCouldNotBeRead => StatusCodes.Status503ServiceUnavailable,
+
+        // Unavailable for the same reason and not a 500: the call was fine, this server is set to
+        // something the plugin cannot run on, and an operator fixing the settings makes the same
+        // call work.
+        RequestFailureCode.ThisInstallCannotRun => StatusCodes.Status503ServiceUnavailable,
 
         _ => throw new ArgumentOutOfRangeException(
             nameof(code),

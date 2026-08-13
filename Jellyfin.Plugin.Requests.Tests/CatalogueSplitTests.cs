@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Api;
+using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
@@ -83,9 +84,9 @@ public sealed class CatalogueSplitTests
     }
 
     /// <summary>
-    /// The controller takes four things and none of them can fetch anything. A metadata source
+    /// The controller takes five things and none of them can fetch anything. A metadata source
     /// arrives as something injected, so the constructor is where one would appear first, and a
-    /// fifth parameter fails here before anybody writes the call.
+    /// sixth parameter fails here before anybody writes the call.
     /// <para>
     /// Written as the exact list rather than as "nothing called a provider". A name test would pass
     /// the day somebody injects a fetcher under a name nobody predicted, which is the shape this
@@ -102,7 +103,13 @@ public sealed class CatalogueSplitTests
             .Select(parameter => parameter.ParameterType.Name);
 
         Assert.Equal(
-            string.Join(" | ", nameof(IRequestStore), nameof(IClock), nameof(IIdentifierSource), nameof(ICallerIdentity)),
+            string.Join(
+                " | ",
+                nameof(IRequestStore),
+                nameof(IClock),
+                nameof(IIdentifierSource),
+                nameof(ICallerIdentity),
+                nameof(IInstallSettings)),
             string.Join(" | ", taken),
             StringComparer.Ordinal);
     }
@@ -135,5 +142,6 @@ public sealed class CatalogueSplitTests
             store,
             new TestClock(new DateTimeOffset(2026, 8, 11, 8, 0, 0, TimeSpan.Zero)),
             new SequentialIdentifierSource(),
-            new FakeCallerIdentity(Operator));
+            new FakeCallerIdentity(Operator),
+            new FakeInstallSettings());
 }

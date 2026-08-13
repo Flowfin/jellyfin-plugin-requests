@@ -69,5 +69,24 @@ public enum RequestFailureCode
     /// path on the server's disk is exactly what an error may not carry. The caller is told the
     /// answer is unavailable rather than that its call was wrong, because its call was not.
     /// </summary>
-    TheStoreCouldNotBeRead = 7
+    TheStoreCouldNotBeRead = 7,
+
+    /// <summary>
+    /// The person calling is already waiting for as many open or approved requests as this install
+    /// allows. Nothing about the call is wrong and it becomes possible again as soon as one of the
+    /// things they asked for is answered, which is what separates it from a body that cannot be
+    /// acted on.
+    /// <para>
+    /// The sentence a person reads is #70's rather than this code's. What is here is the value a
+    /// client branches on.
+    /// </para>
+    /// </summary>
+    TheyAreAtTheirQuota = 8,
+
+    /// <summary>
+    /// What this install is set to is something the plugin cannot run on, so the call could not be
+    /// judged against it. A fault on this server rather than anything the caller sent, and the same
+    /// answer the seam gives a sibling for the same reason.
+    /// </summary>
+    ThisInstallCannotRun = 9
 }

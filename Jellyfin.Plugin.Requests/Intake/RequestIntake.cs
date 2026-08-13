@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
 
@@ -36,17 +37,26 @@ public sealed class RequestIntake
     public const int JoinAttempts = 3;
 
     private readonly IRequestStore _store;
+    private readonly IInstallSettings _settings;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RequestIntake"/> class.
     /// </summary>
     /// <param name="store">Where requests are kept.</param>
-    /// <exception cref="ArgumentNullException">Where there is no store to ask.</exception>
-    public RequestIntake(IRequestStore store)
+    /// <param name="settings">
+    /// What this install is set to, read per ask rather than kept, so an operator raising the quota
+    /// applies to the next person who asks rather than to the next restart.
+    /// </param>
+    /// <exception cref="ArgumentNullException">
+    /// Where there is no store to ask, or nothing to read the settings from.
+    /// </exception>
+    public RequestIntake(IRequestStore store, IInstallSettings settings)
     {
         ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(settings);
 
         _store = store;
+        _settings = settings;
     }
 
     /// <summary>
@@ -58,18 +68,38 @@ public sealed class RequestIntake
     /// </para>
     /// </summary>
     /// <param name="incoming">The request as the surface built it.</param>
+    /// <param name="caller">
+    /// Who is asking and with what authority. It is here so the quota binds every surface at one
+    /// place: a surface that forgot to check it cannot get past this, because there is no way to ask
+    /// without saying who is asking.
+    /// </param>
     /// <param name="cancellationToken">Cancels the call.</param>
     /// <returns>The request the asker is now waiting for, and what asking did.</returns>
-    /// <exception cref="ArgumentNullException">Where there is no request to ask with.</exception>
+    /// <exception cref="ArgumentNullException">
+    /// Where there is no request to ask with, or nobody is named as asking.
+    /// </exception>
     /// <exception cref="RequestStoreLoadException">Where the store cannot be read.</exception>
+    /// <exception cref="RequestQuotaReachedException">
+    /// Where the person asking is already waiting for as many open or approved requests as this
+    /// install allows.
+    /// </exception>
+    /// <exception cref="Configuration.InvalidConfigurationException">
+    /// Where this install is set to something the plugin cannot run on, so there is no quota to
+    /// judge the ask against. Nothing is written, and it is raised rather than defaulted because a
+    /// number nobody chose is how a limit stops being one.
+    /// </exception>
     /// <exception cref="RequestConcurrencyException">
     /// Where a join was refused <see cref="JoinAttempts"/> times because the request kept moving
     /// underneath the write. That is a contended request rather than a fault, and it is raised
     /// rather than retried forever so the caller answers instead of spinning.
     /// </exception>
-    public async Task<IntakeResult> AskAsync(MediaRequest incoming, CancellationToken cancellationToken)
+    public async Task<IntakeResult> AskAsync(
+        MediaRequest incoming,
+        RequestCaller caller,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(incoming);
+        ArgumentNullException.ThrowIfNull(caller);
 
         for (var attempt = 1; ; attempt++)
         {
@@ -98,6 +128,9 @@ public sealed class RequestIntake
 
             if (joining is not StoredRequest existing)
             {
+                await RefuseWhereTheyAreAtTheirQuotaAsync(ask, caller, cancellationToken)
+                    .ConfigureAwait(false);
+
                 var added = await _store.AddAsync(ask, cancellationToken).ConfigureAwait(false);
 
                 return new IntakeResult(added, IntakeOutcome.Created);
@@ -115,6 +148,16 @@ public sealed class RequestIntake
             if (alreadyWaiting && unabsorbed.Length == 0)
             {
                 return new IntakeResult(existing, IntakeOutcome.AlreadyWaiting);
+            }
+
+            if (!alreadyWaiting)
+            {
+                // Joining is one more thing this person is waiting for, so it is bound by the quota
+                // exactly as making a request is. The case above is not: somebody already on the
+                // request takes no new place in the queue, and refusing them would be refusing an
+                // ask that changes nothing.
+                await RefuseWhereTheyAreAtTheirQuotaAsync(ask, caller, cancellationToken)
+                    .ConfigureAwait(false);
             }
 
             // A want is written even where the person is already waiting, because the want is what a
@@ -144,6 +187,58 @@ public sealed class RequestIntake
                 // and the decision may come out differently: an operator who declined it meanwhile
                 // makes it no longer joinable, and the next pass creates instead.
             }
+        }
+    }
+
+    /// <summary>
+    /// Refuses the ask where the person is already waiting for as many things as this install
+    /// allows, and does nothing where they are not.
+    /// <para>
+    /// <b>An administrator is not subject to it, and neither is the plugin itself.</b> The first is
+    /// this issue's rule: an operator answering their own server is not the person a quota exists to
+    /// bound. The second is a shape rather than a case anything reaches today, because nothing makes
+    /// a request on the plugin's own behalf; a limit that applied to it would be a limit on the
+    /// server's own housekeeping. No surface hands an administrator in here yet, because neither the
+    /// endpoint nor the seam can say whether the person calling is one, so the exemption is provable
+    /// against the model and unreachable from outside it until they can.
+    /// </para>
+    /// <para>
+    /// <b>The count is a snapshot and two asks arriving together can both pass it.</b> The store is
+    /// atomic per request and says so, so nothing here can hold a person's whole set still while it
+    /// counts. What that costs is one request over the limit for somebody asking twice in the same
+    /// instant, and what the alternative costs is a lock across every request in the queue on the
+    /// path every ask takes. The limit is a bound on a person's habit rather than a security
+    /// boundary, and this is written down rather than left for somebody to find in a race.
+    /// </para>
+    /// </summary>
+    /// <param name="ask">What is being asked for, which names the person asking.</param>
+    /// <param name="caller">Who is asking and with what authority.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>Nothing. It either returns or refuses.</returns>
+    /// <exception cref="RequestQuotaReachedException">Where they are at their limit.</exception>
+    private async Task RefuseWhereTheyAreAtTheirQuotaAsync(
+        MediaRequest ask,
+        RequestCaller caller,
+        CancellationToken cancellationToken)
+    {
+        var roles = caller.RolesOn(ask);
+
+        if (roles.HasFlag(RequestActor.Administrator) || roles.HasFlag(RequestActor.Plugin))
+        {
+            return;
+        }
+
+        var quota = new RequestQuota(_settings.Current.OpenRequestsPerUser);
+
+        var theirs = await _store
+            .FindForUserAsync(ask.RequestedByUserId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var held = RequestQuota.CountedIn(theirs.Select(stored => stored.Request));
+
+        if (quota.IsReachedBy(held))
+        {
+            throw new RequestQuotaReachedException(held, quota.Limit);
         }
     }
 

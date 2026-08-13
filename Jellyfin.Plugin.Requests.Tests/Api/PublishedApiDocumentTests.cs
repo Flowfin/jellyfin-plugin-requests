@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Api;
 using Jellyfin.Plugin.Requests.Bridge;
+using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
@@ -92,10 +93,11 @@ public sealed class PublishedApiDocumentTests
 
         // Asking for something. Two success codes with one shape: 201 is a new request and 200 is
         // one that was joined or was already the caller's, and a client tells them apart by the
-        // status or by the outcome in the body.
+        // status or by the outcome in the body. The 409 is the person's own quota, which is the one
+        // refusal here that is about the asker rather than about the body or the server.
         "POST MediaRequests/v1/Requests"
             + " (body@Body:CreateRequestBody)"
-            + " -> 200:CreatedRequest, 201:CreatedRequest, 400:RequestFailure, 403:RequestFailure, 503:RequestFailure",
+            + " -> 200:CreatedRequest, 201:CreatedRequest, 400:RequestFailure, 403:RequestFailure, 409:RequestFailure, 503:RequestFailure",
 
         // Saying yes to several at once. Three codes where the single decision publishes six, and
         // the three that are missing are the point: a request that is not there, one that moved and
@@ -282,6 +284,14 @@ public sealed class PublishedApiDocumentTests
         Saw(Create, await ControllerFor(store, Asker).CreateAsync(new CreateRequestBody { Title = "No kind" }, CancellationToken.None).ConfigureAwait(true));
         Saw(Create, await ControllerFor(store, caller: null).CreateAsync(AFilm(), CancellationToken.None).ConfigureAwait(true));
         Saw(Create, await ControllerFor(unreadable, Asker).CreateAsync(AFilm(), CancellationToken.None).ConfigureAwait(true));
+
+        // The asker is now waiting for the film the two calls above put in the queue, so an install
+        // allowing one open request refuses the next thing they ask for.
+        Saw(
+            Create,
+            await ControllerFor(store, Asker, new FakeInstallSettings(new PluginConfiguration { OpenRequestsPerUser = 1 }))
+                .CreateAsync(ASeries(), CancellationToken.None)
+                .ConfigureAwait(true));
 
         Saw(Mine, await ControllerFor(store, Asker).MineAsync(cancellationToken: CancellationToken.None).ConfigureAwait(true));
         Saw(Mine, await ControllerFor(store, Asker).MineAsync(take: RequestsController.MaximumPageSize + 1, cancellationToken: CancellationToken.None).ConfigureAwait(true));
@@ -484,7 +494,18 @@ public sealed class PublishedApiDocumentTests
     /// <param name="caller">Who the server says is calling.</param>
     /// <returns>The controller under test.</returns>
     private RequestsController ControllerFor(IRequestStore store, Guid? caller)
-        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller));
+        => ControllerFor(store, caller, new FakeInstallSettings());
+
+    /// <summary>
+    /// A controller wired to one store, one identity and one install, for the answer that depends on
+    /// what this server is set to.
+    /// </summary>
+    /// <param name="store">Where requests are kept.</param>
+    /// <param name="caller">Who the server says is calling.</param>
+    /// <param name="settings">What this install is set to.</param>
+    /// <returns>The controller under test.</returns>
+    private RequestsController ControllerFor(IRequestStore store, Guid? caller, IInstallSettings settings)
+        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), settings);
 
     /// <summary>
     /// A request as the store holds one.
@@ -521,5 +542,18 @@ public sealed class PublishedApiDocumentTests
         Title = "The Conversation",
         Year = 1974,
         ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "605" }
+    };
+
+    /// <summary>
+    /// A second thing to ask for, so a person already waiting for the film above is asking for
+    /// something the queue does not hold rather than joining what they are already on.
+    /// </summary>
+    /// <returns>The body.</returns>
+    private static CreateRequestBody ASeries() => new CreateRequestBody
+    {
+        Kind = RequestedItemKind.Series,
+        Title = "The Singing Detective",
+        Year = 1986,
+        ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tvdb"] = "76423" }
     };
 }
