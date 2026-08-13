@@ -188,6 +188,37 @@ which is neither a leak that has been shown nor a safety anybody has earned. The
 that a caller reads their own requests and never another person's, is enforced at the endpoints in
 `docs/api.md` and not by the store beneath them.
 
+## An undone gesture does not cross the seam
+
+A gesture that expresses a want can be taken back. Somebody unmarks a favourite, or marks one by
+accident and unmarks it a second later. Nothing about that reaches this side.
+
+The contract carries one message and it is the handover:
+
+    git grep -n 'Task<bool> AcceptAsync' -- Jellyfin.Plugin.Requests/Seam/IWantHandover.cs
+    Jellyfin.Plugin.Requests/Seam/IWantHandover.cs:44:    Task<bool> AcceptAsync(HandedOverWant want, CancellationToken cancellationToken);
+
+There is no second call and no field on the want that says one was withdrawn, so a request made from
+a handover stays exactly as it was when the gesture behind it is undone. That is a statement about
+the contract rather than about either implementation: this side could not act on an undone gesture
+today even if it wanted to, because nothing tells it one happened.
+
+What would have to change for it to cross is a message on the contract, and that is the sibling
+board's to add rather than this one's. This side would implement it when the contract carries it,
+and inventing the field here instead would be half an agreement, which is the same argument
+[the trust section](#what-this-side-trusts-and-what-it-checks-anyway) makes about a caller identity
+nobody agreed. Adding it would also be an argument rather than a field: a want undone a second after
+it was expressed and one undone a week after an operator has already acted on it are not the same
+event, and the second is not something a gesture on a browsing surface can decide alone.
+
+Taking back an ask on this side's own surfaces is a separate thing and is not covered by this
+document. It is #68, it needs a state a request can be withdrawn into, and the model records that
+there is none:
+
+    git grep -n 'Cancelled' -- Jellyfin.Plugin.Requests/Model/
+    Jellyfin.Plugin.Requests/Model/RequestActor.cs:43:    /// is no state for a user withdrawing, refused with the <c>Cancelled</c> state on #113. The
+    Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs:69:/// user withdrawing has no state to move to because <c>Cancelled</c> was refused on #113. An
+
 ## What happens to the wants recorded before this plugin was installed
 
 The sibling records every want locally whether or not anything accepted it, so a server that ran it
@@ -303,5 +334,6 @@ the closing condition of the issue beside it.
 - What a request records about having arrived over the seam, and which caller handed it over. The
   contract carries no field naming the caller, so the second half of that is a question for the
   contract rather than for this side. #118.
-- What an undone gesture does, which today is nothing, because the contract carries no message for
-  it. #68.
+- What a person taking back their own ask does on this side's own surfaces. That an undone gesture
+  does not cross the seam is above; what this document still does not hold is the other half, which
+  needs a state a request can be withdrawn into and has none. #68.
