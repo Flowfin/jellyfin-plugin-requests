@@ -290,6 +290,56 @@ rules:
         - "Jellyfin.Plugin.Requests.Tests/Doubles/TestRunDirectory.cs"
         - "Jellyfin.Plugin.Requests.Tests/TestRunDirectoryTests.cs"
 
+  # Invariant (headless, #115): nothing in the suite opens a socket. Decided in
+  # docs/testing.md, whose first condition is that a test needs no network peer
+  # and whose replacement for a real outbound call is an in-process handler. The
+  # plugin's one outbound path takes its handler as a constructor argument, so
+  # the suite reaches that path by handing in a double and never by building the
+  # pipeline that sends. This refuses the constructs that build one anyway.
+  #
+  # Until the notification sink existed there was nothing here to get wrong, and
+  # that is why this rule arrives after the other three rather than with them.
+  # The near-miss now is the first test somebody writes against that sink: the
+  # double is one directory away, the real handler is one word away, and a test
+  # holding the second passes on a machine with connectivity and fails on the
+  # machine that has none, for a reason that has nothing to do with the sink.
+  # Constructing a client at all is refused here rather than only constructing a
+  # sending one, because the suite builds no client of its own on purpose: the
+  # client under test is the plugin's, built from the handler it was handed, and
+  # a client built here would be a second one nothing in the plugin owns.
+  #
+  # What it does not reach, and deliberately. It is over source text, so a socket
+  # opened inside a package the suite calls is invisible to it, as is an address
+  # handed to something that opens one on the suite's behalf. HttpMessageHandler
+  # is not among the patterns: deriving from it is how every endpoint double in
+  # Doubles/ is written, and it is the shape this rule exists to keep rather than
+  # to refuse.
+  - id: suite-opens-no-socket
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not open a socket in the suite. Hand an HttpMessageHandler double to the
+      type under test, the way ASinkEndpoint is handed to OutboundSink, so the
+      client's own serialisation, timeout and error handling are all exercised
+      and nothing leaves the process (#115).
+    patterns:
+      - pattern-either:
+          - pattern: new HttpClient(...)
+          - pattern: new HttpClientHandler(...)
+          - pattern: new SocketsHttpHandler(...)
+          - pattern: new Socket(...)
+          - pattern: new TcpClient(...)
+          - pattern: new TcpListener(...)
+          - pattern: new HttpListener(...)
+          - pattern: Dns.GetHostEntry(...)
+          - pattern: Dns.GetHostEntryAsync(...)
+          - pattern: Dns.GetHostAddresses(...)
+          - pattern: Dns.GetHostAddressesAsync(...)
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests.Tests/**/*.cs"
+        - "tools/opengrep/fixtures/network/**/*.cs"
+
   # Invariant (model, #43): the history on a request is only ever appended to.
   # Decided in #43, whose second done-condition names this rule. Entries are
   # never edited or removed, and that is the only thing that makes the list
