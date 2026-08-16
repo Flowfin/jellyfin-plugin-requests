@@ -67,6 +67,59 @@ and it is the price of reaching a client nobody here can change. It is not the s
 placeholders into a real library, because a channel's folder is the plugin's own and disappears with
 it.
 
+## The page, as it is built
+
+The page is on the mainline and the channel is not, so this section is about the one of the three
+surfaces that exists beyond the API.
+
+It is served by this plugin rather than registered with the dashboard:
+
+    GET MediaRequests/v1/Page
+
+A plugin's registered pages are fetched through the dashboard, the dashboard is the administrator's,
+and the queue page this plugin registers there is elevated by construction. So a page for a user
+cannot be one of those, and this one is an endpoint under the same versioned prefix as the rest of
+the API, behind the same authentication. What it answers is in [api.md](api.md).
+
+It shows the caller's own requests and nothing else: the title as it was asked for, what sort of
+thing it is, where it stands, when it was asked for, when it last moved, whether the library holds
+it, the note the caller wrote, and the reason and the sentence an operator gave when the answer was
+no. It draws one call, `GET MediaRequests/v1/Requests`, whose answer names no person at all, which is
+what makes "shows nothing about anybody else" a property of the shape rather than of the page's care.
+
+**A caller with no session is refused rather than handed an empty page.** The endpoint carries the
+server's default policy. A shell served to anybody and left to fail on its first call puts this
+plugin's existence and shape in front of somebody who has not signed in, and reads to a person as a
+broken page rather than as a closed door.
+
+### The credential is in the address, and that costs something
+
+A browser navigating to an address sends no Jellyfin session. A session on this server is a header or
+a query value and never a cookie, so the only way a person opens an authenticated page in a tab is
+with the credential in the address, which the server reads out of `api_key` on both claimed lines.
+
+What that costs is real and is not softened here. The value lands in the browser's history, in
+whatever proxy log sits in front of the server, and in any link the person sends somebody else. This
+plugin neither creates such a credential nor extends one, and the page carries what it was opened
+with no further than the one call it makes, but neither of those undoes the first sentence. An
+operator handing this address to their household should treat it as handing over a session.
+
+### What the page does not do
+
+**It offers no decision and no control at all.** Approving and declining need an administrator, and
+cancelling something still open needs a state a request can be withdrawn into, which this plugin does
+not have: whether there is a cancelled state is an open decision on #113. So the page is a thing to
+read, and a control that could not do anything would be worse than none.
+
+**It has no pager.** It asks for the largest page the endpoint serves and says how many matched
+beside how many it drew, so somebody with more requests than that is told so rather than shown a
+shortened list that reads as the whole of it.
+
+**It borrows nothing from the dashboard.** The shared stylesheet and script the dashboard pages use
+are reachable only under a name registered as a plugin page, and those are served to an
+administrator, so a user asking for one would meet a refusal instead of a stylesheet. The page
+carries its own.
+
 ## What is not reached
 
 Nothing here is softened, and the parts that are claims rather than measurements say so.
@@ -79,7 +132,7 @@ measurement of reach.
 
 **A client with no browser cannot open the page.** That is what the page is: a document served over
 HTTP to a signed-in session. A client that draws its own interface and offers no way to open a URL
-gets nothing from #69.
+gets nothing from it.
 
 **A client that does not render channels gets nothing from the channel**, and there is no fallback
 for it inside this plugin beyond the API.
@@ -94,8 +147,8 @@ nothing to ask with. The gesture that creates a request arrives from the sibling
 
 ## The reach matrix
 
-No cell of the reach matrix in docs/surface.md has been checked against a real client, and neither
-the channel nor the page it describes is on the mainline today.
+No cell of the reach matrix in docs/surface.md has been checked against a real client, and the page
+now on the mainline is not a measurement of one; the channel it describes is still not built.
 
 That sentence is the first thing in this section because the table under it looks like a
 capability list and is not one. It is what the decision above would reach if it were built, written
@@ -106,7 +159,7 @@ before it looks. Each file becomes one line, so the count is 1 where the sentenc
 where a word of it has moved:
 
     for f in README.md docs/surface.md; do printf '%s: ' "$f"; tr -s '[:space:]' ' ' < "$f" \
-      | grep -c 'No cell of the reach matrix in docs/surface.md has been checked against a real client, and neither the channel nor the page it describes is on the mainline today.'; done
+      | grep -c 'No cell of the reach matrix in docs/surface.md has been checked against a real client, and the page now on the mainline is not a measurement of one; the channel it describes is still not built.'; done
     README.md: 1
     docs/surface.md: 1
 

@@ -65,6 +65,13 @@ public sealed class EndpointPolicyTests
         // an install accepts is a fact about somebody's server rather than about this version.
         "CapabilitiesController.CapabilitiesAsync GET Capabilities -> (the server's default)",
 
+        // The page a person opens in a browser to see their own requests. A signed-in person, and
+        // it is the policy that makes the page a page rather than a shell: a caller the server has
+        // not authenticated is turned away instead of being handed the document and left to meet
+        // the refusal on its first call. Nothing elevated is reachable from it, because everything
+        // it draws comes from the endpoint below that has nothing but the caller's own to return.
+        "MyRequestsPageController.Page GET Page -> (the server's default)",
+
         // Saying yes. A decision is an administrator's, in the transition table and here, and the
         // two answers have to agree: an endpoint reachable by a signed-in user would refuse every
         // such call in the model, which is a permission decided in two places.

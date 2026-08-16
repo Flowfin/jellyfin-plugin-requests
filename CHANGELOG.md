@@ -17,6 +17,12 @@ what came before it. What landed before this file existed is in the git history,
 where it carries the pull request and the issue it came from, and rewriting it
 from memory into entries would be a description nobody measured.
 
+- A person signed in to the server can open a page in a browser and see what
+  they asked for and what happened to it, at `MediaRequests/v1/Page`. It shows
+  their own requests only, offers no decision, and is refused to a caller with
+  no session. What it costs to open one in a browser, which is a credential in
+  the address, is in [docs/surface.md](docs/surface.md).
+
 - The version starts at `0.1.0.0`. It was `1.0.0.0`, inherited from the
   template, which claimed a released first version of a plugin that has never
   been released.

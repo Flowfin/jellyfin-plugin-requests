@@ -255,6 +255,30 @@ themselves.
 The history is not in the answer. Every entry names the administrator who made the move, and a list a
 user reads is not an audit trail.
 
+## The page a browser opens
+
+    GET MediaRequests/v1/Page
+
+The one endpoint here that answers with a document rather than a record. It returns the page a person
+opens to see what they asked for, which exists because a plugin's own pages live in the dashboard and
+the dashboard is the administrator's. What the page is and what it deliberately does not do are in
+[surface.md](surface.md); this section is what a caller sees.
+
+It answers `text/html` and nothing else, and the document carries no request in itself: what it holds
+is markup and a script that calls `GET MediaRequests/v1/Requests` for whoever is reading it. So who
+may see what is decided by that endpoint and not a second time here.
+
+**It is refused rather than served empty to a caller with no session.** A shell handed to anybody and
+left to fail on its first call would put this plugin's existence and shape in front of somebody who
+has not signed in, and would read to a person as a broken page rather than as a closed door.
+
+**A browser navigating to an address sends no Jellyfin session.** A session here is a header or a
+query value, never a cookie, so a person opening this page in a tab reaches it with the credential in
+the address: `?api_key=` is read out of the query string by the server on both claimed lines. That is
+a real cost and it is stated here and in [surface.md](surface.md) rather than left to be discovered.
+This endpoint neither creates such a credential nor extends one, and the page carries what it was
+opened with no further than the one call it makes.
+
 ## Reading the queue
 
     GET MediaRequests/v1/Requests/Queue
@@ -455,6 +479,7 @@ reading the endpoint.
 | Endpoint                     | Policy                       | Who that is          |
 | ---------------------------- | ---------------------------- | -------------------- |
 | `GET Capabilities`           | the server's default         | any signed-in person |
+| `GET Page`                   | the server's default         | any signed-in person |
 | `POST Requests`              | the server's default         | any signed-in person |
 | `GET Requests`               | the server's default         | any signed-in person |
 | `GET Requests/Queue`         | `Policies.RequiresElevation` | an administrator     |

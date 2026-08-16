@@ -40,6 +40,11 @@
     <EmbeddedResource Include="Web\shell.js" />
     <None Remove="Web\shell.css" />
     <EmbeddedResource Include="Web\shell.css" />
+    <!-- The page a person opens in a browser. It is embedded like the others and registered like
+         none of them: the dashboard serves what GetPages registers and the dashboard is the
+         administrator's, so this one is served by MyRequestsPageController instead. -->
+    <None Remove="Web\mine.html" />
+    <EmbeddedResource Include="Web\mine.html" />
   </ItemGroup>
 
 </Project>
