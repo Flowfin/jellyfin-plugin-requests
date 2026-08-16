@@ -103,9 +103,12 @@ Nothing has to be configured for the plugin to be usable: a person can ask for a
 an operator sees it in the queue and answers it, and the library is what says a request was
 fulfilled.
 
-Nothing is sent anywhere. The outbound notification sink exists and has nowhere to send to, because
+Nothing leaves the server. The outbound notification sink exists and has nowhere to send to, because
 `OutboundNoticeAddress` is empty until an operator types one; there is no credential to hold and no
-other path that could carry anything, since the bridge adapter is #82 and is not built.
+other path that could carry anything, since the bridge adapter is #82 and is not built. What does
+happen on a fresh install is that every transition is written to the server's own activity log, which
+stays on the machine and is a record rather than a message. What an entry says is
+[`notifications.md`](notifications.md).
 `NoRequestBackend` is what a server without an external request service runs, and it is what every
 server runs today.
 
@@ -115,14 +118,18 @@ server runs today.
 as a per-user setting rather than a switch for the whole server, so a boolean here would be the
 wrong shape rather than an early version of the right one.
 
-**Notification switches.** One notification path exists and it is turned off by having nowhere to
-send to, which is `OutboundNoticeAddress` above rather than a switch beside it. The rest are unbuilt,
-and switches for paths that do not exist would be settings an operator can change with no effect,
-which is worse than their absence. They land with the paths, in #79.
+**Notification switches.** Two paths exist and neither has a switch. The activity log is always on
+and is meant to be: it is a record rather than a message, it stays on the server, and an operator who
+could turn it off would be able to lose the answer to what happened to a request. The outbound sink
+is turned off by having nowhere to send to, which is `OutboundNoticeAddress` above rather than a
+switch beside it. The rest are unbuilt, and switches for paths that do not exist would be settings an
+operator can change with no effect, which is worse than their absence. They land with the paths, in
+#79.
 
 **A bridge address and a credential.** The only bridge in this tree is the one for a server that has
 none. A field for an address would be somewhere to type something nothing reads. #82 brings the
-adapter, and #85 decides where a credential is kept and what may honestly be claimed about it.
+adapter; where a credential is kept when there is one, who on the machine can read it, and what is
+refused by name are in [`bridge.md`](bridge.md).
 
 ## What an uninstall leaves behind
 
