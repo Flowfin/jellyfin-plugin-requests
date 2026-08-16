@@ -521,7 +521,7 @@ public sealed class ActOnARequestTests
     /// <param name="caller">Who the server says is calling.</param>
     /// <returns>The controller under test.</returns>
     private RequestsController ControllerFor(IRequestStore store, Guid? caller)
-        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), new FakeInstallSettings());
+        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), new FakeInstallSettings(), new RecordingJournal());
 
     /// <summary>
     /// The row a successful decision handed back, with the status code checked.

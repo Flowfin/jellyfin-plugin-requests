@@ -8,6 +8,7 @@ using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Intake;
 using Jellyfin.Plugin.Requests.Model;
+using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
 using MediaBrowser.Common.Api;
@@ -96,6 +97,7 @@ public sealed class RequestsController : RequestsControllerBase
     private readonly IClock _clock;
     private readonly IIdentifierSource _identifiers;
     private readonly ICallerIdentity _callers;
+    private readonly IActivityJournal _journal;
     private readonly RequestIntake _intake;
 
     /// <summary>
@@ -109,20 +111,27 @@ public sealed class RequestsController : RequestsControllerBase
     /// What this install is set to. The intake reads the quota out of it on every ask, so the
     /// endpoint cannot ask without one.
     /// </param>
+    /// <param name="journal">
+    /// Where a move is written down so an operator can read it after a restart. It is a dependency
+    /// rather than something this controller reaches for, because a decision that is not written
+    /// down is the failure #75 is about and a test has to be able to see the entry without a server.
+    /// </param>
     public RequestsController(
         IRequestStore store,
         IClock clock,
         IIdentifierSource identifiers,
         ICallerIdentity callers,
-        IInstallSettings settings)
+        IInstallSettings settings,
+        IActivityJournal journal)
     {
         _store = store;
         _clock = clock;
         _identifiers = identifiers;
         _callers = callers;
+        _journal = journal;
 
         // Built here rather than injected, because it is this controller's use of the store rather
-        // than a sixth thing the server has to supply. CatalogueSplitTests reads the list this
+        // than one more thing the server has to supply. CatalogueSplitTests reads the list this
         // constructor takes, and a request intake that arrived as a dependency would read as one.
         _intake = new RequestIntake(store, settings);
     }
@@ -726,6 +735,14 @@ public sealed class RequestsController : RequestsControllerBase
         try
         {
             var written = await _store.ReplaceAsync(moved, revision, cancellationToken).ConfigureAwait(false);
+
+            // After the write and never before it. An entry describing a decision the store then
+            // refused would be a line in the operator's activity list for something that did not
+            // happen, and the activity log is the one record here that outlives a restart.
+            if (ActivityNote.For(held.Request, written.Request) is ActivityNote note)
+            {
+                await _journal.WriteAsync(note, cancellationToken).ConfigureAwait(false);
+            }
 
             return new DecidedRequest { Id = id, Request = Queued(written) };
         }

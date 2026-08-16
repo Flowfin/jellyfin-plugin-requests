@@ -620,5 +620,6 @@ public sealed class ListRequestsTests
             new TestClock(new DateTimeOffset(2026, 8, 9, 12, 0, 0, TimeSpan.Zero)),
             _identifiers,
             new FakeCallerIdentity(caller),
-            new FakeInstallSettings());
+            new FakeInstallSettings(),
+            new RecordingJournal());
 }

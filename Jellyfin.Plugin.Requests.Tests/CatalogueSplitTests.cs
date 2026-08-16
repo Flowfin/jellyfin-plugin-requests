@@ -9,6 +9,7 @@ using Jellyfin.Plugin.Requests.Api;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Model;
+using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
 using Jellyfin.Plugin.Requests.Time;
@@ -84,9 +85,9 @@ public sealed class CatalogueSplitTests
     }
 
     /// <summary>
-    /// The controller takes five things and none of them can fetch anything. A metadata source
+    /// The controller takes six things and none of them can fetch anything. A metadata source
     /// arrives as something injected, so the constructor is where one would appear first, and a
-    /// sixth parameter fails here before anybody writes the call.
+    /// seventh parameter fails here before anybody writes the call.
     /// <para>
     /// Written as the exact list rather than as "nothing called a provider". A name test would pass
     /// the day somebody injects a fetcher under a name nobody predicted, which is the shape this
@@ -109,7 +110,8 @@ public sealed class CatalogueSplitTests
                 nameof(IClock),
                 nameof(IIdentifierSource),
                 nameof(ICallerIdentity),
-                nameof(IInstallSettings)),
+                nameof(IInstallSettings),
+                nameof(IActivityJournal)),
             string.Join(" | ", taken),
             StringComparer.Ordinal);
     }
@@ -143,5 +145,6 @@ public sealed class CatalogueSplitTests
             new TestClock(new DateTimeOffset(2026, 8, 11, 8, 0, 0, TimeSpan.Zero)),
             new SequentialIdentifierSource(),
             new FakeCallerIdentity(Operator),
-            new FakeInstallSettings());
+            new FakeInstallSettings(),
+            new RecordingJournal());
 }

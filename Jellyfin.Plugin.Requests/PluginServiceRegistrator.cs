@@ -11,6 +11,7 @@ using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
+using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -90,6 +91,14 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<ILogger<WantHandover>>(),
             WantHandover.DefaultAnswerWithin));
 
+        // The record every move leaves behind, which is the server's own activity log rather than
+        // anything this plugin keeps. Registered beside the sink below and not instead of it: the
+        // sink is a courtesy that may be lost, and this is the line an operator reads afterwards in
+        // a dashboard they already have open.
+        serviceCollection.AddSingleton<IActivityJournal>(provider => new ServerActivityJournal(
+            provider.GetRequiredService<IActivityManager>(),
+            provider.GetRequiredService<ILogger<ServerActivityJournal>>()));
+
         // The one path anything this plugin has to say leaves the server on. Registered on every
         // install rather than only where an address is set, because whether one is set is a value in
         // a file an operator edits while the server is running, and a container built at startup
@@ -119,6 +128,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<IRequestStore>(),
             provider.GetRequiredService<ILibrary>(),
             provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IActivityJournal>(),
             provider.GetRequiredService<ILogger<FulfilmentSweep>>()));
 
         // The event half of the fulfilment check. A hosted service rather than something built when

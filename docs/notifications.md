@@ -45,7 +45,7 @@ work from this plugin. The interface is `IActivityManager`:
 
 This is the path that is always on, because it is a record rather than a message: nobody is
 interrupted by it and it is the thing an operator reads afterwards when somebody asks what happened.
-Issue #75 writes it.
+It is built, and what an entry says is the section below.
 
 **A message to a live session.** An administrator with the dashboard open is told that something
 arrived, through the connection the server already holds to that session. It reaches nobody who is
@@ -144,6 +144,61 @@ this plugin does not remember that it was. That is the right trade for a courtes
 for a record, which is why the record is the server's activity log and not this. An operator who
 needs to know what happened reads that log.
 
+## What an activity entry says
+
+One entry per transition and none for anything else. Asking for something is not a transition:
+nothing has been decided, the model appends no history entry for it, and an entry there would be this
+plugin announcing its own arrival in a list an operator reads for what the server did. Telling an
+administrator that something arrived is a live message and is #76. An observation that changed a
+title's availability without moving the request writes nothing here either, because a line per
+re-observation is the wall of entries this page's own rule refuses.
+
+Each entry is three pieces of text and a user, and they are built from four fields of the request:
+the two states, the identifier, the title snapshot, and who made the move.
+
+| Piece           | What it holds                                                                       |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `Name`          | `Request approved: <title>`, with the title cut to a line                           |
+| `ShortOverview` | the two states, whether a person or the plugin moved it, and the request identifier |
+| `Type`          | `MediaRequest` followed by the state moved into, which is what a filter matches on  |
+| `UserId`        | the administrator who decided, or the empty identifier where the plugin observed    |
+
+The title is cut because it is a snapshot of what whoever asked typed and nothing caps it on the way
+here, so an entry built without the cut is one row of the activity list as long as somebody wanted it
+to be. What is cut is replaced by an ellipsis, so a reader can see that something was.
+
+**A move the plugin made says so in words as well as by the empty identifier.** The server's entity
+has no nullable user, so an entry that only left the identifier empty reads in the dashboard as an
+entry whose user could not be resolved, which is a different statement from nobody having decided
+anything.
+
+### What an entry never carries
+
+The note an operator types with a decline, and the note the requester wrote. Both can be five hundred
+characters, both are a message to one person, and the activity list is read by every administrator on
+the server.
+
+A credential and a path on the server's disk. Neither is reachable from where an entry is built: the
+only input is the request, and the configuration and the file system are not in scope there.
+
+The request identifier is in the text rather than in the entity's `ItemId`. That field is a library
+item on the server's side and the dashboard offers it as a link, so a request identifier there is a
+link to an item that does not exist.
+
+### What the entry is not proof of
+
+That an operator can read it in the dashboard. Nothing in the suite runs a server, which the headless
+rule in [`docs/testing.md`](testing.md) settles, so what is asserted is what this plugin asked to be
+written. Reading the entries back on a running server of each claimed line is the second condition of
+#75 and is a procedure somebody runs where a server can be started.
+
+### When the activity log itself refuses
+
+The move is in the store before the entry is attempted, so a decision is never undone by a log that
+would not take a line about it. The failure is reported to the server's log with the move in it and
+the call carries on. What is lost is the line an operator would have read in the dashboard, and this
+plugin holds nothing that would let it be written later.
+
 ## Why there is no fourth
 
 Because the fourth is the first of six. Growing an integration per messaging service is how a plugin
@@ -165,9 +220,9 @@ lands it is a plan for the other paths rather than a property of the code.
 
 ## What this page does not do
 
-It does not say what the other two paths send. The activity log's wording is #75's and the session
-message's shape is #76's, and each of those is where the text a person actually reads is decided. The
-sink's payload is above, because it is the one path that is built.
+It does not say what the session message sends. That shape is #76's, and it is where the text a
+person actually reads on that path is decided. The activity entry and the sink's payload are both
+above, because those are the two paths that are built.
 
 It does not decide what happens when a path fails. An outbound sink pointed at something that has
 stopped answering is #78's and #86's, and nothing here says a failure to notify may move a request.

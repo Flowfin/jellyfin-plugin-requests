@@ -505,7 +505,7 @@ public sealed class PublishedApiDocumentTests
     /// <param name="settings">What this install is set to.</param>
     /// <returns>The controller under test.</returns>
     private RequestsController ControllerFor(IRequestStore store, Guid? caller, IInstallSettings settings)
-        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), settings);
+        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), settings, new RecordingJournal());
 
     /// <summary>
     /// A request as the store holds one.
