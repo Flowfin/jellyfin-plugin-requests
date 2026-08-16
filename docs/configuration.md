@@ -20,6 +20,7 @@ without this page moving with it, and again if the page cannot reach one of them
 | AcceptsSeries                | true    |
 | FinishedRequestRetentionDays | 365     |
 | OpenRequestsPerUser          | 10      |
+| OutboundNoticeAddress        |         |
 
 <!-- settings ends -->
 
@@ -57,6 +58,20 @@ requests are answered can keep asking.
 Where the quota is enforced is #114, and that is not built yet either. **Nothing refuses an
 eleventh open request today.**
 
+**OutboundNoticeAddress** is empty, and empty is the whole of how the outbound notification path is
+turned off. It is the only setting on this page that causes anything to leave this server, and it is
+the only one that holds text rather than a number or a switch.
+
+With an address in it, every movement in the queue is posted there as a small JSON document. What
+that document carries, what it deliberately does not, and what an operator is agreeing to by typing
+an address are in [notifications.md](notifications.md); the same fields are counted as what leaves
+the server in [personal-data.md](personal-data.md). Nothing waits for the post and nothing is
+retried, so a service that is down costs the messages sent while it was down and costs a request
+nothing.
+
+There is no second setting saying whether to use the address. Two ways to say off is one of them
+being wrong the day somebody sets the other, and an operator who wants it off empties the field.
+
 ## What is refused
 
 A plugin configuration is an XML file on the server, and the dashboard is not the only way one
@@ -64,11 +79,12 @@ arrives: an operator can edit that file, and a restore can put an older one back
 are read at both moments a configuration reaches this plugin, from the same list, in
 [`ConfigurationRules`](../Jellyfin.Plugin.Requests/Configuration/ConfigurationRules.cs).
 
-| Setting                      | Refused when | Because                                                                                        |
-| ---------------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
-| OpenRequestsPerUser          | below 1      | nobody may have a request open, so every ask is refused by an install that still offers itself |
-| AcceptsMovies, AcceptsSeries | both off     | there is nothing anybody can ask for                                                           |
-| FinishedRequestRetentionDays | below 30     | the history is removed while people are still asking about it                                  |
+| Setting                      | Refused when                               | Because                                                                                         |
+| ---------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| OpenRequestsPerUser          | below 1                                    | nobody may have a request open, so every ask is refused by an install that still offers itself  |
+| AcceptsMovies, AcceptsSeries | both off                                   | there is nothing anybody can ask for                                                            |
+| FinishedRequestRetentionDays | below 30                                   | the history is removed while people are still asking about it                                   |
+| OutboundNoticeAddress        | set to something that is not http or https | a notice cannot be posted there, so the sink would send nothing while the page shows an address |
 
 **Nothing is corrected on the way in.** A quota of zero is not raised to one and a retention of five
 days is not raised to thirty. An install running a value it substituted does something other than
@@ -87,10 +103,11 @@ Nothing has to be configured for the plugin to be usable: a person can ask for a
 an operator sees it in the queue and answers it, and the library is what says a request was
 fulfilled.
 
-Nothing is sent anywhere. There is no address to send to, no credential to hold and no switch that
-would turn sending on, because none of the paths that would carry it exist yet: the outbound
-notification sink is #78 and the bridge adapter is #82. `NoRequestBackend` is what a server without
-an external request service runs, and it is what every server runs today.
+Nothing is sent anywhere. The outbound notification sink exists and has nowhere to send to, because
+`OutboundNoticeAddress` is empty until an operator types one; there is no credential to hold and no
+other path that could carry anything, since the bridge adapter is #82 and is not built.
+`NoRequestBackend` is what a server without an external request service runs, and it is what every
+server runs today.
 
 ## What is deliberately not a setting
 
@@ -98,9 +115,10 @@ an external request service runs, and it is what every server runs today.
 as a per-user setting rather than a switch for the whole server, so a boolean here would be the
 wrong shape rather than an early version of the right one.
 
-**Notification switches.** Every path they would turn off is unbuilt. Switches for paths that do not
-exist would be settings an operator can change with no effect, which is worse than their absence.
-They land with the paths, in #79.
+**Notification switches.** One notification path exists and it is turned off by having nowhere to
+send to, which is `OutboundNoticeAddress` above rather than a switch beside it. The rest are unbuilt,
+and switches for paths that do not exist would be settings an operator can change with no effect,
+which is worse than their absence. They land with the paths, in #79.
 
 **A bridge address and a credential.** The only bridge in this tree is the one for a server that has
 none. A field for an address would be somewhere to type something nothing reads. #82 brings the

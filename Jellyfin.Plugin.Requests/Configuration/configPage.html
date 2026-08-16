@@ -42,6 +42,12 @@
                             <div class="fieldDescription">A finished request names a person, a title and a date. After this many days it is removed. Thirty days is the shortest period allowed, so the history cannot be switched off by setting this to nothing.</div>
                         </div>
 
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsOutboundNoticeAddress">Post a notice to</label>
+                            <input is="emby-input" type="url" id="RequestsOutboundNoticeAddress" />
+                            <div class="fieldDescription">Leave this empty and nothing is sent anywhere. With the complete address of a web hook here, scheme included, every movement in the queue is posted to it as a small JSON document naming the request, the title, and the identifiers of the person who asked and the person who answered. That leaves this server. It is never retried and nothing waits for it.</div>
+                        </div>
+
                         <div>
                             <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                                 <span>Save</span>
@@ -91,6 +97,14 @@
                         AcceptsSeries: "#RequestsAcceptsSeries",
                     };
 
+                    // Read and written as typed, with no trimming and no default put in its place.
+                    // The server refuses an address it cannot post to and says which field, and a
+                    // page that quietly repaired the value would be a page disagreeing with the
+                    // file about what this install is set to.
+                    var texts = {
+                        OutboundNoticeAddress: "#RequestsOutboundNoticeAddress",
+                    };
+
                     function show(config) {
                         Object.keys(numbers).forEach(function (setting) {
                             page.querySelector(numbers[setting]).value = config[setting];
@@ -98,6 +112,10 @@
 
                         Object.keys(switches).forEach(function (setting) {
                             page.querySelector(switches[setting]).checked = config[setting];
+                        });
+
+                        Object.keys(texts).forEach(function (setting) {
+                            page.querySelector(texts[setting]).value = config[setting] || "";
                         });
                     }
 
@@ -108,6 +126,10 @@
 
                         Object.keys(switches).forEach(function (setting) {
                             config[setting] = page.querySelector(switches[setting]).checked;
+                        });
+
+                        Object.keys(texts).forEach(function (setting) {
+                            config[setting] = page.querySelector(texts[setting]).value;
                         });
 
                         return config;

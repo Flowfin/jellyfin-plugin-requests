@@ -22,9 +22,9 @@ namespace Jellyfin.Plugin.Requests.Configuration;
 /// boolean added now would be the wrong shape rather than an early version of the right one.
 /// </para>
 /// <para>
-/// There are no notification switches. Every path they would switch is unbuilt, a fresh install
-/// sends nothing outward because there is nothing that could, and #79 is where the switches land
-/// beside the paths they turn off.
+/// There are no notification switches. One path is built and it is turned on by being pointed
+/// somewhere, which is <see cref="OutboundNoticeAddress"/> below; the rest are unbuilt, and #79 is
+/// where the switches land beside the paths they turn off rather than ahead of them.
 /// </para>
 /// <para>
 /// There is no bridge address and no credential. The only implementation of the bridge in this tree
@@ -97,4 +97,27 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </para>
     /// </summary>
     public int FinishedRequestRetentionDays { get; set; } = 365;
+
+    /// <summary>
+    /// Gets or sets where a notice about a request is posted, or nothing to send none.
+    /// <para>
+    /// Empty on a fresh install, and empty is not a degraded setting: it is the whole of how the
+    /// outbound path is turned off, and it is off on every install where nobody has decided
+    /// otherwise. There is no second switch beside it, because two ways to express off is one of
+    /// them being wrong the day somebody sets the other.
+    /// </para>
+    /// <para>
+    /// <b>This is the one field in this class that sends anything anywhere.</b> What leaves the
+    /// server when it is set is written out in <c>docs/notifications.md</c> and counted in
+    /// <c>docs/personal-data.md</c>, because an operator answering for their users needs to read
+    /// what a value here costs before they type one rather than afterwards.
+    /// </para>
+    /// <para>
+    /// It is an address and never a credential. Anything a sink needs to authenticate with belongs
+    /// where #85 decides credentials are kept, and typing one into a query string here would put it
+    /// in this plugin's configuration file, in the settings page's markup and in every log line that
+    /// ever prints the address.
+    /// </para>
+    /// </summary>
+    public string OutboundNoticeAddress { get; set; } = string.Empty;
 }

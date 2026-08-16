@@ -1,9 +1,11 @@
 using System;
+using System.Net.Http;
 using Jellyfin.Plugin.Requests.Api;
 using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Identity;
+using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Seam;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
@@ -87,6 +89,22 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<IKnownUsers>(),
             provider.GetRequiredService<ILogger<WantHandover>>(),
             WantHandover.DefaultAnswerWithin));
+
+        // The one path anything this plugin has to say leaves the server on. Registered on every
+        // install rather than only where an address is set, because whether one is set is a value in
+        // a file an operator edits while the server is running, and a container built at startup
+        // would answer with whatever was true then. The sink reads the address per notice and an
+        // install with none sends nothing, so the registration costs an object and no connection.
+        //
+        // The handler is built here and never shared. It is the socket pipeline the client sends
+        // through, and it is a constructor argument rather than something the sink makes so that the
+        // suite can put an endpoint in the same process, which is what keeps the outbound path
+        // testable under the headless rule.
+        serviceCollection.AddSingleton<IOutboundSink>(provider => new OutboundSink(
+            provider.GetRequiredService<IInstallSettings>(),
+            new SocketsHttpHandler(),
+            provider.GetRequiredService<ILogger<OutboundSink>>(),
+            OutboundSink.DefaultAnswerWithin));
 
         // The server's library, as the two questions this plugin asks of it. One per server, because
         // the instance subscribes to the library's own events and a second subscription would look
