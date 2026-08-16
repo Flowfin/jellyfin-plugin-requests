@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <title>Requests</title>
+        <title data-i18n="queue.title"></title>
     </head>
     <body>
         <div id="RequestsQueuePage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-button,emby-select">
@@ -10,7 +10,7 @@
                 <div class="content-primary">
                     <div class="requestsShell"></div>
 
-                    <h2>Queue</h2>
+                    <h2 data-i18n="queue.heading"></h2>
 
                     <p class="requestsMessage" role="status"></p>
 
@@ -27,37 +27,37 @@
                     -->
                     <div class="requestsQueueControls">
                         <label class="requestsQueueControl" for="RequestsQueueState">
-                            <span>State</span>
+                            <span data-i18n="queue.control.state"></span>
                             <select is="emby-select" id="RequestsQueueState">
-                                <option value="Open" selected>Open</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Declined">Declined</option>
-                                <option value="Fulfilled">Fulfilled</option>
-                                <option value="Failed">Failed</option>
-                                <option value="">Every state</option>
+                                <option value="Open" selected data-i18n="queue.state.Open"></option>
+                                <option value="Approved" data-i18n="queue.state.Approved"></option>
+                                <option value="Declined" data-i18n="queue.state.Declined"></option>
+                                <option value="Fulfilled" data-i18n="queue.state.Fulfilled"></option>
+                                <option value="Failed" data-i18n="queue.state.Failed"></option>
+                                <option value="" data-i18n="queue.state.every"></option>
                             </select>
                         </label>
 
                         <label class="requestsQueueControl" for="RequestsQueueKind">
-                            <span>Kind</span>
+                            <span data-i18n="queue.control.kind"></span>
                             <select is="emby-select" id="RequestsQueueKind">
-                                <option value="" selected>Every kind</option>
-                                <option value="Movie">Film</option>
-                                <option value="Series">Series</option>
+                                <option value="" selected data-i18n="queue.kind.every"></option>
+                                <option value="Movie" data-i18n="kind.Movie"></option>
+                                <option value="Series" data-i18n="kind.Series"></option>
                             </select>
                         </label>
 
                         <label class="requestsQueueControl" for="RequestsQueueOrder">
-                            <span>Ordered by</span>
+                            <span data-i18n="queue.control.order"></span>
                             <select is="emby-select" id="RequestsQueueOrder">
-                                <option value="RequestedAt" selected>When it was asked for</option>
-                                <option value="StateChangedAt">When it last moved</option>
-                                <option value="DisplayTitle">Title</option>
+                                <option value="RequestedAt" selected data-i18n="queue.order.RequestedAt"></option>
+                                <option value="StateChangedAt" data-i18n="queue.order.StateChangedAt"></option>
+                                <option value="DisplayTitle" data-i18n="queue.order.DisplayTitle"></option>
                             </select>
                         </label>
 
                         <label class="requestsQueueControl" for="RequestsQueueDescending">
-                            <span>Direction</span>
+                            <span data-i18n="queue.control.descending"></span>
                             <!--
                                 Ascending and descending rather than oldest and newest, because the
                                 same control also runs the title order and "oldest title" is not a
@@ -65,8 +65,8 @@
                                 what this page opens on.
                             -->
                             <select is="emby-select" id="RequestsQueueDescending">
-                                <option value="false" selected>Ascending</option>
-                                <option value="true">Descending</option>
+                                <option value="false" selected data-i18n="queue.direction.ascending"></option>
+                                <option value="true" data-i18n="queue.direction.descending"></option>
                             </select>
                         </label>
                     </div>
@@ -75,23 +75,23 @@
                         <caption class="requestsQueueSummary" aria-live="polite"></caption>
                         <thead>
                             <tr>
-                                <th scope="col">Title</th>
-                                <th scope="col">Kind</th>
-                                <th scope="col">State</th>
-                                <th scope="col">Asked for</th>
-                                <th scope="col">Last moved</th>
-                                <th scope="col">Requester</th>
-                                <th scope="col">In the library</th>
-                                <th scope="col">Note</th>
-                                <th scope="col">Decision</th>
+                                <th scope="col" data-i18n="queue.column.title"></th>
+                                <th scope="col" data-i18n="queue.column.kind"></th>
+                                <th scope="col" data-i18n="queue.column.state"></th>
+                                <th scope="col" data-i18n="queue.column.requestedAt"></th>
+                                <th scope="col" data-i18n="queue.column.stateChangedAt"></th>
+                                <th scope="col" data-i18n="queue.column.requester"></th>
+                                <th scope="col" data-i18n="queue.column.availability"></th>
+                                <th scope="col" data-i18n="queue.column.note"></th>
+                                <th scope="col" data-i18n="queue.column.decision"></th>
                             </tr>
                         </thead>
                         <tbody class="requestsQueueRows"></tbody>
                     </table>
 
                     <div class="requestsQueuePager">
-                        <button is="emby-button" type="button" class="raised" id="RequestsQueuePrevious">Previous page</button>
-                        <button is="emby-button" type="button" class="raised" id="RequestsQueueNext">Next page</button>
+                        <button is="emby-button" type="button" class="raised" id="RequestsQueuePrevious" data-i18n="queue.previous"></button>
+                        <button is="emby-button" type="button" class="raised" id="RequestsQueueNext" data-i18n="queue.next"></button>
                     </div>
                 </div>
             </div>
@@ -121,41 +121,18 @@
                     var previous = page.querySelector("#RequestsQueuePrevious");
                     var next = page.querySelector("#RequestsQueueNext");
 
-                    var states = {
-                        Open: "Open",
-                        Approved: "Approved",
-                        Declined: "Declined",
-                        Fulfilled: "Fulfilled",
-                        Failed: "Failed",
-                    };
-
-                    var kinds = { Movie: "Film", Series: "Series" };
-
                     /*
-                     * The reasons a request can be declined for, as the model fixes them. An
-                     * operator sees the words rather than the value, and a reason this page has no
-                     * word for is shown as it came rather than dropped.
+                     * Every word this page draws comes from the catalogue the shell fetched, keyed
+                     * by the value the endpoint answered with. There is no map of values to words
+                     * here and there was one until #73: a map in a page is a second catalogue that
+                     * no language file can reach, and it is the reason `Not checked` and
+                     * `Already in the library` stayed English however much else was translated.
+                     *
+                     * A value no key exists for is shown as it came rather than dropped, so a state
+                     * added to the model appears as its own name instead of as a blank cell. That
+                     * is RequestsShell.named, and it is shared with the page a person opens in a
+                     * browser rather than written twice.
                      */
-                    var reasons = {
-                        Other: "Another reason",
-                        AlreadyInTheLibrary: "Already in the library",
-                        AlreadyRequested: "Already asked for",
-                        CannotBeObtained: "Cannot be obtained",
-                        NotWanted: "Not wanted",
-                        NoRoomForIt: "No room for it",
-                    };
-
-                    /*
-                     * What the library holds of what was asked for. `Unknown` is a fourth answer
-                     * rather than a missing one, so it says that nothing has looked rather than
-                     * leaving the cell blank for an operator to read as "no".
-                     */
-                    var availability = {
-                        Unknown: "Not checked",
-                        Absent: "No",
-                        Partial: "In part",
-                        Present: "Yes",
-                    };
 
                     // Loaded through the same endpoint the dashboard fetches this page from, because
                     // an embedded resource is reachable only under a name the plugin registered.
@@ -223,20 +200,20 @@
                         var written = request.DisplayTitle;
 
                         if (request.DisplayYear) {
-                            written = written + " (" + request.DisplayYear + ")";
+                            written = RequestsShell.fill("title.withYear", [written, request.DisplayYear]);
                         }
 
                         if (request.Seasons && request.Seasons.length) {
-                            written = written + ", seasons " + request.Seasons.join(", ");
+                            written = RequestsShell.fill("title.withSeasons", [written, request.Seasons.join(", ")]);
                         }
 
                         return written;
                     }
 
                     function held(request) {
-                        var answer = availability[request.Availability] || request.Availability;
+                        var answer = RequestsShell.named("availability", request.Availability);
 
-                        return request.AvailabilityCheckedAt ? answer + ", checked " + moment(request.AvailabilityCheckedAt) : answer;
+                        return request.AvailabilityCheckedAt ? RequestsShell.fill("queue.availabilityChecked", [answer, moment(request.AvailabilityCheckedAt)]) : answer;
                     }
 
                     /*
@@ -249,9 +226,9 @@
                             return "";
                         }
 
-                        var reason = reasons[request.DeclineReason] || request.DeclineReason;
+                        var reason = RequestsShell.named("declineReason", request.DeclineReason);
 
-                        return request.DeclineNote ? reason + ", " + request.DeclineNote : reason;
+                        return request.DeclineNote ? RequestsShell.fill("declineReason.withNote", [reason, request.DeclineNote]) : reason;
                     }
 
                     function draw(answer) {
@@ -261,8 +238,8 @@
                             var row = document.createElement("tr");
 
                             cell(row, title(request));
-                            cell(row, kinds[request.Kind] || request.Kind);
-                            cell(row, states[request.State] || request.State);
+                            cell(row, RequestsShell.named("kind", request.Kind));
+                            cell(row, RequestsShell.named("queue.state", request.State));
                             cell(row, moment(request.RequestedAt));
                             cell(row, moment(request.StateChangedAt));
                             cell(row, request.RequestedByUserId);
@@ -278,7 +255,7 @@
                         var first = answer.MatchCount === 0 ? 0 : answer.Skip + 1;
                         var last = answer.Skip + answer.Requests.length;
 
-                        summary.textContent = first + " to " + last + " of " + answer.MatchCount;
+                        summary.textContent = RequestsShell.fill("queue.summary", [first, last, answer.MatchCount]);
 
                         previous.disabled = answer.Skip <= 0;
                         next.disabled = last >= answer.MatchCount;
@@ -294,7 +271,7 @@
                                 Dashboard.hideLoadingMsg();
                             })
                             .catch(function () {
-                                RequestsShell.say(page, "The queue could not be read. The server said nothing this page can act on.");
+                                RequestsShell.say(page, "queue.notRead");
                                 Dashboard.hideLoadingMsg();
                             });
                     }
@@ -335,7 +312,11 @@
 
                         shell()
                             .then(function () {
+                                return RequestsShell.load();
+                            })
+                            .then(function () {
                                 RequestsShell.attach(page, "RequestsQueue");
+                                RequestsShell.draw(page);
                                 Dashboard.hideLoadingMsg();
                                 read();
                             })

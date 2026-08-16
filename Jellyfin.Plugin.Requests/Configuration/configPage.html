@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <title>Requests</title>
+        <title data-i18n="config.title"></title>
     </head>
     <body>
         <div id="RequestsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
@@ -10,47 +10,47 @@
                 <div class="content-primary">
                     <div class="requestsShell"></div>
 
-                    <h2>Settings</h2>
+                    <h2 data-i18n="config.heading"></h2>
 
                     <p class="requestsMessage" role="status"></p>
 
                     <form id="RequestsConfigForm">
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="RequestsOpenRequestsPerUser">Open requests per person</label>
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsOpenRequestsPerUser" data-i18n="config.openRequestsPerUser.label"></label>
                             <input is="emby-input" type="number" id="RequestsOpenRequestsPerUser" min="1" step="1" required />
-                            <div class="fieldDescription">How many requests one person may have waiting at once. This is what stands between one person and the whole disk.</div>
+                            <div class="fieldDescription" data-i18n="config.openRequestsPerUser.description"></div>
                         </div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label>
                                 <input is="emby-checkbox" type="checkbox" id="RequestsAcceptsMovies" />
-                                <span>Accept requests for films</span>
+                                <span data-i18n="config.acceptsMovies.label"></span>
                             </label>
-                            <div class="fieldDescription checkboxFieldDescription">Turning both kinds off leaves nothing anybody can ask for.</div>
+                            <div class="fieldDescription checkboxFieldDescription" data-i18n="config.acceptsKinds.description"></div>
                         </div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label>
                                 <input is="emby-checkbox" type="checkbox" id="RequestsAcceptsSeries" />
-                                <span>Accept requests for series</span>
+                                <span data-i18n="config.acceptsSeries.label"></span>
                             </label>
                         </div>
 
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="RequestsFinishedRequestRetentionDays">Keep finished requests for, in days</label>
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsFinishedRequestRetentionDays" data-i18n="config.retention.label"></label>
                             <input is="emby-input" type="number" id="RequestsFinishedRequestRetentionDays" min="30" step="1" required />
-                            <div class="fieldDescription">A finished request names a person, a title and a date. After this many days it is removed. Thirty days is the shortest period allowed, so the history cannot be switched off by setting this to nothing.</div>
+                            <div class="fieldDescription" data-i18n="config.retention.description"></div>
                         </div>
 
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="RequestsOutboundNoticeAddress">Post a notice to</label>
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsOutboundNoticeAddress" data-i18n="config.outboundNoticeAddress.label"></label>
                             <input is="emby-input" type="url" id="RequestsOutboundNoticeAddress" />
-                            <div class="fieldDescription">Leave this empty and nothing is sent anywhere. With the complete address of a web hook here, scheme included, every movement in the queue is posted to it as a small JSON document naming the request, the title, and the identifiers of the person who asked and the person who answered. That leaves this server. It is never retried and nothing waits for it.</div>
+                            <div class="fieldDescription" data-i18n="config.outboundNoticeAddress.description"></div>
                         </div>
 
                         <div>
                             <button is="emby-button" type="submit" class="raised button-submit block emby-button">
-                                <span>Save</span>
+                                <span data-i18n="config.save"></span>
                             </button>
                         </div>
                     </form>
@@ -140,7 +140,11 @@
 
                         shell()
                             .then(function () {
+                                return RequestsShell.load();
+                            })
+                            .then(function () {
                                 RequestsShell.attach(page, "Requests");
+                                RequestsShell.draw(page);
 
                                 return ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId);
                             })
@@ -168,7 +172,7 @@
                             // left looking at a form that appears to have been accepted.
                             .catch(function () {
                                 Dashboard.hideLoadingMsg();
-                                RequestsShell.say(page, "These settings were refused and nothing was changed. The server log names the field and says why.");
+                                RequestsShell.say(page, "config.refused");
                             });
 
                         e.preventDefault();

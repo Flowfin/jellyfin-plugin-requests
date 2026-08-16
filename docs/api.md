@@ -190,6 +190,38 @@ it publishes one status code where the other endpoints publish five.
 one through the server's container, so it never calls this. `docs/seam.md` is where that difference
 is argued.
 
+## Asking for the words a page draws
+
+    GET MediaRequests/v1/Strings
+
+The catalogue behind every word this plugin's pages show, as a flat object of keys and strings. One
+parameter, `culture`, naming what the caller wants, such as `de-DE`. With none, the answer is
+English.
+
+**It exists because nothing can put the words in on the way out.** The dashboard serves a plugin's
+pages itself, out of the assembly's resources under the name the plugin registers, so this plugin
+never sees that request and has no moment at which it could substitute anything. The markup
+therefore ships with keys and the words arrive here.
+
+The answer is complete whatever the asked-for culture has been translated to, because English is
+merged underneath it before it is sent. A page never has to know that a fallback rule exists, and a
+half-translated language shows translated words where it has them and English everywhere else,
+rather than a key.
+
+**A culture nothing recognises is answered rather than refused.** A caller asking for words wants
+words, and the catalogue already falls back per key; an unrecognised name is that same rule with
+nothing matching at any step. So this endpoint publishes one status code and no failure shape.
+
+It says nothing about anybody. An administrator's queue and a person's own list get the identical
+answer to it, which is why it carries the server's default policy rather than elevation: the page a
+browser opens needs it, and a catalogue of English sentences is not a fact about anybody's server.
+Nothing anonymous, for the reason nothing else here is.
+
+`Accept-Language` is deliberately not read. What a browser sends in that header is not what a person
+changed when they changed the language in Jellyfin, and reading it pulls three assemblies into this
+plugin that nothing else here uses, which `ThePluginReferencesExactlyTheAssembliesWrittenDown` in the
+suite would refuse. The pages pass `navigator.language`.
+
 ## Asking for something
 
     POST MediaRequests/v1/Requests
@@ -480,6 +512,7 @@ reading the endpoint.
 | ---------------------------- | ---------------------------- | -------------------- |
 | `GET Capabilities`           | the server's default         | any signed-in person |
 | `GET Page`                   | the server's default         | any signed-in person |
+| `GET Strings`                | the server's default         | any signed-in person |
 | `POST Requests`              | the server's default         | any signed-in person |
 | `GET Requests`               | the server's default         | any signed-in person |
 | `GET Requests/Queue`         | `Policies.RequiresElevation` | an administrator     |

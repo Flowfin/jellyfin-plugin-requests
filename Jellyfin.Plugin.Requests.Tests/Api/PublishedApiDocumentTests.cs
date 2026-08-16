@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Api;
 using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
+using Jellyfin.Plugin.Requests.Localisation;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
@@ -96,6 +97,11 @@ public sealed class PublishedApiDocumentTests
         "GET MediaRequests/v1/Requests/Queue"
             + " (descending@Query:Boolean, kind@Query:RequestedItemKind[], order@Query:RequestQueryOrder, skip@Query:Int32, state@Query:RequestState[], take@Query:Int32)"
             + " -> 200:RequestsPage<QueuedRequest>, 400:RequestFailure, 503:RequestFailure",
+
+        // The words the pages draw. One parameter and one shape, and no failure: a culture nothing
+        // recognises is answered in English rather than refused, because a caller asking for words
+        // wants words and the catalogue already falls back per key.
+        "GET MediaRequests/v1/Strings (culture@Query:String) -> 200:PageStrings",
 
         // Asking for something. Two success codes with one shape: 201 is a new request and 200 is
         // one that was joined or was already the caller's, and a client tells them apart by the
@@ -274,6 +280,7 @@ public sealed class PublishedApiDocumentTests
         const string Decline = "POST MediaRequests/v1/Requests/{id}/Decline";
         const string ApproveMany = "POST MediaRequests/v1/Requests/Approve";
         const string DeclineMany = "POST MediaRequests/v1/Requests/Decline";
+        const string Strings = "GET MediaRequests/v1/Strings";
 
         // What this install allows. One call and one status: it reads no store, refuses nothing and
         // has no failure to walk, which is why it publishes one code where every other endpoint
@@ -313,6 +320,12 @@ public sealed class PublishedApiDocumentTests
         Saw(Queue, await ControllerFor(store, Operator).QueueAsync(cancellationToken: CancellationToken.None).ConfigureAwait(true));
         Saw(Queue, await ControllerFor(store, Operator).QueueAsync(take: RequestsController.MaximumPageSize + 1, cancellationToken: CancellationToken.None).ConfigureAwait(true));
         Saw(Queue, await ControllerFor(unreadable, Operator).QueueAsync(cancellationToken: CancellationToken.None).ConfigureAwait(true));
+
+        // The words the pages draw. One call and one status, and a second call naming a culture no
+        // catalogue exists for, because that is the shape a reader expects to see refused and it is
+        // answered instead: the same 200 in English.
+        Saw(Strings, new StringsController(StringCatalogue.Shipped).Strings(culture: null));
+        Saw(Strings, new StringsController(StringCatalogue.Shipped).Strings("zz-ZZ"));
 
         var toApprove = await store.AddAsync(AnAsk(), CancellationToken.None).ConfigureAwait(true);
         var toDecline = await store.AddAsync(AnAsk(), CancellationToken.None).ConfigureAwait(true);

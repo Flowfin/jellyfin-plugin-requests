@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>My requests</title>
+        <title data-i18n="mine.title"></title>
 
         <!--
             The style is here rather than in the shared stylesheet the dashboard pages use. That
@@ -50,7 +50,13 @@
     </head>
     <body>
         <main id="RequestsMinePage">
-            <h1>My requests</h1>
+            <!--
+                Every word on this page arrives from the catalogue endpoint rather than being
+                written here, which is #73. A `data-i18n` attribute names the key and the element
+                ships empty, so a page that reached a browser before its words did shows nothing
+                rather than showing English to somebody who asked for another language.
+            -->
+            <h1 data-i18n="mine.title"></h1>
 
             <!--
                 What this page is and is not. It shows one person their own requests and offers no
@@ -66,14 +72,14 @@
                 <caption class="requestsMineSummary" aria-live="polite"></caption>
                 <thead>
                     <tr>
-                        <th scope="col">Title</th>
-                        <th scope="col">Kind</th>
-                        <th scope="col">Where it stands</th>
-                        <th scope="col">Asked for</th>
-                        <th scope="col">Last moved</th>
-                        <th scope="col">In the library</th>
-                        <th scope="col">Your note</th>
-                        <th scope="col">Why</th>
+                        <th scope="col" data-i18n="mine.column.title"></th>
+                        <th scope="col" data-i18n="mine.column.kind"></th>
+                        <th scope="col" data-i18n="mine.column.state"></th>
+                        <th scope="col" data-i18n="mine.column.requestedAt"></th>
+                        <th scope="col" data-i18n="mine.column.stateChangedAt"></th>
+                        <th scope="col" data-i18n="mine.column.availability"></th>
+                        <th scope="col" data-i18n="mine.column.yourNote"></th>
+                        <th scope="col" data-i18n="mine.column.why"></th>
                     </tr>
                 </thead>
                 <tbody class="requestsMineRows"></tbody>
@@ -97,35 +103,35 @@
                 var most = 200;
 
                 /*
-                 * The words a person reads, per value the endpoint answers with. A value this page
-                 * has no word for is shown as it came rather than dropped, so a state added to the
-                 * model appears here as its own name instead of as a blank cell.
+                 * The words, once they have arrived. Empty until then, and a lookup against an
+                 * empty catalogue answers with nothing rather than with a key: showing somebody
+                 * `mine.column.why` is showing them the inside of the plugin.
+                 *
+                 * What that costs, stated rather than left to be found: a catalogue that cannot be
+                 * fetched leaves this page wordless, including the sentence below that would say
+                 * so. It is not a failure of its own, because the catalogue and the caller's own
+                 * requests are two calls to the same server behind the same credential, so a page
+                 * that cannot reach one cannot reach the other either.
                  */
-                var states = {
-                    Open: "Waiting for an answer",
-                    Approved: "Approved",
-                    Declined: "Declined",
-                    Fulfilled: "In the library",
-                    Failed: "Could not be obtained",
-                };
+                var words = {};
 
-                var kinds = { Movie: "Film", Series: "Series" };
+                function word(key) {
+                    return Object.prototype.hasOwnProperty.call(words, key) ? words[key] : "";
+                }
 
-                var reasons = {
-                    Other: "Another reason",
-                    AlreadyInTheLibrary: "Already in the library",
-                    AlreadyRequested: "Already asked for",
-                    CannotBeObtained: "Cannot be obtained",
-                    NotWanted: "Not wanted",
-                    NoRoomForIt: "No room for it",
-                };
+                /*
+                 * A sentence with values put into it, where the catalogue holds the sentence and
+                 * this holds none of it. The placeholders are numbered rather than named so a
+                 * translator can move them, which is the whole reason a sentence is one string
+                 * instead of three pieces joined in this file.
+                 */
+                function say(key, values) {
+                    return word(key).replace(/\{(\d+)\}/g, function (whole, at) {
+                        var value = values[Number(at)];
 
-                var availability = {
-                    Unknown: "Not checked",
-                    Absent: "No",
-                    Partial: "In part",
-                    Present: "Yes",
-                };
+                        return value === undefined ? whole : String(value);
+                    });
+                }
 
                 /*
                  * Where this page reads from, resolved against its own address rather than built
@@ -139,18 +145,30 @@
                  * server reads it from there on both claimed lines. Nothing here stores it, and
                  * docs/surface.md says plainly what that costs.
                  */
-                function address() {
-                    var asked = new URL("Requests", window.location.href);
+                function address(endpoint, asked) {
+                    var target = new URL(endpoint, window.location.href);
                     var opened = new URLSearchParams(window.location.search);
                     var carried = opened.get("api_key") || opened.get("ApiKey");
 
-                    asked.searchParams.set("take", String(most));
+                    Object.keys(asked || {}).forEach(function (name) {
+                        target.searchParams.set(name, String(asked[name]));
+                    });
 
                     if (carried) {
-                        asked.searchParams.set("api_key", carried);
+                        target.searchParams.set("api_key", carried);
                     }
 
-                    return asked;
+                    return target;
+                }
+
+                function fetched(endpoint, asked) {
+                    return fetch(address(endpoint, asked), { headers: { Accept: "application/json" } }).then(function (answered) {
+                        if (!answered.ok) {
+                            throw new Error(String(answered.status));
+                        }
+
+                        return answered.json();
+                    });
                 }
 
                 /*
@@ -173,18 +191,27 @@
                     var written = request.DisplayTitle;
 
                     if (request.DisplayYear) {
-                        written = written + " (" + request.DisplayYear + ")";
+                        written = say("title.withYear", [written, request.DisplayYear]);
                     }
 
                     if (request.Seasons && request.Seasons.length) {
-                        written = written + ", seasons " + request.Seasons.join(", ");
+                        written = say("title.withSeasons", [written, request.Seasons.join(", ")]);
                     }
 
                     return written;
                 }
 
+                /*
+                 * A value the endpoint answered with, as a word. A value this page has no key for
+                 * is shown as it came rather than dropped, so a state added to the model appears
+                 * here as its own name instead of as a blank cell.
+                 */
+                function named(group, value) {
+                    return word(group + "." + value) || value;
+                }
+
                 function held(request) {
-                    return availability[request.Availability] || request.Availability;
+                    return named("availability", request.Availability);
                 }
 
                 /*
@@ -197,9 +224,9 @@
                         return "";
                     }
 
-                    var reason = reasons[request.DeclineReason] || request.DeclineReason;
+                    var reason = named("declineReason", request.DeclineReason);
 
-                    return request.DeclineNote ? reason + ", " + request.DeclineNote : reason;
+                    return request.DeclineNote ? say("declineReason.withNote", [reason, request.DeclineNote]) : reason;
                 }
 
                 function draw(answer) {
@@ -209,8 +236,8 @@
                         var row = document.createElement("tr");
 
                         cell(row, title(request));
-                        cell(row, kinds[request.Kind] || request.Kind);
-                        cell(row, states[request.State] || request.State);
+                        cell(row, named("kind", request.Kind));
+                        cell(row, named("mine.state", request.State));
                         cell(row, moment(request.RequestedAt));
                         cell(row, moment(request.StateChangedAt));
                         cell(row, held(request));
@@ -223,32 +250,54 @@
                     rows.replaceChildren(drawn);
 
                     if (answer.MatchCount === 0) {
-                        summary.textContent = "You have not asked for anything yet.";
+                        summary.textContent = word("mine.empty");
                         return;
                     }
 
-                    summary.textContent = answer.Requests.length === answer.MatchCount ? answer.MatchCount + " in all" : "The first " + answer.Requests.length + " of " + answer.MatchCount;
+                    summary.textContent = answer.Requests.length === answer.MatchCount ? say("mine.countAll", [answer.MatchCount]) : say("mine.countSome", [answer.Requests.length, answer.MatchCount]);
                 }
 
-                function say(text) {
-                    message.textContent = text;
+                function tell(key) {
+                    message.textContent = key ? word(key) : "";
+                }
+
+                /*
+                 * Every element that names a key gets the word under it. Attributes are not walked
+                 * here because nothing on this page carries a translatable one; the two that would
+                 * be, a label and a title on a control, arrive with the controls this page does not
+                 * have.
+                 */
+                function fill() {
+                    document.querySelectorAll("[data-i18n]").forEach(function (element) {
+                        element.textContent = word(element.getAttribute("data-i18n"));
+                    });
+                }
+
+                /*
+                 * The culture the browser is set to, handed to the endpoint rather than left to the
+                 * request headers. A page opened with a credential in its address is opened in
+                 * whatever the person's browser is, and `navigator.language` is what that browser
+                 * says; the endpoint falls back to Accept-Language and then to English, so a
+                 * browser that answers with nothing loses nothing.
+                 */
+                function culture() {
+                    return window.navigator && window.navigator.language ? { culture: window.navigator.language } : {};
                 }
 
                 function read() {
-                    return fetch(address(), { headers: { Accept: "application/json" } })
-                        .then(function (answered) {
-                            if (!answered.ok) {
-                                throw new Error(String(answered.status));
-                            }
+                    return fetched("Strings", culture())
+                        .then(function (answer) {
+                            words = answer.Strings || {};
+                            fill();
 
-                            return answered.json();
+                            return fetched("Requests", { take: most });
                         })
                         .then(function (answer) {
-                            say("");
+                            tell("");
                             draw(answer);
                         })
                         .catch(function () {
-                            say("Your requests could not be read. If this page was opened from a link that has expired, sign in again and open it afresh.");
+                            tell("mine.notRead");
                         });
                 }
 
