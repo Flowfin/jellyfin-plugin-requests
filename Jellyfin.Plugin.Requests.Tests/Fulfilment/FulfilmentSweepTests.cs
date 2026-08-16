@@ -309,7 +309,7 @@ public class FulfilmentSweepTests
                 Asked,
                 RequestCaller.Administrator(Requester)));
 
-        var sweep = new FulfilmentSweep(moving, library, new TestClock(Asked), new RecordingLogger());
+        var sweep = new FulfilmentSweep(moving, library, new TestClock(Asked), new RecordingJournal(), new RecordingLogger());
 
         await store.AddAsync(Request(RequestedItemKind.Movie, "Tmdb", "603"), CancellationToken.None);
         library.Put(RequestedItemKind.Movie, "Tmdb", "603");
@@ -323,7 +323,7 @@ public class FulfilmentSweepTests
     }
 
     private static FulfilmentSweep Sweep(IRequestStore store, ILibrary library, TestClock clock)
-        => new FulfilmentSweep(store, library, clock, new RecordingLogger());
+        => new FulfilmentSweep(store, library, clock, new RecordingJournal(), new RecordingLogger());
 
     private static async Task<MediaRequest> Only(InMemoryRequestStore store)
         => (await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true)).Single().Request;

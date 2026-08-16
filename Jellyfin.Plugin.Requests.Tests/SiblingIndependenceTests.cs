@@ -83,6 +83,13 @@ public class SiblingIndependenceTests
         "System.ComponentModel",
         "System.Linq",
 
+        // A title snapshot is cut to a line before it goes into an activity entry, and the cut is
+        // made over a span rather than by taking a substring because CA1846 refuses the substring
+        // and the analyzer posture in Directory.Build.props makes that refusal a build failure. The
+        // span type lives here. It is a facade over the runtime the server already runs on rather
+        // than a package this plugin carries, and it is excluded from the install with the rest.
+        "System.Memory",
+
         // The outbound notification sink posts a document to an address an operator typed, so the
         // client, the pipeline its handler sits in and the address type all come from here. It is
         // the one thing in this plugin that talks outward, it is off on every install where nobody

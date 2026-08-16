@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Model;
+using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
 using Microsoft.Extensions.Logging;
@@ -49,6 +50,7 @@ public sealed class FulfilmentSweep
     private readonly IRequestStore _store;
     private readonly ILibrary _library;
     private readonly IClock _clock;
+    private readonly IActivityJournal _journal;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -57,22 +59,29 @@ public sealed class FulfilmentSweep
     /// <param name="store">Where the requests are.</param>
     /// <param name="library">What the server holds.</param>
     /// <param name="clock">The injected clock, so an observation's time is one a test can set.</param>
+    /// <param name="journal">
+    /// Where a move is written down. This path is the one nobody watched happen, so the entry is
+    /// the only thing that tells an operator afterwards that a request moved on its own.
+    /// </param>
     /// <param name="logger">The server's log, where a refused write is reported.</param>
     /// <exception cref="ArgumentNullException">Where anything it needs is missing.</exception>
     public FulfilmentSweep(
         IRequestStore store,
         ILibrary library,
         IClock clock,
+        IActivityJournal journal,
         ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(journal);
         ArgumentNullException.ThrowIfNull(logger);
 
         _store = store;
         _library = library;
         _clock = clock;
+        _journal = journal;
         _logger = logger;
     }
 
@@ -220,6 +229,14 @@ public sealed class FulfilmentSweep
                 "A request moved while the library was being looked at for it, so this observation was dropped and the next look will make it again.");
 
             return false;
+        }
+
+        // After the write, for the reason the endpoint writes its entry after one. Nothing this
+        // path moves was asked for by a person, so the entry is what the operator has instead of
+        // having been there.
+        if (ActivityNote.For(request, observed) is ActivityNote note)
+        {
+            await _journal.WriteAsync(note, cancellationToken).ConfigureAwait(false);
         }
 
         return moves;

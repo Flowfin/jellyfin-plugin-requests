@@ -118,7 +118,7 @@ public class BothPathsTests
 
         using var watcher = new LibraryWatcher(
             library,
-            new FulfilmentSweep(refusing, library, new TestClock(Asked), log),
+            new FulfilmentSweep(refusing, library, new TestClock(Asked), new RecordingJournal(), log),
             log);
 
         await store.AddAsync(Request(), CancellationToken.None);
@@ -150,7 +150,7 @@ public class BothPathsTests
     }
 
     private static FulfilmentSweep Sweep(IRequestStore store, ILibrary library)
-        => new FulfilmentSweep(store, library, new TestClock(Asked), new RecordingLogger());
+        => new FulfilmentSweep(store, library, new TestClock(Asked), new RecordingJournal(), new RecordingLogger());
 
     private static async Task<MediaRequest> Only(InMemoryRequestStore store)
         => (await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true)).Single().Request;

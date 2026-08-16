@@ -365,7 +365,8 @@ public sealed class CreateRequestTests
             new TestClock(new DateTimeOffset(2026, 8, 9, 12, 0, 0, TimeSpan.Zero)),
             _identifiers,
             new FakeCallerIdentity(caller),
-            new FakeInstallSettings());
+            new FakeInstallSettings(),
+            new RecordingJournal());
 
     /// <summary>
     /// The answer, with the status code checked, so a leg cannot pass on a body that came back under
