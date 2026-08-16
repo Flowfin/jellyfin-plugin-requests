@@ -77,6 +77,12 @@ public sealed class PublishedApiDocumentTests
         // before anybody configures anything.
         "GET MediaRequests/v1/Capabilities () -> 200:InstallCapabilities",
 
+        // The page a browser opens. One status and one shape, and the shape is a string because
+        // what comes back is a document rather than a record: a generated client that expected a
+        // record here would parse the markup. It refuses nothing of its own, so it publishes no
+        // failure; who may reach it is the server's evaluation of the policy and is not an answer.
+        "GET MediaRequests/v1/Page () -> 200:String",
+
         // One person's own requests. The parameters are the same six the queue takes, because the
         // difference between the two reads is what the store is asked rather than what the caller
         // may ask for.
@@ -260,6 +266,7 @@ public sealed class PublishedApiDocumentTests
         var unreadable = new StoreThatCannotBeRead();
 
         const string Capabilities = "GET MediaRequests/v1/Capabilities";
+        const string BrowserPage = "GET MediaRequests/v1/Page";
         const string Create = "POST MediaRequests/v1/Requests";
         const string Mine = "GET MediaRequests/v1/Requests";
         const string Queue = "GET MediaRequests/v1/Requests/Queue";
@@ -276,6 +283,11 @@ public sealed class PublishedApiDocumentTests
             await new CapabilitiesController(new FakeInstallSettings(), new NoRequestBackend())
                 .CapabilitiesAsync(CancellationToken.None)
                 .ConfigureAwait(true));
+
+        // The page. One call and one status: it reads no store and refuses nothing of its own, and
+        // the only way it answers with anything else is by being served out of an assembly that
+        // does not carry it, which raises rather than answering.
+        SawPage(BrowserPage, new MyRequestsPageController().Page());
 
         // Asking for something. The same body twice: the first is a new request and the second is
         // the caller already waiting for it, which is the endpoint's other success code.
@@ -339,7 +351,14 @@ public sealed class PublishedApiDocumentTests
 
         return answered;
 
-        void Saw<T>(string endpoint, ActionResult<T> came)
+        void Saw<T>(string endpoint, ActionResult<T> came) => Answered(endpoint, Status(came));
+
+        // The page answers with a document rather than a record, so it comes back as a result that
+        // carries its own content type instead of one the framework serialises. That is why it has
+        // a walk of its own here rather than going through the one above.
+        void SawPage(string endpoint, ContentResult came) => Answered(endpoint, came.StatusCode ?? 200);
+
+        void Answered(string endpoint, int status)
         {
             if (!answered.TryGetValue(endpoint, out var statuses))
             {
@@ -347,7 +366,7 @@ public sealed class PublishedApiDocumentTests
                 answered[endpoint] = statuses;
             }
 
-            statuses.Add(Status(came));
+            statuses.Add(status);
         }
     }
 
