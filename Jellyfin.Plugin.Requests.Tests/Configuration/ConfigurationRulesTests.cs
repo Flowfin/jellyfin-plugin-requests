@@ -129,7 +129,8 @@ public class ConfigurationRulesTests
             OpenRequestsPerUser = 0,
             AcceptsMovies = false,
             AcceptsSeries = false,
-            FinishedRequestRetentionDays = 0
+            FinishedRequestRetentionDays = 0,
+            OutboundNoticeAddress = "example.invalid/hook"
         };
 
         var declared = typeof(PluginConfiguration)

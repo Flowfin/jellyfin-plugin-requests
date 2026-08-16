@@ -26,7 +26,7 @@ namespace Jellyfin.Plugin.Requests.Tests.Configuration;
 public class PluginConfigurationTests
 {
     /// <summary>
-    /// Every setting this plugin has, with the value a fresh install runs. Four lines is the whole
+    /// Every setting this plugin has, with the value a fresh install runs. This is the whole
     /// configuration surface, and a change to any of them is a change to this list with a reason in
     /// the commit that made it.
     /// </summary>
@@ -37,7 +37,8 @@ public class PluginConfigurationTests
             { "AcceptsMovies", "true" },
             { "AcceptsSeries", "true" },
             { "FinishedRequestRetentionDays", "365" },
-            { "OpenRequestsPerUser", "10" }
+            { "OpenRequestsPerUser", "10" },
+            { "OutboundNoticeAddress", string.Empty }
         };
 
     /// <summary>
@@ -85,17 +86,23 @@ public class PluginConfigurationTests
     }
 
     /// <summary>
-    /// Every setting is a number or a switch, so nothing here can hold an address or a credential.
+    /// One setting holds text and it is the address a notice is posted to. Every other setting is a
+    /// number or a switch, so there is nowhere else here for an address or a credential to be typed.
     /// <para>
-    /// This is the guard on the sentence that a fresh install sends nothing outward, and it is
-    /// written over the shape rather than over the names because a name check passes for whatever
-    /// somebody called the field. The first outbound thing to arrive will want somewhere to type an
-    /// address, and where a credential lives and what may honestly be claimed about it is #85's
+    /// This used to say that no setting could hold either, which was the guard on a plugin that made
+    /// no outbound call at all. The outbound sink is that call, and it needs somewhere for an
+    /// operator to say where, so the guard narrows to the one field rather than being deleted: what
+    /// it is really for is a second one arriving quietly, and a credential is the second one it is
+    /// most against. Where a credential lives and what may honestly be claimed about it is #85's
     /// decision rather than a field added while doing something else.
+    /// </para>
+    /// <para>
+    /// It is written over the shape rather than over the names, because a name check passes for
+    /// whatever somebody called the field.
     /// </para>
     /// </summary>
     [Fact]
-    public void NoSettingCanHoldAnAddressOrACredential()
+    public void TheOnlySettingThatHoldsTextIsTheAddressANoticeIsPostedTo()
     {
         var carrying = Settings()
             .Where(setting => setting.PropertyType != typeof(int) && setting.PropertyType != typeof(bool))
@@ -103,7 +110,7 @@ public class PluginConfigurationTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([], carrying);
+        Assert.Equal(["OutboundNoticeAddress is String"], carrying);
     }
 
     /// <summary>
@@ -116,12 +123,16 @@ public class PluginConfigurationTests
     /// </para>
     /// </summary>
     /// <param name="setting">The setting.</param>
-    /// <param name="expected">What it is on a fresh install, which this leg does not read.</param>
+    /// <param name="expected">
+    /// What it is on a fresh install, which this leg does not read. It is not asserted to be
+    /// anything here, because one setting's default is deliberately nothing at all: an install with
+    /// no address typed into it sends nothing anywhere.
+    /// </param>
     [Theory]
     [MemberData(nameof(TheSettingsAndTheirDefaults))]
     public void EverySettingIsReachableFromTheSettingsPage(string setting, string expected)
     {
-        Assert.NotEmpty(expected);
+        Assert.NotNull(expected);
 
         var page = SettingsPage();
 

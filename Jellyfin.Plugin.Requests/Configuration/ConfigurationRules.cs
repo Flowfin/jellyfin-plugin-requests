@@ -84,8 +84,39 @@ public static class ConfigurationRules
             });
         }
 
+        // An address is optional and an unusable one is not. Empty means no sink, which is the
+        // shipping state and nothing to refuse; anything typed has to be somewhere a notice can
+        // actually be posted, because the alternative is a sink that silently sends nothing while
+        // the settings page shows an address an operator believes in.
+        if (!string.IsNullOrWhiteSpace(configuration.OutboundNoticeAddress)
+            && !IsSomewhereANoticeCanBePosted(configuration.OutboundNoticeAddress))
+        {
+            problems.Add(new ConfigurationProblem
+            {
+                Setting = nameof(PluginConfiguration.OutboundNoticeAddress),
+                Why = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "OutboundNoticeAddress is \"{0}\", which is not a complete http or https address. It has to be one a notice can be posted to, scheme included, or empty to send nothing at all.",
+                    configuration.OutboundNoticeAddress)
+            });
+        }
+
         return problems;
     }
+
+    /// <summary>
+    /// Whether an address is one a notice could be posted to.
+    /// <para>
+    /// Complete rather than relative, because there is nothing here for a relative address to be
+    /// relative to, and HTTP rather than any scheme the runtime can parse: a file or mail address
+    /// parses perfectly and is not a thing this plugin posts to.
+    /// </para>
+    /// </summary>
+    /// <param name="address">What the operator typed.</param>
+    /// <returns><see langword="true"/> where a notice could be posted there.</returns>
+    private static bool IsSomewhereANoticeCanBePosted(string address)
+        => Uri.TryCreate(address, UriKind.Absolute, out var parsed)
+            && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps);
 
     /// <summary>
     /// Whether this plugin can run on a configuration.
