@@ -82,6 +82,15 @@ public class SiblingIndependenceTests
         // is part of the same runtime.
         "System.ComponentModel",
         "System.Linq",
+
+        // The outbound notification sink posts a document to an address an operator typed, so the
+        // client, the pipeline its handler sits in and the address type all come from here. It is
+        // the one thing in this plugin that talks outward, it is off on every install where nobody
+        // typed an address, and these three assemblies are part of the runtime the server already
+        // runs on rather than a package this plugin carries.
+        "System.Net.Http",
+        "System.Net.Http.Json",
+        "System.Net.Primitives",
         "System.Runtime",
 
         // The store keeps requests as JSON, so the serialiser the framework already ships is what

@@ -73,15 +73,21 @@ because two copies of a path are two answers the day one of them moves.
 Everything above is in the queue file. The settings file holds no person at all, which is the whole
 of that class rather than a sample:
 
-    git grep -nE '^    public (const )?(int|bool) ' -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
+    git grep -nE '^    public (const )?(int|bool|string) ' -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
     Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:52:    public const int MinimumRetentionDays = 30;
     Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:67:    public int OpenRequestsPerUser { get; set; } = 10;
     Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:72:    public bool AcceptsMovies { get; set; } = true;
     Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:83:    public bool AcceptsSeries { get; set; } = true;
     Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:99:    public int FinishedRequestRetentionDays { get; set; } = 365;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:123:    public string OutboundNoticeAddress { get; set; } = string.Empty;
 
-Three numbers, one of them the floor under another, and two switches. Nothing there is about
-anybody.
+Three numbers, one of them the floor under another, two switches, and one address. Nothing there is
+about anybody. The address is where a notice is posted and is empty until an operator types one; it
+names a machine rather than a person, and what typing one into it sends is the section on what
+leaves the server below.
+
+`PluginConfigurationTests` refuses a second setting of that shape, so a credential arriving beside
+it is a red suite rather than a thing to notice.
 
 ## Who on the machine can read it
 
@@ -148,10 +154,19 @@ current absence as a retention choice would be exactly that.
 
 ## What leaves the server
 
-**Nothing leaves the server today.** The plugin makes no outbound call of any kind:
+**Nothing leaves the server on a fresh install, and one path can be turned on.** The plugin makes
+exactly one outbound call, and it is the notification sink:
 
-    git grep -n 'HttpClient\|IHttpClientFactory\|WebRequest' -- Jellyfin.Plugin.Requests/ ; echo "exit=$?"
-    exit=1
+    git grep -ln 'HttpClient\|IHttpClientFactory\|WebRequest' -- Jellyfin.Plugin.Requests/
+    Jellyfin.Plugin.Requests/Notify/OutboundSink.cs
+
+It sends nothing until an operator sets `OutboundNoticeAddress`, which is empty on every install
+where nobody has decided otherwise, and there is no other way to turn it on. What it sends when it is
+on is a small JSON document per movement in the queue: the request's identifier, what happened to it,
+when, the title and year, and the identifiers of the person who asked and the person who answered. It
+carries neither note, no provider identifiers, nobody else waiting on the request, and no user name of
+any kind, because this plugin holds none. [notifications.md](notifications.md) is where that document
+is written out field by field.
 
 The bridge to an external request service has exactly one implementation in this tree, and it is the
 one for a server that has no backend:
@@ -171,11 +186,11 @@ recorded in [notifications.md](notifications.md) with the decision behind it.
 Three paths would carry something outward once they are built, and each is named here so that an
 operator can find out what turning one on would mean before it exists:
 
-| Path                | Issue | What would leave                                            | Off until         |
-| ------------------- | ----- | ----------------------------------------------------------- | ----------------- |
-| The bridge          | #82   | a title, and an external account for the person who asked   | a backend is set  |
-| The outbound sink   | #78   | a payload naming a person and a title, to an address chosen | an address is set |
-| The session message | #76   | nothing off the machine, a message to a dashboard session   | not decided yet   |
+| Path                | Issue | What leaves, or would                                                           | Off until         | Built |
+| ------------------- | ----- | ------------------------------------------------------------------------------- | ----------------- | ----- |
+| The outbound sink   | #78   | the identifiers of the asker and the answerer, the title, the year, the request | an address is set | yes   |
+| The bridge          | #82   | a title, and an external account for the person who asked                       | a backend is set  | no    |
+| The session message | #76   | nothing off the machine, a message to a dashboard session                       | not decided yet   | no    |
 
 The bridge names a person to the external service by an account the operator wrote into a table, and
 never by their name. That is the decision in [bridge.md](bridge.md), and the table is empty on a
@@ -183,7 +198,7 @@ fresh install, so a bridge configured and nothing else sends no attribution at a
 in #75 is the fourth path and it is not in the table because it writes into the server's own log,
 which does not leave the machine.
 
-**None of the three is built.** The rows say what each one is for, not what it does.
+**Only the first is built.** The other two rows say what each one is for, not what it does.
 
 ## What arrives from another plugin, and what this side trusts
 
