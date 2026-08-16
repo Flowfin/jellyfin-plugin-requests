@@ -34,10 +34,10 @@ document.
 A refused test is not dropped. Each one below names what replaces it, and a proposal that fits a
 refusal is answered with that replacement rather than with a no.
 
-Three of the ways this rule gets broken are refused, and the rest of it is read by a person. The
+Four of the ways this rule gets broken are refused, and the rest of it is read by a person. The
 refusals are rules in the invariant lint, and each names the line above it stands for:
 
-    git grep -n "^  - id: no-browser-automation-package\|^  - id: no-certificate-store-access\|^  - id: suite-writes-only-under-the-run-directory" tools/opengrep/rules.yaml
+    git grep -n "^  - id: no-browser-automation-package\|^  - id: no-certificate-store-access\|^  - id: suite-writes-only-under-the-run-directory\|^  - id: suite-opens-no-socket" tools/opengrep/rules.yaml
 
 `no-browser-automation-package` refuses a reference to Playwright, Selenium, Puppeteer or WebDriver
 in the project, props, targets and lock files, which is how a display requirement arrives.
@@ -45,15 +45,17 @@ in the project, props, targets and lock files, which is how a display requiremen
 `certutil` in any script or workflow, which is the elevation form that outlives the run.
 `suite-writes-only-under-the-run-directory` refuses the seven calls that ask the machine for a
 location, anywhere in the test project except the run directory itself and its own tests.
+`suite-opens-no-socket` refuses the constructs that build a sending client, accept a connection or
+ask a resolver, anywhere in the test project, which is how a real network peer arrives now that the
+plugin has an outbound path at all.
 
-What is still read by a person and refused by nothing. A test that opens a socket passes: the
-mechanism for that refuses outbound calls at the handler the plugin resolves, and the plugin
-resolves no handler because it makes no outbound call. A display requirement arriving as something
-other than a package reference passes. A test that reaches a shared location without naming one of
-the seven calls passes, because the check is over source text and not over what a run did. A test
-needing a running server or a container engine passes. So a test breaking most of the lines above
-still builds and runs exactly like one that does not, and the three rules narrow that rather than
-closing it. #115 is where the rest of the gap is held.
+What is still read by a person and refused by nothing. A socket opened inside a package the suite
+calls passes, and so does an address handed to something that opens one on the suite's behalf,
+because the check over the network is source text like the other three. A display requirement
+arriving as something other than a package reference passes. A test that reaches a shared location
+without naming one of the seven calls passes, for the same reason. A test needing a running server
+or a container engine passes. So a test breaking several of the lines above still builds and runs
+exactly like one that does not, and the four rules narrow that rather than closing it.
 
 ### The refusals, and what replaces each
 
