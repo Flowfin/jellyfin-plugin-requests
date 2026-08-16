@@ -9,8 +9,8 @@ It is not the whole of the bridge. The interface is
 [`IRequestBackend`](../Jellyfin.Plugin.Requests/Bridge/IRequestBackend.cs), the implementation every
 server without a service runs is
 [`NoRequestBackend`](../Jellyfin.Plugin.Requests/Bridge/NoRequestBackend.cs), and how a submission is
-made, what happens when the service misbehaves and where a credential lives are separate questions
-this page does not answer.
+made and what happens when the service misbehaves are separate questions this page does not answer.
+Where a credential lives is answered at the end of it.
 
 ## The mapping
 
@@ -148,6 +148,79 @@ where the judgement is written down for a reader.
 The other half of the same claim is that only one implementation ships. Every server this plugin runs
 on resolves `NoRequestBackend` until an adapter replaces that one registration, and the suite refuses
 a second implementation arriving in the plugin assembly unnamed for the same reason.
+
+## Where a credential would live, and what may be claimed about it
+
+**There is no credential today and nothing here holds one.** The only implementation of the bridge in
+this tree is the one for a server that has no service, it makes no call, and the configuration
+carries no field for an address or for a secret. Everything below is what will be true the day the
+adapter in #82 adds one, written now so that it is a position rather than a description written
+afterwards to fit whatever was built.
+
+### Where it goes
+
+In the settings file, beside every other setting. That is the row already written down in
+[`storage.md`](storage.md), `plugin-configurations/Jellyfin.Plugin.Requests.xml` under the server's
+own data directory, and it is where it goes because it is where the server puts a plugin's
+configuration. The host decides that and this plugin does not choose it:
+
+    ### MediaBrowser.Common.Plugins.BasePlugin`1  [MediaBrowser.Common.dll]
+        System.String get_ConfigurationFilePath()
+        System.Void SaveConfiguration(TConfigurationType)
+
+    ### MediaBrowser.Common.Configuration.IApplicationPaths  [MediaBrowser.Common.dll]
+        System.String get_PluginConfigurationsPath()
+
+Read out of the reference assemblies each target framework compiles against, `jellyfin.common` at
+`10.11.11` on `net9.0` and at `12.0.0-rc4` on `net10.0`, with identical output on both. A plugin that
+wrote its secret somewhere else would be a plugin whose secret is not in the operator's backup and
+not in their restore, which is a worse failure than the one it would be avoiding.
+
+### Who on the machine can read it
+
+Everybody who can read that file, and the list is longer than an operator expects.
+
+The account the server runs as, which is what reads it on every start. Anybody with administrative
+rights on the machine. Anybody holding a backup of the server's data directory, because the file is
+in it by design and the row in `storage.md` says it is required. Any other plugin loaded into the
+same server process, which can read the file directly, and that is the same position
+[`seam.md`](seam.md) takes about a caller inside the process: anything in there can already read this
+plugin's files.
+
+And an administrator of the server over the API, because the dashboard reads a plugin's configuration
+back in order to render its page. This plugin's own page does exactly that for the settings that
+exist today:
+
+    git grep -n "getPluginConfiguration" -- Jellyfin.Plugin.Requests/Configuration/configPage.html
+    Jellyfin.Plugin.Requests/Configuration/configPage.html:145:                                return ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId);
+    Jellyfin.Plugin.Requests/Configuration/configPage.html:158:                        ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId)
+
+So the protection a credential gets here is the protection the server's data directory gets, and this
+page claims no more than that.
+
+### What is refused by name
+
+**Encrypting it at rest with a key on the same disk.** The key has to be readable by the same process
+that reads the file, so anything that can read one can read the other, and what it buys is the
+appearance of protection. That is worse than buying nothing: a page saying the credential is
+encrypted changes what an operator does about a stolen backup. It is refused here rather than left as
+an idea somebody has later and half builds.
+
+**A second place to put it.** An environment variable or a file of its own would be somewhere the
+operator's backup does not reach and somewhere the dashboard cannot show, which trades one honest
+exposure for two ways to lose the value.
+
+### What is claimed
+
+Four things, and each is a rule about this plugin's own code rather than about the machine. It is
+never written to a log. It is never included in anything a diagnostics route produces. It is never
+returned to a page or an endpoint that does not need it. And it is never sent anywhere except the
+service the operator configured.
+
+**None of the four is enforced, because there is nothing yet to enforce them over.** The lint rule
+that would refuse a log or a diagnostics call reaching it, and the test that would assert it does not
+appear in a log written during a bridge failure, are the other two conditions of #85, and both
+quantify over a value that does not exist. They land with the adapter in #82 and not before.
 
 ## Where the list of words came from
 
