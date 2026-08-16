@@ -250,13 +250,20 @@ public sealed class OutboundSinkTests
     }
 
     /// <summary>
-    /// Announcing several things and then waiting waits for all of them, rather than for the last
-    /// one. Without this the two legs above could assert against an endpoint that had received
-    /// nothing yet and pass for the wrong reason.
+    /// Every announcement is sent. Nothing is dropped because something was already in flight and
+    /// nothing is collapsed into one message, so five movements in the queue are five documents at
+    /// the endpoint.
+    /// <para>
+    /// What this leg does not prove is that waiting for quiet waits for all of them rather than for
+    /// the last one. Five sends against an endpoint that answers immediately all finish either way,
+    /// so a sink that tracked only the most recent delivery passes this leg. That property is held
+    /// by the chaining in <c>Both</c> and by nothing that fails when it is removed, and saying so is
+    /// cheaper than a leg that looks like a guard and is not one.
+    /// </para>
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
-    public async Task WaitingForQuietWaitsForEverythingAnnouncedAndNotOnlyTheLast()
+    public async Task EveryAnnouncementIsSentRatherThanDroppedWhileAnotherIsInFlight()
     {
         var endpoint = ASinkEndpoint.ThatAccepts();
         using var sink = Sink(endpoint, Address);
