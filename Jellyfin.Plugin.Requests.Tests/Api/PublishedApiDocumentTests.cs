@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Api;
 using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
+using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Localisation;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
@@ -77,6 +78,12 @@ public sealed class PublishedApiDocumentTests
         // No failure shape, because it reads no store and refuses nothing: what it answers is known
         // before anybody configures anything.
         "GET MediaRequests/v1/Capabilities () -> 200:InstallCapabilities",
+
+        // Whether the plugin is working. One status and no failure shape, and that is deliberate
+        // rather than an omission: a store that cannot be read is a field on the answer, because an
+        // endpoint that refused when the plugin is unhealthy would go quiet at the moment somebody
+        // is reading it to find out why.
+        "GET MediaRequests/v1/Health () -> 200:PluginHealth",
 
         // The page a browser opens. One status and one shape, and the shape is a string because
         // what comes back is a document rather than a record: a generated client that expected a
@@ -281,6 +288,7 @@ public sealed class PublishedApiDocumentTests
         const string ApproveMany = "POST MediaRequests/v1/Requests/Approve";
         const string DeclineMany = "POST MediaRequests/v1/Requests/Decline";
         const string Strings = "GET MediaRequests/v1/Strings";
+        const string Health = "GET MediaRequests/v1/Health";
 
         // What this install allows. One call and one status: it reads no store, refuses nothing and
         // has no failure to walk, which is why it publishes one code where every other endpoint
@@ -320,6 +328,13 @@ public sealed class PublishedApiDocumentTests
         Saw(Queue, await ControllerFor(store, Operator).QueueAsync(cancellationToken: CancellationToken.None).ConfigureAwait(true));
         Saw(Queue, await ControllerFor(store, Operator).QueueAsync(take: RequestsController.MaximumPageSize + 1, cancellationToken: CancellationToken.None).ConfigureAwait(true));
         Saw(Queue, await ControllerFor(unreadable, Operator).QueueAsync(cancellationToken: CancellationToken.None).ConfigureAwait(true));
+
+        // Whether the plugin is working. Two calls and one status, and the second is the reason this
+        // endpoint publishes no failure: a store that cannot be read answers 200 with the flag on
+        // the body turned off, because an endpoint that refused here would be silent at the one
+        // moment somebody is reading it to find out what is wrong.
+        Saw(Health, await HealthFor(store).HealthAsync(CancellationToken.None).ConfigureAwait(true));
+        Saw(Health, await HealthFor(unreadable).HealthAsync(CancellationToken.None).ConfigureAwait(true));
 
         // The words the pages draw. One call and one status, and a second call naming a culture no
         // catalogue exists for, because that is the shape a reader expects to see refused and it is
@@ -538,6 +553,20 @@ public sealed class PublishedApiDocumentTests
     /// <returns>The controller under test.</returns>
     private RequestsController ControllerFor(IRequestStore store, Guid? caller, IInstallSettings settings)
         => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), settings, new RecordingJournal());
+
+    /// <summary>
+    /// The health endpoint over one store, with nothing behind the bridge and no sweep having run,
+    /// which is what a fresh install answers with.
+    /// </summary>
+    /// <param name="store">Where requests are kept.</param>
+    /// <returns>The controller under test.</returns>
+    private HealthController HealthFor(IRequestStore store)
+        => new HealthController(
+            store,
+            new NoRequestBackend(),
+            new FulfilmentSweep(store, new FakeLibrary(), new TestClock(Started), new RecordingJournal(), new RecordingLogger()),
+            new BridgeWatch(),
+            new TestClock(Started));
 
     /// <summary>
     /// A request as the store holds one.

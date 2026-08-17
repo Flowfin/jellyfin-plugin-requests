@@ -134,9 +134,10 @@ cannot arrive quietly: it either gets a line in this table saying so, or the cha
 
 <!-- needs-a-bridge begins -->
 
-| What                     | Without a bridge                                |
-| ------------------------ | ----------------------------------------------- |
-| `CapabilitiesController` | Answers, and says that no bridge is configured. |
+| What                     | Without a bridge                                                          |
+| ------------------------ | ------------------------------------------------------------------------- |
+| `CapabilitiesController` | Answers, and says that no bridge is configured.                           |
+| `HealthController`       | Answers, and says the bridge is not configured rather than not answering. |
 
 <!-- needs-a-bridge ends -->
 

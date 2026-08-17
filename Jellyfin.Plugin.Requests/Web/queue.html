@@ -15,6 +15,28 @@
                     <p class="requestsMessage" role="status"></p>
 
                     <!--
+                        Whether the plugin itself is working, which is #63. It is above the queue and
+                        not below it, because the question it answers is the one an operator has
+                        before they read a single row: requests have stopped moving, and they do not
+                        know whether that is a quiet week or a broken plugin. Without it the next
+                        step is the server log, which is the second system this plugin exists to
+                        remove.
+
+                        Every moment on it is about this server process rather than about the
+                        install, so each sentence says "since this server started" rather than
+                        "never". Nothing here is persisted and nothing here is a path or a
+                        credential: the answer carries counts, moments and one enumeration.
+                    -->
+                    <section class="requestsQueueHealth" aria-live="polite">
+                        <h3 data-i18n="queue.health.heading"></h3>
+
+                        <p class="requestsQueueHealthCounts"></p>
+                        <p class="requestsQueueHealthStore"></p>
+                        <p class="requestsQueueHealthSweep"></p>
+                        <p class="requestsQueueHealthBridge"></p>
+                    </section>
+
+                    <!--
                         Every narrowing here is a parameter of the queue endpoint and none of it is
                         done in this page. The server holds the whole queue, so it is the only side
                         that can filter, order and slice one read; a page that fetched everything and
@@ -222,6 +244,11 @@
                     var summary = page.querySelector(".requestsQueueSummary");
                     var previous = page.querySelector("#RequestsQueuePrevious");
                     var next = page.querySelector("#RequestsQueueNext");
+
+                    var healthCounts = page.querySelector(".requestsQueueHealthCounts");
+                    var healthStore = page.querySelector(".requestsQueueHealthStore");
+                    var healthSweep = page.querySelector(".requestsQueueHealthSweep");
+                    var healthBridge = page.querySelector(".requestsQueueHealthBridge");
 
                     var declineForm = page.querySelector(".requestsQueueDecline");
                     var declineTitle = page.querySelector(".requestsQueueDeclineTitle");
@@ -659,14 +686,98 @@
                             });
                     }
 
+                    /*
+                     * Whether the plugin is working, drawn into the panel above the queue.
+                     *
+                     * Read on every turn of the queue rather than once, because the questions it
+                     * answers are the ones an operator asks while they are looking, and a panel
+                     * showing the state of the plugin ten minutes ago is a panel that says a bridge
+                     * is fine after it stopped answering.
+                     *
+                     * Nothing here is a failure of the queue. A panel that could not be read leaves
+                     * its own sentence and the rows are still drawn, because the rows are what the
+                     * operator came for.
+                     */
+                    function health() {
+                        return RequestsShell.get("Health", {})
+                            .then(function (answer) {
+                                var counted = [];
+
+                                Object.keys(answer.Counts).forEach(function (state) {
+                                    counted.push(RequestsShell.fill("queue.health.count", [RequestsShell.named("queue.state", state), answer.Counts[state]]));
+                                });
+
+                                healthCounts.textContent = counted.join(", ");
+
+                                if (answer.StoreReadable) {
+                                    healthStore.textContent = storeSentence(answer);
+                                } else {
+                                    healthStore.textContent = RequestsShell.word("queue.health.storeUnreadable");
+                                }
+
+                                healthSweep.textContent = sweepSentence(answer);
+                                healthBridge.textContent = bridgeSentence(answer);
+                            })
+                            .catch(function () {
+                                healthCounts.textContent = RequestsShell.word("queue.health.notRead");
+                                healthStore.textContent = "";
+                                healthSweep.textContent = "";
+                                healthBridge.textContent = "";
+                            });
+                    }
+
+                    function storeSentence(answer) {
+                        if (!answer.LastStoreWriteAt) {
+                            return RequestsShell.word("queue.health.lastWriteNone");
+                        }
+
+                        return RequestsShell.fill("queue.health.lastWrite", [moment(answer.LastStoreWriteAt)]);
+                    }
+
+                    function sweepSentence(answer) {
+                        if (!answer.LastSweepAt) {
+                            return RequestsShell.word("queue.health.lastSweepNone");
+                        }
+
+                        return RequestsShell.fill("queue.health.lastSweep", [moment(answer.LastSweepAt), answer.LastSweepExamined, answer.LastSweepFulfilled]);
+                    }
+
+                    /*
+                     * The bridge, in two sentences where there is a second one to say.
+                     *
+                     * The three answers are kept apart on purpose. An install with no service is not
+                     * a fault and does not read as one; a service that is not answering is the
+                     * failure this panel exists to show rather than hide, and the moment beside it
+                     * is when this server last saw it answer rather than when it broke.
+                     */
+                    function bridgeSentence(answer) {
+                        var said = RequestsShell.named("queue.health.bridge", answer.Bridge);
+
+                        if (answer.Bridge !== "Unreachable") {
+                            return said;
+                        }
+
+                        if (!answer.BridgeLastReachableAt) {
+                            return said + " " + RequestsShell.word("queue.health.bridgeNeverReachable");
+                        }
+
+                        var since = RequestsShell.fill("queue.health.bridgeLastReachable", [moment(answer.BridgeLastReachableAt)]);
+
+                        return said + " " + since;
+                    }
+
                     function read() {
                         Dashboard.showLoadingMsg();
                         RequestsShell.say(page, "");
 
+                        // The panel beside the rows, read on the same turn. It is asked for after the
+                        // queue rather than beside it, so a health answer that is slow never holds
+                        // up the rows an operator opened the page for.
                         return RequestsShell.get("Requests/Queue", question())
                             .then(function (answer) {
                                 draw(answer);
                                 Dashboard.hideLoadingMsg();
+                                return health();
                             })
                             .catch(function () {
                                 RequestsShell.say(page, "queue.notRead");

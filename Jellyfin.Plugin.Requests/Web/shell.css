@@ -69,6 +69,30 @@
     gap: 0.2em;
 }
 
+/*
+ * Whether the plugin is working, above the rows. Boxed rather than run into the page, because it
+ * answers a different question from everything under it and an operator scanning for it needs to
+ * find it without reading.
+ */
+.requestsQueueHealth {
+    border: 1px solid rgba(127, 127, 127, 0.4);
+    border-radius: 0.3em;
+    padding: 0.6em 0.8em;
+    margin-bottom: 1em;
+}
+
+.requestsQueueHealth h3 {
+    margin: 0 0 0.4em;
+}
+
+.requestsQueueHealth p {
+    margin: 0.2em 0;
+}
+
+.requestsQueueHealth p:empty {
+    display: none;
+}
+
 .requestsQueueTable {
     width: 100%;
     border-collapse: collapse;

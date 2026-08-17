@@ -19,9 +19,10 @@ today. The last part is what makes the list checkable rather than aspirational. 
 can answer is work that has to be named, and two of the six were exactly that until the answer was
 widened to carry them.
 
-The measurements are read at `11aa09a`, which is the commit that widened it and is the parent of the
-one carrying this text. Every command below was re-run at that commit rather than carried over from
-the reading the list was first written at.
+The measurements are read at `16d73b4`, which is the parent of the commit carrying this text. Every
+command below was re-run there rather than carried over from an earlier reading, and the line numbers
+in this file moved for that reason: the panel described at the end sits above everything the page
+already drew.
 
 ## Who asked, and when
 
@@ -45,12 +46,12 @@ asks it to start.
 The page does that turning:
 
     git grep -n "people\[request.RequestedByUserId\]" -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:430:                        return people[request.RequestedByUserId] || request.RequestedByUserId;
+    Jellyfin.Plugin.Requests/Web/queue.html:457:                        return people[request.RequestedByUserId] || request.RequestedByUserId;
 
 The list behind `people` is asked for once when the page opens:
 
     git grep -n "getUsers" -- Jellyfin.Plugin.Requests/Web/
-    Jellyfin.Plugin.Requests/Web/queue.html:651:                        return ApiClient.getUsers()
+    Jellyfin.Plugin.Requests/Web/queue.html:678:                        return ApiClient.getUsers()
 
 A list that cannot be read leaves the identifier in the cell, which is worse to read rather than
 wrong, and it leaves the queue readable. This is the only call either page makes that is not to this
@@ -207,25 +208,25 @@ The page was a shell when this list was written and it is not one now. It draws 
 row carries the decisions its state admits, from #61, and the two items above are columns on it:
 
     git grep -n "cell(row, " -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:321:                    function cell(row, text) {
-    Jellyfin.Plugin.Requests/Web/queue.html:610:                            cell(row, title(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:611:                            cell(row, RequestsShell.named("kind", request.Kind));
-    Jellyfin.Plugin.Requests/Web/queue.html:612:                            cell(row, RequestsShell.named("queue.state", request.State));
-    Jellyfin.Plugin.Requests/Web/queue.html:613:                            cell(row, moment(request.RequestedAt));
-    Jellyfin.Plugin.Requests/Web/queue.html:614:                            cell(row, moment(request.StateChangedAt));
-    Jellyfin.Plugin.Requests/Web/queue.html:615:                            cell(row, who(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:616:                            cell(row, waitingFor(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:617:                            cell(row, held(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:618:                            cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
-    Jellyfin.Plugin.Requests/Web/queue.html:619:                            cell(row, request.RequesterNote || "");
-    Jellyfin.Plugin.Requests/Web/queue.html:620:                            cell(row, decided(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:348:                    function cell(row, text) {
+    Jellyfin.Plugin.Requests/Web/queue.html:637:                            cell(row, title(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:638:                            cell(row, RequestsShell.named("kind", request.Kind));
+    Jellyfin.Plugin.Requests/Web/queue.html:639:                            cell(row, RequestsShell.named("queue.state", request.State));
+    Jellyfin.Plugin.Requests/Web/queue.html:640:                            cell(row, moment(request.RequestedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:641:                            cell(row, moment(request.StateChangedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:642:                            cell(row, who(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:643:                            cell(row, waitingFor(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:644:                            cell(row, held(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:645:                            cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
+    Jellyfin.Plugin.Requests/Web/queue.html:646:                            cell(row, request.RequesterNote || "");
+    Jellyfin.Plugin.Requests/Web/queue.html:647:                            cell(row, decided(request));
 
 The first of those twelve lines is the function that writes a cell and the other eleven are the cells
 one row carries. The twelfth column beside them is the decisions that row admits, which is #61:
 
     git grep -n "decide(row, request)" -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:442:                    function decide(row, request) {
-    Jellyfin.Plugin.Requests/Web/queue.html:621:                            decide(row, request);
+    Jellyfin.Plugin.Requests/Web/queue.html:469:                    function decide(row, request) {
+    Jellyfin.Plugin.Requests/Web/queue.html:648:                            decide(row, request);
 
 Read against the six items above, that is all of them.
 

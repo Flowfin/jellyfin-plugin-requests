@@ -30,6 +30,10 @@ internal sealed class StoreThatCannotBeRead : IRequestStore
     public const string NamedDetail = "The document ends in the middle of a request at byte 4096.";
 
     /// <inheritdoc />
+    /// <remarks>A store nothing can be read out of has written nothing.</remarks>
+    public DateTimeOffset? LastWrittenAt => null;
+
+    /// <inheritdoc />
     public Task<StoredRequest?> GetAsync(Guid id, CancellationToken cancellationToken) => throw Unreadable();
 
     /// <inheritdoc />

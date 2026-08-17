@@ -219,7 +219,7 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
             await File.WriteAllBytesAsync(seeding.FilePath, before, CancellationToken.None).ConfigureAwait(true);
             await File.WriteAllBytesAsync(seeding.PendingFilePath, wholeWrite[..stopped], CancellationToken.None).ConfigureAwait(true);
 
-            var store = new FileRequestStore(directory, new RecordingLogger());
+            var store = new FileRequestStore(directory, new RecordingLogger(), TestClock.AtAFixedMoment());
 
             try
             {
@@ -301,7 +301,7 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
         {
             await File.WriteAllBytesAsync(seeding.FilePath, whole[..cut], CancellationToken.None).ConfigureAwait(true);
 
-            var store = new FileRequestStore(directory, new RecordingLogger());
+            var store = new FileRequestStore(directory, new RecordingLogger(), TestClock.AtAFixedMoment());
 
             try
             {
@@ -366,7 +366,7 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
         Assert.NotEqual(written, damaged);
         await File.WriteAllTextAsync(seeding.FilePath, damaged, Encoding.UTF8, CancellationToken.None).ConfigureAwait(true);
 
-        var store = new FileRequestStore(directory, new RecordingLogger());
+        var store = new FileRequestStore(directory, new RecordingLogger(), TestClock.AtAFixedMoment());
 
         try
         {
@@ -521,7 +521,7 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
 
     private FileRequestStore NewStore(string directory)
     {
-        var store = new FileRequestStore(directory, new RecordingLogger());
+        var store = new FileRequestStore(directory, new RecordingLogger(), TestClock.AtAFixedMoment());
         _stores.Add(store);
         return store;
     }

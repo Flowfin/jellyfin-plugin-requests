@@ -25,6 +25,10 @@ namespace Jellyfin.Plugin.Requests.Tests.Doubles;
 internal sealed class StoreThatNeverAnswers : IRequestStore
 {
     /// <inheritdoc />
+    /// <remarks>The one member here that answers rather than hangs, because a property cannot be awaited.</remarks>
+    public DateTimeOffset? LastWrittenAt => null;
+
+    /// <inheritdoc />
     public Task<StoredRequest?> GetAsync(Guid id, CancellationToken cancellationToken) => Never<StoredRequest?>();
 
     /// <inheritdoc />

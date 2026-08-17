@@ -30,6 +30,16 @@ internal sealed class InMemoryRequestStore : IRequestStore
     private readonly object _gate = new object();
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Set rather than kept. This double takes no clock, and giving it one would put a clock in the
+    /// forty-odd places that construct it in order to serve the one property that reads it. What
+    /// <see cref="IRequestStore"/> asks of an implementation that records nothing is exactly this
+    /// answer, so a test that wants a moment here sets one and every other test reads the honest
+    /// null.
+    /// </remarks>
+    public DateTimeOffset? LastWrittenAt { get; set; }
+
+    /// <inheritdoc />
     public Task<StoredRequest?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

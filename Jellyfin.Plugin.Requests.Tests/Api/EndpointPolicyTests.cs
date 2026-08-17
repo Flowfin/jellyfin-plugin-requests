@@ -65,6 +65,11 @@ public sealed class EndpointPolicyTests
         // an install accepts is a fact about somebody's server rather than about this version.
         "CapabilitiesController.CapabilitiesAsync GET Capabilities -> (the server's default)",
 
+        // Whether the plugin itself is working. Elevated, and not because the numbers are secret:
+        // they are counts of other people's requests, and a total is a disclosure like any row. It
+        // sits where the queue sits, which is the only other place the whole store is readable.
+        "HealthController.HealthAsync GET Health -> RequiresElevation",
+
         // The page a person opens in a browser to see their own requests. A signed-in person, and
         // it is the policy that makes the page a page rather than a shell: a caller the server has
         // not authenticated is turned away instead of being handed the document and left to meet

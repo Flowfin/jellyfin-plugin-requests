@@ -330,7 +330,7 @@ public sealed class FileRequestStoreQueryCostTests : IDisposable
             Path.Combine(directory, FileRequestStore.FileName),
             JsonSerializer.Serialize(persisted)).ConfigureAwait(true);
 
-        var store = new FileRequestStore(directory, new RecordingLogger());
+        var store = new FileRequestStore(directory, new RecordingLogger(), TestClock.AtAFixedMoment());
         _stores.Add(store);
 
         // The first read is what parses the file, so it is made here and not inside a measured

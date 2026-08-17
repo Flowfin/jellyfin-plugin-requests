@@ -27,10 +27,10 @@ namespace Jellyfin.Plugin.Requests.Tests.Bridge;
 public class NoBackendCompletenessTests
 {
     /// <summary>
-    /// Everything in the plugin that touches the bridge. One entry today, and each is a place that
-    /// has to keep working on a server with no external service.
+    /// Everything in the plugin that touches the bridge. Each is a place that has to keep working
+    /// on a server with no external service.
     /// </summary>
-    private static readonly string[] Expected = ["CapabilitiesController"];
+    private static readonly string[] Expected = ["CapabilitiesController", "HealthController"];
 
     /// <summary>
     /// Everything that takes the bridge is named in the register, and nothing is named there that

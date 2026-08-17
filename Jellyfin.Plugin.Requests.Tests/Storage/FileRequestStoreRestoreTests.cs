@@ -330,7 +330,7 @@ public sealed class FileRequestStoreRestoreTests : IDisposable
     private FileRequestStore NewStore(string directory, out RecordingLogger log)
     {
         log = new RecordingLogger();
-        var store = new FileRequestStore(directory, log);
+        var store = new FileRequestStore(directory, log, TestClock.AtAFixedMoment());
         _stores.Add(store);
         return store;
     }

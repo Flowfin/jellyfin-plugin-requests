@@ -28,6 +28,19 @@ internal sealed class TestClock : IClock
     public DateTimeOffset UtcNow { get; private set; }
 
     /// <summary>
+    /// A clock standing at one moment, for a test that needs the injected clock to exist and does
+    /// not care what it says.
+    /// <para>
+    /// Written once here rather than in each of the places that construct a store, so a test whose
+    /// subject is not time does not choose a date, and so the tests whose subject IS time are the
+    /// ones that name a moment.
+    /// </para>
+    /// </summary>
+    /// <returns>The clock.</returns>
+    public static TestClock AtAFixedMoment()
+        => new TestClock(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+
+    /// <summary>
     /// Moves the clock forward.
     /// </summary>
     /// <param name="by">How far forward. Must not be negative: a test that needs a clock going
