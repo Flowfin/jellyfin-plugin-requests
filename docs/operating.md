@@ -32,9 +32,10 @@ the order to take them in and what each one costs you later.
   the server rather than accepted and quietly replaced.
 - **Which kinds of thing may be asked for.** Turning one off is how a server that holds only films
   stops collecting series requests it will never answer.
-- **How long a finished request is kept.** It is a number today and nothing acts on it. A finished
-  request stays until somebody removes the file, which is stated in
-  [personal-data.md](personal-data.md) and is the honest reading of that field.
+- **How long a finished request is kept.** A daily task removes a request that has been fulfilled,
+  declined or failed for longer than this, counted from the move that finished it. A request nobody
+  has answered is never removed by age. What is held and for how long is
+  [personal-data.md](personal-data.md).
 - **The address a notice is posted to.** Leave it empty unless you have somewhere to receive one.
   Empty means nothing is sent, and that is a supported way to run rather than a half-configured one.
 

@@ -28,9 +28,10 @@ public sealed record QueueContext
     /// <summary>
     /// Gets what was already decided about the same work, most recent first.
     /// <para>
-    /// Bounded by nothing but the store. A finished request is kept until the retention period is
-    /// enforced, which is #49 and is not built, so today this is every decision ever made about that
-    /// work rather than the ones inside the period an operator configured.
+    /// Bounded by the store, which <see cref="Storage.RetentionSweep"/> now bounds in turn: a
+    /// finished request is removed once it has been finished for longer than this install keeps
+    /// them, so this is every decision inside that period rather than every decision ever made about
+    /// that work.
     /// </para>
     /// </summary>
     public IReadOnlyList<EarlierDecision> EarlierDecisions { get; init; } = [];

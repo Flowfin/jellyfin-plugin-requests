@@ -17,6 +17,12 @@ what came before it. What landed before this file existed is in the git history,
 where it carries the pull request and the issue it came from, and rewriting it
 from memory into entries would be a description nobody measured.
 
+- `FinishedRequestRetentionDays` is enforced. A scheduled task removes a request
+  that has been fulfilled, declined or failed for longer than that number of
+  days, counted from the move that finished it, and it runs daily and at
+  startup. A request nobody has answered is never removed by age. Until now the
+  number was a setting nothing acted on and a server kept every request.
+
 - A person signed in to the server can open a page in a browser and see what
   they asked for and what happened to it, at `MediaRequests/v1/Page`. It shows
   their own requests only, offers no decision, and is refused to a caller with

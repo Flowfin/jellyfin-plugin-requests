@@ -44,10 +44,21 @@ different answer changes it without waiting for a release. The floor is there so
 set to nothing: zero would delete the history quietly and leave the queue answering that question
 with no.
 
-What removes an expired request is #49, and it is not built yet. **Until it is, nothing enforces this
-number**, and a server running this plugin keeps every finished request. That is a gap rather than a
-setting an operator can rely on, and it is written here rather than left for somebody to discover
-from a store that never shrinks.
+What removes an expired request is the scheduled task **Remove finished requests that have been kept
+long enough**, in the `Requests` category of the server's task list. It runs daily and at startup,
+and it removes a request that has been fulfilled, declined or failed for longer than this number
+says. The period is measured from the move that finished the request rather than from the day it was
+asked for, so a request answered after sitting open for a year is kept for the whole period after
+the answer. Startup is one of its triggers because a period that only elapses while the machine is
+running is not the period that was set.
+
+Removed rather than anonymised. A row that has lost its requester still says the title was asked for
+on this server on that date and answers nothing anybody wanted to ask, so the period ends with the
+record gone.
+
+**What this does not reach is a request that is still open or approved**, at any age. Those are the
+two states somebody still owes an answer or a delivery on, and a request that disappeared on its
+anniversary would be this plugin answering it with nothing.
 
 **OpenRequestsPerUser** is 10. The quota is the only thing between one person and the whole disk,
 and a limit introduced after people have habits is enforced against those habits rather than in

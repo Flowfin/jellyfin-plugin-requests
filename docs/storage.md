@@ -55,7 +55,9 @@ What is not decided here, and where it is:
 
 - What happens to a write interrupted halfway is #46.
 - The on-disk shape, its version, and the rules for changing it are below.
-- How long a finished request is kept is #49, and the number itself is decision 5 on #113.
+- How long a finished request is kept is `FinishedRequestRetentionDays`, and what acts on it is
+  `RetentionSweep` beside this store, driven by a scheduled task. What happens to a record when the
+  person it names is deleted is still open and is #49.
 
 ## The three questions the store is asked
 

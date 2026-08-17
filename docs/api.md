@@ -335,9 +335,10 @@ nobody built are different statements, so the field is absent rather than empty:
 second as the first would tell an operator that nothing has ever been decided about a title on a
 route that never looked.
 
-**`Context.EarlierDecisions` is bounded by nothing but the store.** A finished request is kept until
-the retention period is enforced, which is #49 and is not built, so this is every decision ever made
-about that work rather than the ones inside the period an operator configured.
+**`Context.EarlierDecisions` is bounded by the store, and the store is bounded by the retention
+period.** `RetentionSweep` removes a finished request once it has been finished for longer than
+`FinishedRequestRetentionDays`, so this is every decision inside that period rather than every
+decision ever made about that work.
 
 **Nothing under `Context` says who.** An earlier decision carries the answer, when it was made, the
 seasons it covered and the reason, and never the person who asked for it or the person who decided

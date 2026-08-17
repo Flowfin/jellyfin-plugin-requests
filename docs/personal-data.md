@@ -115,19 +115,41 @@ accounts on the machine is a fact about the installation, and no run on this boa
 [configuration.md](configuration.md) carries the number, the reason it is a field and the reason the
 floor exists, and this page does not restate the argument.
 
-**Nothing removes anything today.** The setting is read where it is validated and nowhere else:
+**A request that has been finished for longer than that is deleted.** The setting is read where it
+is validated and by the thing that acts on it:
 
     git grep -ln 'FinishedRequestRetentionDays' -- Jellyfin.Plugin.Requests/
     Jellyfin.Plugin.Requests/Configuration/ConfigurationRules.cs
     Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
     Jellyfin.Plugin.Requests/Configuration/configPage.html
+    Jellyfin.Plugin.Requests/Storage/RetentionSweep.cs
 
-The class that declares it, the rule that refuses a value under the floor, and the field on the
-settings page. There is no sweep, no scheduled task and no code path that deletes a finished request,
-so a server running this plugin keeps every request forever, whatever the number says. What builds
-the thing that enforces it is #49.
+The class that declares it, the rule that refuses a value under the floor, the field on the settings
+page, and the sweep. `RetentionTask` is what runs the sweep without anybody remembering to: daily and
+at startup, in the server's own task list under `Requests`.
 
-An operator answering for this today should read the number as a plan and the file as the fact.
+Deleted rather than anonymised. A record stripped of its requester still says a title was asked for
+on this server on that date, and keeping that is not what a retention period is for.
+
+**Finished means fulfilled, declined or failed**, which is the same partition the quota already
+draws, and the suite asserts the two agree over every state rather than leaving them to drift. An
+open or approved request is never removed by age, because those are the two somebody still owes an
+answer or a delivery on.
+
+**The period runs from the move that finished the request**, `StateChangedAt`, and not from the day
+it was asked for. A request answered after a year open is kept for the whole period after the
+answer, and a declined request an operator later approves has left the finished set and starts again
+if it comes back to it.
+
+**An install whose settings this plugin will not run on deletes nothing.** The period is read through
+the same seam that refuses a stored configuration rather than correcting it, so a file holding a
+retention below the floor stops the run with the refusal instead of deleting against a number nobody
+chose.
+
+**What was not measured.** No run of this task on a server has been watched. What is measured is the
+sweep, against the store the plugin ships, on both claimed target frameworks; that the server lists
+and starts the task on either line is the same unrun procedure every other scheduled behaviour here
+carries, in [testing.md](testing.md).
 
 ## What happens when a Jellyfin user is deleted
 
@@ -151,6 +173,9 @@ identifier out of past entries is not a small change to make while implementing 
 the question and states the three answers that are available, each of which leaves something
 different behind. This page cannot state a behaviour that has not been decided, and describing the
 current absence as a retention choice would be exactly that.
+
+The retention period above is not that rule and does not stand in for it. It reaches a record when
+the record is old, whoever it names, and a deleted person's identifier sits in the file until then.
 
 ## What leaves the server
 
