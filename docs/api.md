@@ -344,6 +344,41 @@ seasons it covered and the reason, and never the person who asked for it or the 
 it. The count is a number and not a list. What a user may learn about another user's request is
 unchanged by any of it and is still nothing: this endpoint is administrators only.
 
+## Asking whether the plugin is working
+
+    GET MediaRequests/v1/Health
+
+The few facts that separate a broken plugin from a quiet week: how many requests are in each state,
+when the store last accepted a write, what the last full sweep of the library did, and whether an
+external request service is configured and answering. It carries the same elevation as the queue,
+and for the same reason: a count of requests is a disclosure about other people's requests, and what
+one person learns about another's is nothing.
+
+**It answers `200` on a broken install and publishes no failure shape.** A store that cannot be read
+is a field on the answer, `StoreReadable`, with every count left at zero. An endpoint that refused
+here would be silent at exactly the moment somebody is reading it to find out what is wrong, and an
+empty queue and an unreadable one produce the same numbers while being opposite answers.
+
+**Every state is counted, including the ones nothing is in.** A caller drawing only what the store
+held would show a shorter list on a quieter server, and a reader comparing two days would be
+comparing two different tables.
+
+**Every moment on this answer is about the server process and not about the install.** Nothing here
+is persisted, so a server restarted a minute ago answers that it has swept nothing and written
+nothing. That is true of the process and is not a claim that the plugin has never done either, and
+anything drawing it has to say so in those words. Persisting them would mean this plugin writing a
+file to record when it last read one, and when somebody else's system last answered.
+
+**`BridgeLastReachableAt` advances when something asks, and nothing asks on its own.** There is no
+timer behind it: it records what a caller already had to find out, which today is this endpoint. On
+an install where nobody reads this, it stays where it was. What it says is when this plugin last had
+evidence, never when the other system stopped working.
+
+**Nothing on this answer is a credential, a path, or anything about a person.** It is counts,
+moments, one switch and one enumeration, which is a property of the shape rather than of a filter:
+there is no field a secret or a file name could arrive in, and `NothingOnThisAnswerCouldCarryA`
+`CredentialOrAPath` reds on the day one is added.
+
 ## Deciding on one
 
     POST MediaRequests/v1/Requests/{id}/Approve
