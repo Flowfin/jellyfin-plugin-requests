@@ -75,6 +75,7 @@
                         <th scope="col" data-i18n="mine.column.title"></th>
                         <th scope="col" data-i18n="mine.column.kind"></th>
                         <th scope="col" data-i18n="mine.column.state"></th>
+                        <th scope="col" data-i18n="mine.column.whatNext"></th>
                         <th scope="col" data-i18n="mine.column.requestedAt"></th>
                         <th scope="col" data-i18n="mine.column.stateChangedAt"></th>
                         <th scope="col" data-i18n="mine.column.availability"></th>
@@ -215,6 +216,31 @@
                 }
 
                 /*
+                 * What happens next, as a sentence rather than as the state name in the column
+                 * before it. Two of the three outcomes #70 names are states a row can be in, and a
+                 * person who reads only `Waiting for an answer` is the person who asks the operator
+                 * what that means. The third, being at one's quota, is met while asking rather than
+                 * while reading, so it has no row here and reaches a person through the answer the
+                 * API gives whoever asked on their behalf.
+                 *
+                 * A state with no sentence gets an empty cell rather than an invented one. A state
+                 * added to the model therefore reads as a row with nothing in this column, which is
+                 * the honest rendering: nothing here knows what happens next for a state nobody has
+                 * written a sentence for.
+                 */
+                function next(request) {
+                    if (request.State === "Open") {
+                        return word("outcome.waiting");
+                    }
+
+                    if (request.State === "Declined") {
+                        return word("outcome.declined");
+                    }
+
+                    return "";
+                }
+
+                /*
                  * Why the answer was no, where it was. The reason is one of a fixed set and the
                  * sentence beside it is what the operator wrote for this person to read, which is
                  * the one piece of somebody else's writing this page shows at all.
@@ -238,6 +264,7 @@
                         cell(row, title(request));
                         cell(row, named("kind", request.Kind));
                         cell(row, named("mine.state", request.State));
+                        cell(row, next(request));
                         cell(row, moment(request.RequestedAt));
                         cell(row, moment(request.StateChangedAt));
                         cell(row, held(request));
