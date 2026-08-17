@@ -135,9 +135,10 @@ anybody made.
 
 **Two things this deliberately does not carry.** It never says who asked for the earlier one or who
 decided it: the operator can read that on the request itself, and repeating it here would put a
-person's name beside a title they did not ask for this time. And it is bounded by nothing but the
-store. Enforcing the retention period is #49 and is not built, so this is every decision ever made
-about that work rather than the ones inside the period an operator configured:
+person's name beside a title they did not ask for this time. And it is bounded by the store, which is
+now bounded in turn: `RetentionSweep` removes a finished request once it has been finished for longer
+than this install keeps them, so what an operator sees here is every decision inside that period
+rather than every decision ever made about that work:
 
     git grep -n "FinishedRequestRetentionDays" -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
     Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:99:    public int FinishedRequestRetentionDays { get; set; } = 365;
@@ -247,9 +248,10 @@ than two fields because neither is a property of the request: both are worked ou
 store holds, and a request knows nothing about its neighbours.
 
 **What is short here is a cell an operator cannot read rather than an item nobody answered.** A row
-for a title decided a dozen times carries a dozen lines in one cell, because nothing bounds the set
-and #49 is what would. That is a shape somebody should look at on a real queue before it is called
-finished, and it is not the absence this section was written about.
+for a title decided a dozen times carries a dozen lines in one cell. The retention period bounds how
+far back the set reaches and nothing bounds how many decisions fall inside it. That is a shape
+somebody should look at on a real queue before it is called finished, and it is not the absence this
+section was written about.
 
 Nothing here was read from a running dashboard. What is measured is what the page draws, read out of
 the file, which is the bound every check over these assets carries.

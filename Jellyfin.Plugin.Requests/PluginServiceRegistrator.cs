@@ -156,5 +156,17 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // registered so that the one it constructs is built from the same objects as everything
         // above rather than from a second set.
         serviceCollection.AddSingleton<IScheduledTask, FulfilmentTask>();
+
+        // What removes a finished request once it has been kept for as long as this install says.
+        // The settings are taken as the seam rather than read here, because the period is a value an
+        // operator changes while the server is running and a number captured at startup would be the
+        // one they replaced.
+        serviceCollection.AddSingleton(provider => new RetentionSweep(
+            provider.GetRequiredService<IRequestStore>(),
+            provider.GetRequiredService<IInstallSettings>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ILogger<RetentionSweep>>()));
+
+        serviceCollection.AddSingleton<IScheduledTask, RetentionTask>();
     }
 }

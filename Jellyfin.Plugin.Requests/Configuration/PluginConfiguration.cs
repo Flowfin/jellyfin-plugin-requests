@@ -93,7 +93,7 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <para>
     /// The number is here rather than in the code, decided on #113, so an operator with a different
     /// answer changes a field instead of asking for a release. <see cref="MinimumRetentionDays"/> is
-    /// the floor under it, and what removes an expired request is #49.
+    /// the floor under it, and what removes an expired request is <see cref="Storage.RetentionSweep"/>.
     /// </para>
     /// </summary>
     public int FinishedRequestRetentionDays { get; set; } = 365;
