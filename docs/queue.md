@@ -18,7 +18,9 @@ Each item below says what it is, why the decision needs it, and where it comes f
 today. The last part is what makes the list checkable rather than aspirational. An item nothing here
 can answer is work that has to be named, and two of the six are exactly that.
 
-The measurements are read at `e667f895b81f6fc62b7778de601fde607068fb17`, which is `master`.
+The measurements are read at `8e60f101df6c05815c24fbf083ffe8c2eab6b89e`, which is `master`. Every
+command below was re-run at that commit rather than carried over from the reading the list was first
+written at.
 
 ## Who asked, and when
 
@@ -156,13 +158,54 @@ a request sitting in approved forever, which is the `Failed` state and is #82 an
 
 ## What the page shows today
 
-The page is a shell. It says so about itself:
+The page was a shell when this list was written and it is not one now. It draws rows, from #60, and
+each row carries the decisions its state admits, from #61:
 
-    git grep -n "The queue view is not built yet" -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:29:                    <p>The queue view is not built yet.</p>
+    git grep -n "cell(row, " -- Jellyfin.Plugin.Requests/Web/queue.html
+    Jellyfin.Plugin.Requests/Web/queue.html:304:                    function cell(row, text) {
+    Jellyfin.Plugin.Requests/Web/queue.html:527:                            cell(row, title(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:528:                            cell(row, RequestsShell.named("kind", request.Kind));
+    Jellyfin.Plugin.Requests/Web/queue.html:529:                            cell(row, RequestsShell.named("queue.state", request.State));
+    Jellyfin.Plugin.Requests/Web/queue.html:530:                            cell(row, moment(request.RequestedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:531:                            cell(row, moment(request.StateChangedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:532:                            cell(row, request.RequestedByUserId);
+    Jellyfin.Plugin.Requests/Web/queue.html:533:                            cell(row, held(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:534:                            cell(row, request.RequesterNote || "");
+    Jellyfin.Plugin.Requests/Web/queue.html:535:                            cell(row, decided(request));
 
-So the second condition of #59 is unmet in full and is #60's to meet. Of the six items, four can be
-rendered from the answer the queue endpoint already gives, and two cannot be rendered at all until
-that answer carries them: whether the same title was asked for before and what was decided, and how
-much this person is asking for. Those two are work on the endpoint, and a page built without them
-would meet the list only by dropping the two hardest items from it.
+The first of those ten lines is the function that writes a cell and the other nine are the cells one
+row carries. The tenth column beside them is the decisions that row admits, which is #61:
+
+    git grep -n "decide(row, request)" -- Jellyfin.Plugin.Requests/Web/queue.html
+    Jellyfin.Plugin.Requests/Web/queue.html:359:                    function decide(row, request) {
+    Jellyfin.Plugin.Requests/Web/queue.html:536:                            decide(row, request);
+
+Read against the six items above, that is four of them and part of a fifth.
+
+What is asked for is there, with the seasons and the requester's note. Whether the server already
+holds it is there, with the time the answer was read, which is the `held` call. What approving will
+do next is answered per install rather than per row and is the panel beside the queue, which is #63.
+
+Who asked is on the page as the identifier the answer carries and not as a name:
+
+    git grep -n "cell(row, request.RequestedByUserId)" -- Jellyfin.Plugin.Requests/Web/queue.html
+    Jellyfin.Plugin.Requests/Web/queue.html:532:                            cell(row, request.RequestedByUserId);
+
+The item above says turning one into the other is the server's own user list, which the dashboard
+reaches without leaving the server. Nothing on the page does that turning, so an operator reads a
+column of identifiers where the argument for the item was that a decision is about a person. That is
+work on the page rather than on the answer, and it is the one part of this list that is short for a
+reason no endpoint has to fix.
+
+Two items cannot be rendered at all until the queue answer carries them, which is what it carries:
+
+    git grep -c "get; init;" -- Jellyfin.Plugin.Requests/Api/QueuedRequest.cs
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:18
+
+Eighteen properties and none of them is a prior decision on the same title or a count of what this
+person already has open. Both facts are in the store and neither reaches the queue answer, so both
+are work on the endpoint. A page built without them would meet the list only by dropping the two
+hardest items from it.
+
+Nothing here was read from a running dashboard. What is measured is what the page draws, read out of
+the file, which is the bound every check over these assets carries.
