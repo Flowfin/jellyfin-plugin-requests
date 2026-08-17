@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Model;
+using Jellyfin.Plugin.Requests.Time;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Requests.Storage;
@@ -104,6 +105,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     private readonly string _filePath;
     private readonly string _pendingFilePath;
     private readonly ILogger _logger;
+    private readonly IClock _clock;
 
     /// <summary>
     /// Held for the whole of a write, so no two writes are building the pending file at once and no
@@ -119,6 +121,13 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     private Snapshot? _held;
 
     /// <summary>
+    /// When the file this store keeps was last replaced. Written under the write lock and read
+    /// without one, which is why it is a field rather than something derived: a reader that caught
+    /// it between two writes reads one of the two moments and never a half of either.
+    /// </summary>
+    private DateTimeOffset? _lastWrittenAt;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="FileRequestStore"/> class.
     /// </summary>
     /// <param name="directoryPath">
@@ -129,16 +138,26 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     /// Where a refusal to open is written. It is required rather than optional, because a logger
     /// that may be absent is one that is absent on the machine where the refusal happened.
     /// </param>
-    public FileRequestStore(string directoryPath, ILogger logger)
+    /// <param name="clock">
+    /// What the moment of a write is read from. It is injected rather than read off the machine for
+    /// the same reason every other moment in this tree is: a store that read the wall clock would be
+    /// a store whose behaviour cannot be put under a test that decides what time it is.
+    /// </param>
+    public FileRequestStore(string directoryPath, ILogger logger, IClock clock)
     {
         ArgumentException.ThrowIfNullOrEmpty(directoryPath);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(clock);
 
         _directoryPath = directoryPath;
         _filePath = Path.Combine(directoryPath, FileName);
         _pendingFilePath = Path.Combine(directoryPath, PendingFileName);
         _logger = logger;
+        _clock = clock;
     }
+
+    /// <inheritdoc />
+    public DateTimeOffset? LastWrittenAt => _lastWrittenAt;
 
     /// <summary>
     /// Gets the file the requests are kept in.
@@ -598,6 +617,12 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
         }
 
         File.Move(_pendingFilePath, _filePath, overwrite: true);
+
+        // After the move rather than before it. What this answers is when the file a later reader
+        // would open last changed, so a write that serialised and then failed to land must not
+        // advance it: an operator reading a fresh timestamp beside a store that never took the
+        // write is being told the opposite of what happened.
+        _lastWrittenAt = _clock.UtcNow;
     }
 
     /// <summary>

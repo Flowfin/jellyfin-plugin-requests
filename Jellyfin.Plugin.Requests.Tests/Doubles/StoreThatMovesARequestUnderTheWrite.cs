@@ -43,6 +43,10 @@ internal sealed class StoreThatMovesARequestUnderTheWrite : IRequestStore
     }
 
     /// <inheritdoc />
+    /// <remarks>Not what this double is about, so it answers as a store that has written nothing.</remarks>
+    public DateTimeOffset? LastWrittenAt => null;
+
+    /// <inheritdoc />
     public Task<StoredRequest?> GetAsync(Guid id, CancellationToken cancellationToken)
         => _inner.GetAsync(id, cancellationToken);
 

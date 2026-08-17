@@ -59,6 +59,24 @@ namespace Jellyfin.Plugin.Requests.Storage;
 public interface IRequestStore
 {
     /// <summary>
+    /// Gets when this store last accepted a write, or <see langword="null"/> where it has accepted
+    /// none.
+    /// <para>
+    /// It is here because an operator whose requests have stopped moving asks whether anything is
+    /// working at all, and the answer nobody can give them from outside is whether this plugin has
+    /// written anything. A store that has never been written to on a server that has had requests
+    /// for a week is a different fault from a queue nobody has decided on.
+    /// </para>
+    /// <para>
+    /// <b>It is a fact about this process and not about the data.</b> Nothing persists it, so a
+    /// restart answers <see langword="null"/> until the next write, and an implementation that
+    /// keeps nothing at all may answer <see langword="null"/> always. That is why what reads it says
+    /// "not since this server started" rather than "never".
+    /// </para>
+    /// </summary>
+    DateTimeOffset? LastWrittenAt { get; }
+
+    /// <summary>
     /// Reads one request.
     /// </summary>
     /// <param name="id">The request's own identifier.</param>

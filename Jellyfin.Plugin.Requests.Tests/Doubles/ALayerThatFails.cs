@@ -42,6 +42,10 @@ internal sealed class ALayerThatFails : IRequestStore, IClock, IIdentifierSource
     public PluginConfiguration Current => throw Failed();
 
     /// <inheritdoc />
+    /// <remarks>A layer that fails has written nothing, so there is no moment to answer with.</remarks>
+    public DateTimeOffset? LastWrittenAt => null;
+
+    /// <inheritdoc />
     public Guid NewId() => throw Failed();
 
     /// <inheritdoc />

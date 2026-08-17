@@ -528,13 +528,13 @@ public class WantHandoverTests
 
         try
         {
-            using (var before = new FileRequestStore(directory, new RecordingLogger()))
+            using (var before = new FileRequestStore(directory, new RecordingLogger(), TestClock.AtAFixedMoment()))
             {
                 Assert.True(await Seam(before).AcceptAsync(want, CancellationToken.None));
                 Assert.Single(await before.GetAllAsync(CancellationToken.None));
             }
 
-            using var after = new FileRequestStore(directory, new RecordingLogger());
+            using var after = new FileRequestStore(directory, new RecordingLogger(), TestClock.AtAFixedMoment());
 
             Assert.True(await Seam(after).AcceptAsync(want, CancellationToken.None));
 

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Localisation;
 using Jellyfin.Plugin.Requests.Model;
 using Xunit;
@@ -63,7 +64,8 @@ public sealed class PageWordsTests
         ("mine.state", typeof(RequestState)),
         ("queue.state", typeof(RequestState)),
         ("declineReason", typeof(DeclineReason)),
-        ("availability", typeof(LibraryAvailability))
+        ("availability", typeof(LibraryAvailability)),
+        ("queue.health.bridge", typeof(BackendReachability))
     ];
 
     /// <summary>

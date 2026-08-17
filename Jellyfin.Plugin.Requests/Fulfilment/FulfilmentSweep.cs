@@ -86,6 +86,23 @@ public sealed class FulfilmentSweep
     }
 
     /// <summary>
+    /// Gets what the last full run did, or <see langword="null"/> where none has run in this
+    /// process.
+    /// <para>
+    /// The scheduled run only. A library event moves requests too, and it looks at the handful of
+    /// requests naming one title rather than at the queue, so recording it here would answer "the
+    /// sweep last examined two" on a server holding four hundred. What an operator is asking is
+    /// whether the thing that walks everything is walking, and that is this.
+    /// </para>
+    /// <para>
+    /// Held in this process and nowhere else, so a restart answers <see langword="null"/> until the
+    /// task next runs. Persisting it would mean this plugin writing a file to say when it last read
+    /// one.
+    /// </para>
+    /// </summary>
+    public SweepReport? LastSweep { get; private set; }
+
+    /// <summary>
     /// Looks at the library for every request the store holds.
     /// <para>
     /// Every request, in every state, and not only the ones that can still move. A declined request
@@ -110,6 +127,11 @@ public sealed class FulfilmentSweep
                 fulfilled++;
             }
         }
+
+        // Recorded after the walk rather than at the top of it, so a run that was cancelled part way
+        // leaves the previous report standing. A half run reported as the last one would tell an
+        // operator the sweep examined forty of their four hundred and say nothing about why.
+        LastSweep = new SweepReport(_clock.UtcNow, held.Count, fulfilled);
 
         if (_logger.IsEnabled(LogLevel.Debug))
         {

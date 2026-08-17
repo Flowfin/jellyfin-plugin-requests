@@ -63,7 +63,8 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             (Plugin.Instance ?? throw new InvalidOperationException(
                 "The request store was asked for before this plugin was loaded, so there is no data directory to keep requests in."))
             .DataFolderPath,
-            provider.GetRequiredService<ILogger<FileRequestStore>>()));
+            provider.GetRequiredService<ILogger<FileRequestStore>>(),
+            provider.GetRequiredService<IClock>()));
 
         // Who is calling, asked of the server rather than decided here. Registered so an endpoint
         // takes the seam and never the server's context directly, which is what keeps an endpoint
@@ -82,6 +83,11 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // service exists before deciding what to do. An adapter, when there is one, replaces this
         // registration and nothing else.
         serviceCollection.AddSingleton<IRequestBackend, NoRequestBackend>();
+
+        // When the bridge was last seen answering. One per server, because it is a fact about the
+        // install and the controller that reads it is built per call: state kept on that controller
+        // would be forgotten between two reads of the same page.
+        serviceCollection.AddSingleton<BridgeWatch>();
 
         // The seam the sibling discover plugin hands a want across. Registered into the server's own
         // collection because that is where a second plugin in this process would resolve it from;
