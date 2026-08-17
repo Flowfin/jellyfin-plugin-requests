@@ -91,6 +91,15 @@
     vertical-align: top;
 }
 
+/*
+ * One earlier decision to a line. The cell is built with textContent, so the line breaks in it are
+ * characters rather than markup and a browser would otherwise run them together into one sentence
+ * saying a title was declined and fulfilled at once.
+ */
+.requestsQueueAskedBefore {
+    white-space: pre-line;
+}
+
 .requestsQueuePager {
     display: flex;
     gap: 0.5em;

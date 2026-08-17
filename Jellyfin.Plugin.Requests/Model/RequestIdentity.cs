@@ -54,9 +54,7 @@ public static class RequestIdentity
         ArgumentNullException.ThrowIfNull(existing);
         ArgumentNullException.ThrowIfNull(incoming);
 
-        // A film and a series can carry the same number under the same provider and be two
-        // different works, so the kind is part of the identity rather than a property of it.
-        if (existing.Kind != incoming.Kind || !ShareAnIdentifier(existing, incoming))
+        if (!NameTheSameWork(existing, incoming))
         {
             return RequestMatch.Different;
         }
@@ -90,6 +88,32 @@ public static class RequestIdentity
         }
 
         return covered == incoming.Seasons.Count ? RequestMatch.Same : RequestMatch.Overlapping;
+    }
+
+    /// <summary>
+    /// Whether two requests are about the same work at all, before any question about seasons.
+    /// <para>
+    /// A film and a series can carry the same number under the same provider and be two different
+    /// works, so the kind is part of the identity rather than a property of it.
+    /// </para>
+    /// <para>
+    /// This is the coarser of the two questions in this class and the two are not interchangeable.
+    /// <see cref="Compare"/> asks whether a new asker joins an existing request, and for a series it
+    /// answers on the seasons, so a request for season five is <see cref="RequestMatch.Different"/>
+    /// from a request for seasons one and two. That is right for joining and wrong for a reader who
+    /// wants to know what has been decided about a series, which is what this answers instead.
+    /// </para>
+    /// </summary>
+    /// <param name="one">A request.</param>
+    /// <param name="other">The request it is being held against.</param>
+    /// <returns><see langword="true"/> where both name one work.</returns>
+    /// <exception cref="ArgumentNullException">Where either request is missing.</exception>
+    public static bool NameTheSameWork(MediaRequest one, MediaRequest other)
+    {
+        ArgumentNullException.ThrowIfNull(one);
+        ArgumentNullException.ThrowIfNull(other);
+
+        return one.Kind == other.Kind && ShareAnIdentifier(one, other);
     }
 
     /// <summary>

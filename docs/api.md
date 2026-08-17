@@ -322,8 +322,27 @@ server and by nobody else.
 Each row carries the revision the store has the request at, because the next thing an operator does
 is move it and the store refuses a write made against a revision that has moved underneath it.
 
-What a queue must show for a decision to be possible is #59, so this is what the queue can show
-rather than a settled answer to what it should.
+What a queue must show for a decision to be possible is [queue.md](queue.md), and every item on that
+list is on this answer. Two of them are not properties of the request and arrive under `Context`:
+what was already decided about the same work, and how many requests the person asking is waiting for.
+Both are worked out from the whole store, which is why they are a shape of their own rather than
+fields beside the title.
+
+`Context` is absent on every other answer that carries a row. Approving or declining hands one
+request back so a page can redraw what it just changed, and reading the whole store to answer a
+question nobody asked would be a read of everything per decision. An empty context and a context
+nobody built are different statements, so the field is absent rather than empty: a page reading the
+second as the first would tell an operator that nothing has ever been decided about a title on a
+route that never looked.
+
+**`Context.EarlierDecisions` is bounded by nothing but the store.** A finished request is kept until
+the retention period is enforced, which is #49 and is not built, so this is every decision ever made
+about that work rather than the ones inside the period an operator configured.
+
+**Nothing under `Context` says who.** An earlier decision carries the answer, when it was made, the
+seasons it covered and the reason, and never the person who asked for it or the person who decided
+it. The count is a number and not a list. What a user may learn about another user's request is
+unchanged by any of it and is still nothing: this endpoint is administrators only.
 
 ## Deciding on one
 

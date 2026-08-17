@@ -361,20 +361,30 @@ public sealed class RequestsController : RequestsControllerBase
             return Invalid(refusal.Field, refusal.Reason);
         }
 
-        RequestPage page;
+        IReadOnlyList<StoredRequest> held;
 
         try
         {
-            page = await _store.PageAsync(query, cancellationToken).ConfigureAwait(false);
+            held = await _store.GetAllAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (RequestStoreLoadException)
         {
             return TheStoreCouldNotBeRead();
         }
 
+        // The whole set and then the page out of it, rather than the store's own paging read. The
+        // two produce the same page from the same snapshot, and this way the context beside each row
+        // is worked out from the set the page came out of. Two reads would let a count beside a row
+        // disagree with the row, which is the kind of wrong nobody reports and nobody can reproduce.
+        var page = query.PageOf(held);
+        var context = QueueContext.For(page.Requests, held);
+
         return Ok(new RequestsPage<QueuedRequest>
         {
-            Requests = [.. page.Requests.Select(Queued)],
+            Requests = [.. page.Requests.Select(stored => Queued(stored) with
+            {
+                Context = context.TryGetValue(stored.Request.Id, out var beside) ? beside : null
+            })],
             MatchCount = page.MatchCount,
             Skip = query.Skip,
             Take = query.Take
