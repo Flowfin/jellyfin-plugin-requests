@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Jellyfin.Plugin.Requests.Localisation;
 using Xunit;
 
 using PluginUnderTest = global::Jellyfin.Plugin.Requests.Plugin;
@@ -51,18 +52,26 @@ public sealed class PageControlsTests
     /// tags. Both sides are read off the page rather than listed here, so a control added without
     /// either is named by this the first time the suite runs.
     /// </para>
+    /// <para>
+    /// A button ships with no words in it since #73, because its label comes from the catalogue,
+    /// so the second half asks the question one step back: the button names a key and the shipped
+    /// English catalogue carries that key. A button naming a key nobody wrote a word for is as
+    /// silent to a screen reader as one with nothing between its tags, and the misspelt key is the
+    /// way that now happens.
+    /// </para>
     /// </summary>
     [Fact]
     public void EveryControlOnTheQueueCarriesANameSomethingCanReadOut()
     {
         var body = Queue();
+        var words = StringCatalogue.Shipped.For(culture: null);
 
         var unlabelled = IdentifiersOf(body, "<select ")
             .Where(id => !body.Contains("for=\"" + id + "\"", StringComparison.Ordinal))
             .ToArray();
 
         var silent = Buttons(body)
-            .Where(button => button.Words.Length == 0)
+            .Where(button => button.Words.Length == 0 && !words.ContainsKey(button.Key))
             .Select(button => button.Id)
             .ToArray();
 
@@ -187,13 +196,14 @@ public sealed class PageControlsTests
     }
 
     /// <summary>
-    /// The buttons the page draws, with what a person hears when they reach one.
+    /// The buttons the page draws, with what a person hears when they reach one and the catalogue
+    /// key it comes from.
     /// </summary>
     /// <param name="body">The page.</param>
-    /// <returns>The identifier and the words of each.</returns>
-    private static (string Id, string Words)[] Buttons(string body)
+    /// <returns>The identifier, the words and the key of each.</returns>
+    private static (string Id, string Words, string Key)[] Buttons(string body)
     {
-        var buttons = new List<(string Id, string Words)>();
+        var buttons = new List<(string Id, string Words, string Key)>();
 
         var at = body.IndexOf("<button ", StringComparison.Ordinal);
 
@@ -212,9 +222,14 @@ public sealed class PageControlsTests
             var named = declared.IndexOf(Marker, StringComparison.Ordinal);
             var start = named + Marker.Length;
 
+            const string Names = "data-i18n=\"";
+            var keyed = declared.IndexOf(Names, StringComparison.Ordinal);
+            var from = keyed + Names.Length;
+
             buttons.Add((
                 named >= 0 ? declared[start..declared.IndexOf('"', start)] : declared,
-                body[(opens + 1)..closes].Trim()));
+                body[(opens + 1)..closes].Trim(),
+                keyed >= 0 ? declared[from..declared.IndexOf('"', from)] : string.Empty));
 
             at = body.IndexOf("<button ", closes, StringComparison.Ordinal);
         }

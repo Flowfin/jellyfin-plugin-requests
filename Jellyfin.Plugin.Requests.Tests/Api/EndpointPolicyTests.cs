@@ -100,7 +100,13 @@ public sealed class EndpointPolicyTests
 
         // The whole queue, which is every person's requests and who asked for each. An
         // administrator, and it is the only read here that needs one.
-        "RequestsController.QueueAsync GET Requests/Queue -> RequiresElevation"
+        "RequestsController.QueueAsync GET Requests/Queue -> RequiresElevation",
+
+        // The words this plugin's pages draw. A signed-in person, because the page a browser opens
+        // is one and it needs them, and because a catalogue of English sentences is not a fact
+        // about anybody's server. It is the one endpoint here that reads nothing about anybody: an
+        // administrator's queue and a person's own list get the identical answer to it.
+        "StringsController.Strings GET Strings -> (the server's default)"
     ];
 
     /// <summary>

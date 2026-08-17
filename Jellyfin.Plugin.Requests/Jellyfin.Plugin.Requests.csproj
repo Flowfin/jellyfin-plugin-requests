@@ -47,4 +47,14 @@
     <EmbeddedResource Include="Web\mine.html" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The word catalogues, one file per culture, taken by a glob rather than named one at a time.
+         That is the whole of what #73 asks for by "adding a language is adding a file, with no code
+         change": a file dropped in here is embedded by this line and found by StringCatalogue
+         walking the manifest, and no list anywhere says which cultures exist. Naming each file here
+         would put that list back, one build file away from the code that reads it. -->
+    <None Remove="Localisation\Strings\*.json" />
+    <EmbeddedResource Include="Localisation\Strings\*.json" />
+  </ItemGroup>
+
 </Project>

@@ -5,6 +5,7 @@ using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Identity;
+using Jellyfin.Plugin.Requests.Localisation;
 using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Seam;
 using Jellyfin.Plugin.Requests.Storage;
@@ -40,6 +41,11 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
     {
         serviceCollection.AddSingleton<IClock, SystemClock>();
         serviceCollection.AddSingleton<IIdentifierSource, GuidIdentifierSource>();
+
+        // The word catalogues, read out of the assembly once. They are files inside it and cannot
+        // change while the server is running, so a second copy would be a second parse of the same
+        // bytes per page load.
+        serviceCollection.AddSingleton(StringCatalogue.Shipped);
 
         // The store, one per server for the same reason the other two are: it holds the set in
         // memory and serialises the writes against it, and a second instance over one directory

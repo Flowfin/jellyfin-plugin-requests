@@ -551,3 +551,97 @@ rules:
       include:
         - "Jellyfin.Plugin.Requests/**/*.cs"
         - "tools/opengrep/fixtures/metadata/**/*.cs"
+
+  # Invariant (surface, #73): no word a person reads is written into a page.
+  # Decided in docs/surface.md, under what the catalogue is for. The strings live
+  # in Localisation/Strings/*.json and a page names a key; a language then arrives
+  # as a file and nothing else. What this rule refuses is the way that decays: one
+  # more label typed straight into the markup, which renders correctly, ships, and
+  # is invisible to a translator because it was never in the catalogue to
+  # translate.
+  #
+  # The elements are named rather than every tag matched, because a page is mostly
+  # structure and only some elements carry words. An element opened and followed
+  # immediately by non-whitespace is one with text in it; an element that wraps
+  # another is followed by a newline and a tag, and is left alone.
+  - id: page-text-comes-from-the-catalogue
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not write a word into a page. Give the element a data-i18n key, add the
+      string to Localisation/Strings/en.json, and let the catalogue put it in
+      (#73). A word written here reaches no catalogue and no translator.
+    patterns:
+      - pattern-regex: '<(h1|h2|h3|p|span|option|button|th|td|caption|title|label|a|li|div)\b[^>]*>[ \t]*[^\s<]'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.html"
+        - "tools/opengrep/fixtures/words/**/*.html"
+
+  # Invariant (surface, #73), the same rule one layer down: a page's script puts
+  # words on the screen through textContent, and a string literal assigned
+  # straight to it is the markup case written in JavaScript. A lookup is allowed
+  # and is the whole point, so what is refused is the quote immediately after the
+  # equals sign rather than a literal anywhere on the line: `word("mine.empty")`
+  # names a key and passes, `"You have not asked for anything yet."` does not.
+  #
+  # The bound, because it is narrower than the sentence above: the second branch
+  # of a ternary is not reached by this pattern, and clearing a line by assigning
+  # the empty string is deliberately allowed, because it carries no word. What it
+  # catches is the plain assignment, which is what somebody writes.
+  - id: page-sets-no-text-from-a-literal
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not assign a literal to textContent. Look the string up by key from the
+      catalogue the page fetched (#73), so the sentence a person reads is one a
+      language file can replace.
+    patterns:
+      - pattern-regex: 'textContent\s*=\s*"[^"]'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.html"
+        - "Jellyfin.Plugin.Requests/**/*.js"
+        - "tools/opengrep/fixtures/words/**/*.html"
+        - "tools/opengrep/fixtures/words/**/*.js"
+
+  # Invariant (surface, #73): the name a screen reader announces is a word too,
+  # and it is the one that gets forgotten, because nobody sees it. An accessible
+  # name written as a literal is English for every person on the server however
+  # much else has been translated.
+  - id: control-is-named-from-the-catalogue
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not write an accessible name as a literal. It is a word a person reads,
+      through a screen reader rather than on the screen, so it comes from the
+      catalogue like every other one (#73).
+    patterns:
+      - pattern-regex: 'setAttribute\(\s*"aria-label"\s*,\s*"'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.html"
+        - "Jellyfin.Plugin.Requests/**/*.js"
+        - "tools/opengrep/fixtures/words/**/*.html"
+        - "tools/opengrep/fixtures/words/**/*.js"
+
+  # Invariant (surface, #73): RequestsShell.say takes a key and looks it up, so a
+  # caller handing it a sentence gets that sentence looked up as a key, misses,
+  # and shows the operator nothing at all. A key carries no space and a sentence
+  # does, which is what separates the two without this rule needing to know the
+  # catalogue.
+  - id: a-page-says-a-key-and-never-a-sentence
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Pass a catalogue key here, not a sentence. RequestsShell.say looks its
+      argument up, so a sentence is looked up as a key, misses, and leaves the
+      operator with an empty line where the message was (#73).
+    patterns:
+      - pattern-regex: '\.say\(\s*page\s*,\s*"[^"]*\s'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.html"
+        - "Jellyfin.Plugin.Requests/**/*.js"
+        - "tools/opengrep/fixtures/words/**/*.html"
+        - "tools/opengrep/fixtures/words/**/*.js"

@@ -42,6 +42,11 @@ namespace Jellyfin.Plugin.Requests.Tests.Web;
 public sealed class BrowserPageTests
 {
     /// <summary>
+    /// The endpoints the page is allowed to name, in the order the assertion compares them.
+    /// </summary>
+    private static readonly string[] TheTwoItAsksFor = ["Requests", "Strings"];
+
+    /// <summary>
     /// The elements a browser gives a person something to operate. Anything a page offers a
     /// decision through is one of these, which is why the assertion is over them rather than over
     /// the words on the page.
@@ -105,22 +110,34 @@ public sealed class BrowserPageTests
     }
 
     /// <summary>
-    /// The page asks this plugin for one thing and it is the caller's own requests.
+    /// The page asks this plugin for two things and they are its own words and the caller's own
+    /// requests.
     /// <para>
     /// The address is built against the page's own, so what is asserted is the relative part and
-    /// that there is one of it. A second call added to this page is a second thing a user's browser
-    /// asks for on their behalf, and it is the shape by which an administrator's answer arrives on
-    /// a page that was never meant to hold one.
+    /// that there is one place that builds it. A third call added to this page is a third thing a
+    /// user's browser asks for on their behalf, and that is the shape by which an administrator's
+    /// answer arrives on a page that was never meant to hold one. The set is written out rather
+    /// than counted, so a call swapped for another of the same number fails here too.
+    /// </para>
+    /// <para>
+    /// The words are the second because the page ships with none, which is #73. What that costs is
+    /// in the page's own comment: a catalogue that cannot be fetched leaves the page wordless.
     /// </para>
     /// </summary>
     [Fact]
-    public void ThePageAsksForNothingButTheCallersOwnRequests()
+    public void ThePageAsksForNothingButItsWordsAndTheCallersOwnRequests()
     {
         var body = Page();
 
         Assert.Equal(1, Occurrences(body, "fetch("));
         Assert.Equal(1, Occurrences(body, "new URL("));
-        Assert.Contains(@"new URL(""Requests"", window.location.href)", body, StringComparison.Ordinal);
+        Assert.Equal(
+            TheTwoItAsksFor,
+            Regex.Matches(body, @"fetched\(""(?<endpoint>[A-Za-z]+)""")
+                .Select(match => match.Groups["endpoint"].Value)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(endpoint => endpoint, StringComparer.Ordinal)
+                .ToArray());
     }
 
     /// <summary>

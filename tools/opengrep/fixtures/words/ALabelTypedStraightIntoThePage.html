@@ -1,0 +1,54 @@
+<!doctype html>
+<!--
+    Fixture for page-text-comes-from-the-catalogue and for
+    a-page-says-a-key-and-never-a-sentence. This file is embedded in nothing and
+    served to nobody; it exists so the two rules can be watched refusing the
+    mistakes they name.
+
+    The near-miss is the one somebody writes while adding a column. Every other
+    cell on the page already reads correctly in a browser, the new one is one
+    line, and typing the word is shorter than opening the catalogue. It renders,
+    it ships, and it is the one heading that stays English on a translated
+    server.
+-->
+<html lang="en">
+    <head>
+        <title data-i18n="queue.title"></title>
+    </head>
+    <body>
+        <div id="RequestsFixturePage">
+            <!-- Legal neighbours, left here on purpose: the rules have to stay quiet on all of these. -->
+            <h2 data-i18n="queue.heading"></h2>
+            <p class="requestsMessage" role="status"></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col" data-i18n="queue.column.title"></th>
+                    </tr>
+                </thead>
+            </table>
+
+            <!-- The regression, one column later. -->
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Requested by</th>
+                    </tr>
+                </thead>
+            </table>
+
+            <script type="text/javascript">
+                (function () {
+                    var page = document.querySelector("#RequestsFixturePage");
+
+                    // Legal neighbour: a key, which is what this call takes.
+                    RequestsShell.say(page, "queue.notRead");
+
+                    // The regression. It looks up a sentence as though it were a
+                    // key, finds nothing, and shows the operator an empty line.
+                    RequestsShell.say(page, "The queue could not be read.");
+                })();
+            </script>
+        </div>
+    </body>
+</html>

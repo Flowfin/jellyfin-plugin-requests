@@ -1,6 +1,6 @@
 /*
- * What both plugin pages share: the strip of links between them, the stylesheet load, and the small
- * amount of code that talks to this plugin's API.
+ * What both plugin pages share: the strip of links between them, the stylesheet load, the words
+ * they draw, and the small amount of code that talks to this plugin's API.
  *
  * It is a global object rather than a module. A plugin page is injected into the dashboard's own
  * document rather than loaded as a document of its own, so `import` has no base to resolve against
@@ -21,12 +21,82 @@ var RequestsShell = {
 
     /*
      * The pages, in the order the strip shows them. The queue is first because it is the one an
-     * operator opens every day and the settings are the ones they open twice.
+     * operator opens every day and the settings are the ones they open twice. Each carries the key
+     * its label is under rather than the label, which is #73: no word a person reads is written in
+     * a file this plugin ships as code.
      */
     pages: [
-        { name: "RequestsQueue", label: "Queue" },
-        { name: "Requests", label: "Settings" },
+        { name: "RequestsQueue", label: "shell.page.RequestsQueue" },
+        { name: "Requests", label: "shell.page.Requests" },
     ],
+
+    /*
+     * The words, once they have arrived. Empty until then, and a lookup against an empty catalogue
+     * answers with nothing rather than with a key, because showing somebody `queue.column.title` is
+     * showing them the inside of the plugin.
+     *
+     * What that costs, stated rather than left to be found: a catalogue that cannot be fetched
+     * leaves a page wordless, the sentence that would say so included. It is not a failure of its
+     * own, because the catalogue and the queue are two calls to the same server behind the same
+     * session, so a page that cannot reach one cannot reach the other.
+     */
+    words: {},
+
+    /*
+     * The catalogue, fetched once however many pages ask for it. The culture is the browser's,
+     * handed over rather than left to the request headers, because the dashboard's client sets its
+     * own and a person who changed the language in Jellyfin has changed the one `navigator.language`
+     * answers with.
+     */
+    load: function () {
+        if (Object.keys(RequestsShell.words).length > 0) {
+            return Promise.resolve();
+        }
+
+        var asked = window.navigator && window.navigator.language ? { culture: window.navigator.language } : {};
+
+        return RequestsShell.get("Strings", asked).then(function (answer) {
+            RequestsShell.words = answer.Strings || {};
+        });
+    },
+
+    /*
+     * One word, by key.
+     */
+    word: function (key) {
+        return Object.prototype.hasOwnProperty.call(RequestsShell.words, key) ? RequestsShell.words[key] : "";
+    },
+
+    /*
+     * A value the API answered with, as a word. A value no key exists for is shown as it came
+     * rather than dropped, so a state added to the model appears as its own name instead of as a
+     * blank cell.
+     */
+    named: function (group, value) {
+        return RequestsShell.word(group + "." + value) || value;
+    },
+
+    /*
+     * A sentence with values put into it, where the catalogue holds the sentence and this holds
+     * none of it. The placeholders are numbered rather than named so a translator can move them,
+     * which is the whole reason a sentence is one string instead of three pieces joined here.
+     */
+    fill: function (key, values) {
+        return RequestsShell.word(key).replace(/\{(\d+)\}/g, function (whole, at) {
+            var value = values[Number(at)];
+
+            return value === undefined ? whole : String(value);
+        });
+    },
+
+    /*
+     * Every element on a page that names a key gets the word under it.
+     */
+    draw: function (page) {
+        page.querySelectorAll("[data-i18n]").forEach(function (element) {
+            element.textContent = RequestsShell.word(element.getAttribute("data-i18n"));
+        });
+    },
 
     /*
      * Puts the shell on a page and returns when it is there.
@@ -47,7 +117,7 @@ var RequestsShell = {
 
         var nav = document.createElement("nav");
         nav.className = "requestsShellNav";
-        nav.setAttribute("aria-label", "Requests");
+        nav.setAttribute("aria-label", RequestsShell.word("shell.label"));
 
         RequestsShell.pages.forEach(function (entry) {
             var link = document.createElement("a");
@@ -58,7 +128,7 @@ var RequestsShell = {
              * the reload that would throw away whatever the operator had open.
              */
             link.href = "#/configurationpage?name=" + encodeURIComponent(entry.name);
-            link.textContent = entry.label;
+            link.textContent = RequestsShell.word(entry.label);
 
             if (entry.name === current) {
                 link.setAttribute("aria-current", "page");
@@ -126,17 +196,18 @@ var RequestsShell = {
     },
 
     /*
-     * Puts a sentence where the operator is looking.
+     * Puts a sentence where the operator is looking, named by its key rather than written by the
+     * caller. An empty key clears it.
      *
      * `textContent` rather than any of the ways of writing markup. What is shown here can carry a
      * message the server built out of text a person typed, and rendering that as markup is a
      * scripting hole in the dashboard of a server reachable by anybody who can file a request.
      */
-    say: function (page, text) {
+    say: function (page, key) {
         var target = page.querySelector(".requestsMessage");
 
         if (target) {
-            target.textContent = text;
+            target.textContent = key ? RequestsShell.word(key) : "";
         }
     },
 };

@@ -44,6 +44,10 @@
          files the release path reads instead of a number restated in a test. -->
     <None Include="../build.yaml" Link="build.yaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../build-jf12.yaml" Link="build-jf12.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The plugin's own project file, for the one claim about it that is not visible from the
+         built assembly: that the word catalogues are embedded by a wildcard, which is what makes
+         adding a language a file and nothing else. -->
+    <None Include="../Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj" Link="Jellyfin.Plugin.Requests.csproj.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -77,6 +81,16 @@
          produced. A migration test that builds its own starting bytes agrees with the migration by
          construction, so these are files rather than string literals in a test. -->
     <None Include="Storage/Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Catalogues of this suite's own, embedded by the same glob shape the plugin uses. They are
+         what "adding a language is adding a file" is measured against: nothing in the suite names
+         a culture, so a check that the loader found these found them by walking the manifest. The
+         keys in them are nonsense on purpose, because a fixture sharing a key with the shipped
+         catalogue would pass whichever of the two the loader actually read. -->
+    <None Remove="Localisation\Strings\*.json" />
+    <EmbeddedResource Include="Localisation\Strings\*.json" />
   </ItemGroup>
 
   <ItemGroup>

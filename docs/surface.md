@@ -222,6 +222,40 @@ anything, and what cancelling will mean per state is #68.
     HttpPost("Requests/{id}/Approve")
     HttpPost("Requests/{id}/Decline")
 
+## The words a person reads
+
+Every word any surface here shows is in `Jellyfin.Plugin.Requests/Localisation/Strings/en.json`, keyed,
+and no word is written into a page. English is what ships. Adding a language is adding a file beside
+that one and changing nothing else: the project embeds the directory by a wildcard, the loader finds
+what the assembly carries by walking its manifest, and nothing in this tree holds a list of the
+cultures that exist.
+
+A key a culture has no string for falls back to that culture's language, and then to English. It
+never falls back to the key, because showing somebody `queue.column.title` is showing them the inside
+of the plugin. A key English has no string for either is a failure raised where it was written,
+which is a packaging fault rather than anything a caller did.
+
+The words reach a page over the API, at `GET MediaRequests/v1/Strings`, and `docs/api.md` says why
+that is the only shape available: the dashboard serves a plugin's pages out of the assembly itself,
+so this plugin never sees the request and cannot substitute anything on the way out.
+
+**What that costs, and it is real.** A catalogue that cannot be fetched leaves a page with no words
+at all, including the sentence that would say so. It is not a failure of its own: the catalogue and
+the queue are two calls to the same server behind the same session, so a page that cannot reach one
+cannot reach the other either.
+
+Four rules in `tools/opengrep/rules.yaml` refuse the ways a word gets written back in, and each is
+watched refusing a fixture: a word typed into the markup, a literal assigned to `textContent`, an
+accessible name written as a literal, and a sentence handed to `RequestsShell.say` where a key
+belongs. Beside them, `PageWordsTests` compares the pages and the catalogue in both directions, so a
+key with a letter wrong is a red suite rather than a blank cell.
+
+**Three strings are outside all of this and are named rather than left to be found.** The plugin's
+own name and description, and the display name of the page the dashboard lists, are read by the
+server once when the plugin is registered rather than per person, so there is no culture to resolve
+them against and no catalogue entry could reach them. What a language file changes is everything
+inside the pages, not the entry in the dashboard's own menu.
+
 ## What the rest of this milestone follows from
 
 Every issue after #65 in milestone 8 is read against the decision above.
@@ -237,6 +271,6 @@ Every issue after #65 in milestone 8 is read against the decision above.
 - #71, never revealing a title a user is not allowed to see, applies to both.
 - #72, the reach matrix, is the table above. It is the shape of the measurement this page says it
   does not have, with every cell still saying so.
-- #73, the localisation catalogue, covers the strings both surfaces show.
+- #73, the localisation catalogue, covers the strings both surfaces show, and is the section above.
 
 None of them assumes a surface other than these, and none is closed as not wanted.
