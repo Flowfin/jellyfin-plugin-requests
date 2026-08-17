@@ -138,9 +138,12 @@ command is right:
     call / build
     call / test
     Reject Trojan Source Unicode
+    Audit workflows (zizmor)
+    Check formatting
 
-Three of the fifteen. The set above is not applied: a ruleset is a repository
-setting rather than a file in this tree, and nothing in this change touches one.
+Five of the fifteen. The rest of the set above is not applied: a ruleset is a
+repository setting rather than a file in this tree, and nothing in this change
+touches one.
 #30 carries the application and the demonstration that a red check refuses a
 merge.
 
