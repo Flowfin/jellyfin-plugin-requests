@@ -22,8 +22,8 @@
                         of requests so that a browser could throw away all but fifty of them.
 
                         What the rows show is the list in docs/queue.md, less the two items that
-                        document names as absent from the answer this endpoint gives. Acting on a row
-                        is #61 and #62, and the panel beside the queue is #63.
+                        document names as absent from the answer this endpoint gives. Acting on
+                        several rows at once is #62, and the panel beside the queue is #63.
                     -->
                     <div class="requestsQueueControls">
                         <label class="requestsQueueControl" for="RequestsQueueState">
@@ -71,6 +71,49 @@
                         </label>
                     </div>
 
+                    <!--
+                        Where a decline says why, open only while one is being made. It is a strip on
+                        the page rather than a dialog because a dialog is the dashboard's own
+                        component and a plugin page that builds one of its own is a second dialog
+                        that stops matching the server the day the server's changes.
+
+                        The reason is required and the endpoint refuses a decline without one, so
+                        this collects it before anything is sent rather than sending and reporting a
+                        refusal an operator could have been spared. The list opens on a value that
+                        chooses nothing, so a decline never carries a reason nobody picked.
+
+                        Each option carries the name the model gives that reason rather than its
+                        number, which is what the state filter above already does. A number here
+                        would be a second spelling of the same list, readable by nobody, and it
+                        would go on parsing after somebody reordered the enumeration.
+                    -->
+                    <div class="requestsQueueDecline" hidden>
+                        <p class="requestsQueueDeclineTitle"></p>
+
+                        <div class="requestsQueueControls">
+                            <label class="requestsQueueControl" for="RequestsQueueDeclineReason">
+                                <span data-i18n="queue.decline.reason"></span>
+                                <select is="emby-select" id="RequestsQueueDeclineReason">
+                                    <option value="" selected data-i18n="queue.decline.choose"></option>
+                                    <option value="AlreadyInTheLibrary" data-i18n="declineReason.AlreadyInTheLibrary"></option>
+                                    <option value="AlreadyRequested" data-i18n="declineReason.AlreadyRequested"></option>
+                                    <option value="CannotBeObtained" data-i18n="declineReason.CannotBeObtained"></option>
+                                    <option value="NoRoomForIt" data-i18n="declineReason.NoRoomForIt"></option>
+                                    <option value="NotWanted" data-i18n="declineReason.NotWanted"></option>
+                                    <option value="Other" data-i18n="declineReason.Other"></option>
+                                </select>
+                            </label>
+
+                            <label class="requestsQueueControl" for="RequestsQueueDeclineNote">
+                                <span data-i18n="queue.decline.note"></span>
+                                <textarea id="RequestsQueueDeclineNote" rows="2"></textarea>
+                            </label>
+
+                            <button is="emby-button" type="button" class="raised" id="RequestsQueueDeclineSend" data-i18n="queue.decline.send"></button>
+                            <button is="emby-button" type="button" class="raised" id="RequestsQueueDeclineCancel" data-i18n="queue.decline.cancel"></button>
+                        </div>
+                    </div>
+
                     <table class="requestsQueueTable">
                         <caption class="requestsQueueSummary" aria-live="polite"></caption>
                         <thead>
@@ -84,6 +127,7 @@
                                 <th scope="col" data-i18n="queue.column.availability"></th>
                                 <th scope="col" data-i18n="queue.column.note"></th>
                                 <th scope="col" data-i18n="queue.column.decision"></th>
+                                <th scope="col" data-i18n="queue.column.decide"></th>
                             </tr>
                         </thead>
                         <tbody class="requestsQueueRows"></tbody>
@@ -116,10 +160,82 @@
                      */
                     var bounds = { skip: 0, take: 50 };
 
+                    /*
+                     * Which decisions a row admits, by the state it is in. It is the cells of the
+                     * transition table an administrator may make, and it is a second copy of a rule
+                     * the model already holds, because the answer this page draws carries a request's
+                     * state and not the moves that are open on it.
+                     *
+                     * A second copy is what drifts, so EveryDecisionAnOperatorMayMakeIsOfferedByTheQueue
+                     * reads this object and compares it against RequestLifecycle's own table. A cell
+                     * that opens or closes in the model reds the suite here rather than leaving an
+                     * operator with a button the server refuses or a move nobody can make.
+                     *
+                     * Fulfilled carries an empty list rather than being left out: the end of the life
+                     * of a request is a state with no decisions in it, and saying so here is what
+                     * separates it from a state somebody forgot.
+                     */
+                    var decisions = {
+                        Open: ["Approve", "Decline"],
+                        Approved: ["Decline"],
+                        Declined: ["Approve"],
+                        Fulfilled: [],
+                        Failed: ["Approve", "Decline"],
+                    };
+
+                    /*
+                     * The two decisions themselves. Each key is the last segment of the endpoint that
+                     * makes it, so the path a button posts to is built from the same word the table
+                     * above names it by rather than from a second list.
+                     *
+                     * The label is the word on the button and the name is what a screen reader
+                     * announces, which carries the title as well: a column of buttons all saying
+                     * `Approve` tells somebody who cannot see the row nothing about which row they
+                     * are on.
+                     *
+                     * An approval is sent from the button and a decline goes through the strip
+                     * above, because one of the two carries something an operator has to say first.
+                     */
+                    var moves = {
+                        Approve: {
+                            label: "queue.decide.approve",
+                            name: function (written) {
+                                return RequestsShell.fill("queue.decide.approveNamed", [written]);
+                            },
+                            act: function (request) {
+                                send(request, "Approve", { Revision: request.Revision });
+                            },
+                        },
+                        Decline: {
+                            label: "queue.decide.decline",
+                            name: function (written) {
+                                return RequestsShell.fill("queue.decide.declineNamed", [written]);
+                            },
+                            act: function (request) {
+                                collect(request);
+                            },
+                        },
+                    };
+
                     var rows = page.querySelector(".requestsQueueRows");
                     var summary = page.querySelector(".requestsQueueSummary");
                     var previous = page.querySelector("#RequestsQueuePrevious");
                     var next = page.querySelector("#RequestsQueueNext");
+
+                    var declineForm = page.querySelector(".requestsQueueDecline");
+                    var declineTitle = page.querySelector(".requestsQueueDeclineTitle");
+                    var declineReason = control("declineReason");
+                    var declineNote = control("declineNote");
+                    var declineSend = control("declineSend");
+                    var declineCancel = control("declineCancel");
+
+                    /*
+                     * The answer the rows on the screen were drawn from, and the request a reason is
+                     * being collected for. Both are the page's own memory of what an operator is
+                     * looking at, which is what a decision puts back rather than replacing.
+                     */
+                    var showing = null;
+                    var declining = null;
 
                     /*
                      * Every word this page draws comes from the catalogue the shell fetched, keyed
@@ -231,8 +347,179 @@
                         return request.DeclineNote ? RequestsShell.fill("declineReason.withNote", [reason, request.DeclineNote]) : reason;
                     }
 
+                    /*
+                     * The decisions open on one row, as buttons.
+                     *
+                     * A real button rather than a styled element with a click handler on it: the
+                     * second is a control the keyboard never reaches, and it looks identical to one
+                     * that works. The dashboard's own button is asked for by name, and a browser
+                     * that does not build customised elements gets an ordinary button, which is the
+                     * same control with the server's styling missing rather than a broken one.
+                     */
+                    function decide(row, request) {
+                        var target = document.createElement("td");
+                        var written = title(request);
+                        var open = decisions[request.State] || [];
+
+                        target.className = "requestsQueueDecide";
+
+                        open.forEach(function (move) {
+                            var button = document.createElement("button", { is: "emby-button" });
+
+                            button.type = "button";
+                            button.className = "raised";
+                            button.textContent = RequestsShell.word(moves[move].label);
+                            button.setAttribute("aria-label", moves[move].name(written));
+                            button.addEventListener("click", function () {
+                                moves[move].act(request);
+                            });
+
+                            target.appendChild(button);
+                        });
+
+                        row.appendChild(target);
+                    }
+
+                    /*
+                     * One request, put back into the answer on the screen and drawn where it already
+                     * was.
+                     *
+                     * Reading the queue again instead would move the operator: a row that no longer
+                     * matches the filter it was read under takes every row under it up one line, and
+                     * the next thing clicked is not the thing that was aimed at. So a decision
+                     * changes one row and leaves the filter, the order and the page where they were.
+                     */
+                    function replace(request) {
+                        if (!showing) {
+                            return;
+                        }
+
+                        for (var at = 0; at < showing.Requests.length; at++) {
+                            if (showing.Requests[at].Id === request.Id) {
+                                showing.Requests[at] = request;
+                            }
+                        }
+
+                        draw(showing);
+                    }
+
+                    /*
+                     * A decision, with the revision the operator was looking at.
+                     *
+                     * The revision is what makes two operators with the queue open safe: a request
+                     * that moved since this page drew it is refused rather than decided over
+                     * somebody else's decision, and the refusal carries what the queue holds now.
+                     *
+                     * It answers whether the decision was taken, which is what the strip above reads
+                     * to decide whether to close: a decline the server refused leaves the reason and
+                     * the words the operator typed where they are, so the repair is adding what was
+                     * missing rather than typing it all again.
+                     */
+                    function send(request, move, body) {
+                        Dashboard.showLoadingMsg();
+
+                        return RequestsShell.post("Requests/" + request.Id + "/" + move, body)
+                            .then(function (answer) {
+                                RequestsShell.say(page, "");
+                                replace(answer);
+                                Dashboard.hideLoadingMsg();
+                                return true;
+                            })
+                            .catch(function (refusal) {
+                                Dashboard.hideLoadingMsg();
+                                return refused(request, move, refusal);
+                            });
+                    }
+
+                    /*
+                     * A refused decision, as the operator meets it: what they tried to do, what the
+                     * server said, and the row put back as the store holds it now.
+                     *
+                     * The refusal carries that row itself on every code about a request that is
+                     * there, which is what makes "somebody else approved it a moment ago" readable
+                     * without opening the queue again. A rejection this page cannot read a body out
+                     * of is said as that rather than dressed up as a refusal with a reason.
+                     */
+                    function refused(request, move, refusal) {
+                        var carried = refusal && typeof refusal.json === "function" ? refusal.json() : Promise.resolve(null);
+                        var tried = moves[move].name(title(request));
+
+                        return carried
+                            .catch(function () {
+                                return null;
+                            })
+                            .then(function (failure) {
+                                if (failure && failure.Current) {
+                                    replace(failure.Current);
+                                }
+
+                                if (failure && failure.Message) {
+                                    RequestsShell.say(page, "queue.decisionRefused", [tried, failure.Message]);
+                                    return false;
+                                }
+
+                                RequestsShell.say(page, "queue.decisionNotSent", [tried]);
+
+                                return false;
+                            });
+                    }
+
+                    /*
+                     * Collecting the reason a decline carries, before anything is sent. A decline
+                     * with no reason reads as arbitrariness to the person who asked, and what they
+                     * do next is ask for the same title again.
+                     */
+                    function collect(request) {
+                        declining = request;
+                        declineReason.value = "";
+                        declineNote.value = "";
+                        declineTitle.textContent = RequestsShell.fill("queue.decline.heading", [title(request)]);
+                        declineForm.hidden = false;
+                        declineReason.focus();
+                    }
+
+                    function stop() {
+                        declining = null;
+                        declineForm.hidden = true;
+                    }
+
+                    /*
+                     * The decline, once the operator has said why.
+                     *
+                     * The one thing checked here is that a reason was chosen, because the list opens
+                     * on nothing and sending that would spend a call to be told what this page
+                     * already knows. Everything else a decline has to satisfy stays the model's:
+                     * that the reason which says nothing on its own needs a sentence beside it is
+                     * one rule in one place, and what an operator meets when they miss it is the
+                     * server's own words rather than a second copy of them that drifts.
+                     */
+                    function decline() {
+                        if (!declining) {
+                            return;
+                        }
+
+                        if (declineReason.value === "") {
+                            RequestsShell.say(page, "queue.decline.needsReason");
+                            return;
+                        }
+
+                        var request = declining;
+
+                        send(request, "Decline", {
+                            Revision: request.Revision,
+                            Reason: declineReason.value,
+                            Note: declineNote.value,
+                        }).then(function (decided) {
+                            if (decided) {
+                                stop();
+                            }
+                        });
+                    }
+
                     function draw(answer) {
                         var drawn = document.createDocumentFragment();
+
+                        showing = answer;
 
                         answer.Requests.forEach(function (request) {
                             var row = document.createElement("tr");
@@ -246,6 +533,7 @@
                             cell(row, held(request));
                             cell(row, request.RequesterNote || "");
                             cell(row, decided(request));
+                            decide(row, request);
 
                             drawn.appendChild(row);
                         });
@@ -298,6 +586,9 @@
                             from.addEventListener("change", narrowed);
                         }
                     });
+
+                    declineSend.addEventListener("click", decline);
+                    declineCancel.addEventListener("click", stop);
 
                     previous.addEventListener("click", function () {
                         step(-1);
