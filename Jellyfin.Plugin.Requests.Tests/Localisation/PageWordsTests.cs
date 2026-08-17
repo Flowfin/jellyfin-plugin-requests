@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using Jellyfin.Plugin.Requests.Localisation;
@@ -139,7 +140,38 @@ public sealed class PageWordsTests
             }
         }
 
+        foreach (var key in Declared())
+        {
+            named.Add(key);
+        }
+
         return named;
+    }
+
+    /// <summary>
+    /// The keys named on this side of the API rather than in an asset.
+    /// <para>
+    /// One of the three sentences #70 owns is met while asking for something rather than while
+    /// reading a page, so no page draws it and the second leg above would read it as a string
+    /// nobody shows. It is named by <see cref="Sentences"/>, which is the one place the three are
+    /// declared, and it is read off that class rather than repeated here so a fourth sentence is
+    /// covered the first time the suite runs.
+    /// </para>
+    /// </summary>
+    /// <returns>The keys.</returns>
+    private static string[] Declared()
+    {
+        var declared = typeof(Sentences)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .Select(field => (string?)field.GetRawConstantValue())
+            .Where(key => !string.IsNullOrEmpty(key))
+            .Select(key => key!)
+            .ToArray();
+
+        Assert.NotEmpty(declared);
+
+        return declared;
     }
 
     /// <summary>

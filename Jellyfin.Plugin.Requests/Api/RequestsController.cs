@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Intake;
+using Jellyfin.Plugin.Requests.Localisation;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Storage;
@@ -210,11 +211,19 @@ public sealed class RequestsController : RequestsControllerBase
             // The numbers are the caller's own and say nothing about anybody else's queue, which is
             // why they may be reported: how many things this person is waiting for is something they
             // can already read off their own page.
+            //
+            // The sentence is the catalogue's rather than one written here, which is #70: a person
+            // meets this outcome through whatever asked on their behalf, and a second copy of the
+            // words in this file is the copy that goes stale. It is answered in English because this
+            // API answers in English throughout, for the reason StringsController sets out about
+            // Accept-Language, and the catalogue is reached rather than injected for the same
+            // reason: there is no culture here to resolve against, so there is nothing for the suite
+            // to hand a different one of.
             return Failed(
                 RequestFailureCode.TheyAreAtTheirQuota,
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "You are waiting for {0} requests and this server allows {1} at once. One of them has to be answered before you can ask for something else.",
+                    StringCatalogue.Shipped.Get(Sentences.AtTheirQuota, culture: null),
                     atTheirQuota.Held,
                     atTheirQuota.Limit));
         }
