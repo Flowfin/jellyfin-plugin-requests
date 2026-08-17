@@ -118,4 +118,16 @@ public sealed record QueuedRequest
     /// Gets when that was last worked out, where it has been.
     /// </summary>
     public DateTimeOffset? AvailabilityCheckedAt { get; init; }
+
+    /// <summary>
+    /// Gets the two facts a decision needs that are not on the request: what was decided about the
+    /// same work before, and how much the person asking is already waiting for.
+    /// <para>
+    /// Absent on the answer to a move. Approving or declining hands one request back so a page can
+    /// redraw the row it just changed, and working the whole queue out again for that would be a
+    /// read of everything to answer a question nobody asked. The queue read is where a decision is
+    /// made and is where this is filled in.
+    /// </para>
+    /// </summary>
+    public QueueContext? Context { get; init; }
 }

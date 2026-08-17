@@ -21,8 +21,7 @@
                         did the same work again would be asking a household server to send a decade
                         of requests so that a browser could throw away all but fifty of them.
 
-                        What the rows show is the list in docs/queue.md, less the two items that
-                        document names as absent from the answer this endpoint gives. Acting on
+                        What the rows show is the list in docs/queue.md, all of it. Acting on
                         several rows at once is #62, and the panel beside the queue is #63.
                     -->
                     <div class="requestsQueueControls">
@@ -124,7 +123,9 @@
                                 <th scope="col" data-i18n="queue.column.requestedAt"></th>
                                 <th scope="col" data-i18n="queue.column.stateChangedAt"></th>
                                 <th scope="col" data-i18n="queue.column.requester"></th>
+                                <th scope="col" data-i18n="queue.column.waitingFor"></th>
                                 <th scope="col" data-i18n="queue.column.availability"></th>
+                                <th scope="col" data-i18n="queue.column.askedBefore"></th>
                                 <th scope="col" data-i18n="queue.column.note"></th>
                                 <th scope="col" data-i18n="queue.column.decision"></th>
                                 <th scope="col" data-i18n="queue.column.decide"></th>
@@ -238,6 +239,22 @@
                     var declining = null;
 
                     /*
+                     * The names this server knows, by identifier. Empty until the list has been read
+                     * and empty for good where it could not be, and a row falls back to the
+                     * identifier in both cases.
+                     *
+                     * It is asked for once per opening of the page rather than on every page turn,
+                     * so somebody renamed while the queue is open reads as their old name until it
+                     * is opened again. That is the whole cost of it, and it is worth naming: the
+                     * alternative is a second call to the server behind every step of the pager.
+                     *
+                     * This plugin stores no name of anybody. What it holds is the identifier the
+                     * server minted, which is docs/personal-data.md, and this is the dashboard
+                     * looking up a name for it in the list it can already read.
+                     */
+                    var people = {};
+
+                    /*
                      * Every word this page draws comes from the catalogue the shell fetched, keyed
                      * by the value the endpoint answered with. There is no map of values to words
                      * here and there was one until #73: a map in a page is a second catalogue that
@@ -345,6 +362,72 @@
                         var reason = RequestsShell.named("declineReason", request.DeclineReason);
 
                         return request.DeclineNote ? RequestsShell.fill("declineReason.withNote", [reason, request.DeclineNote]) : reason;
+                    }
+
+                    /*
+                     * What was decided about the same work before this request was made, one
+                     * decision to a line. Empty where nothing was, which is the ordinary case and
+                     * reads as an empty cell rather than as a sentence saying nothing happened.
+                     *
+                     * The seasons are put on a series decision because declining seasons one and
+                     * two says nothing certain about season five, and an operator reading "Declined"
+                     * against a series would otherwise take it as covering the show.
+                     */
+                    function askedBefore(request) {
+                        var context = request.Context;
+
+                        if (!context || context.EarlierDecisions.length === 0) {
+                            return "";
+                        }
+
+                        var lines = [];
+
+                        context.EarlierDecisions.forEach(function (decision) {
+                            var answer = RequestsShell.named("queue.state", decision.State);
+                            var said = RequestsShell.fill("queue.askedBefore.decision", [answer, moment(decision.DecidedAt)]);
+
+                            if (decision.Seasons && decision.Seasons.length) {
+                                said = RequestsShell.fill("title.withSeasons", [said, decision.Seasons.join(", ")]);
+                            }
+
+                            if (decision.DeclineReason) {
+                                var why = RequestsShell.named("declineReason", decision.DeclineReason);
+
+                                if (decision.DeclineNote) {
+                                    why = RequestsShell.fill("declineReason.withNote", [why, decision.DeclineNote]);
+                                }
+
+                                said = RequestsShell.fill("queue.askedBefore.withReason", [said, why]);
+                            }
+
+                            lines.push(said);
+                        });
+
+                        return lines.join("\n");
+                    }
+
+                    /*
+                     * How much the person asking is already waiting for. It is a plain number and
+                     * not a sentence, because the column heading is what says what the number is
+                     * and a sentence in every row of a table is a table nobody scans.
+                     *
+                     * An answer this page was not given reads as an empty cell. A zero would be a
+                     * claim, and the one thing that is certainly false is that somebody with a row
+                     * in the queue is waiting for nothing.
+                     */
+                    function waitingFor(request) {
+                        return request.Context ? String(request.Context.OpenRequestsByRequester) : "";
+                    }
+
+                    /*
+                     * Who asked, as a name where this server knows one.
+                     *
+                     * The names are the server's own user list and this plugin holds no copy of
+                     * anybody's. Where the list could not be read the identifier is shown, which is
+                     * what the row said before and is worse to read rather than wrong.
+                     */
+                    function who(request) {
+                        return people[request.RequestedByUserId] || request.RequestedByUserId;
                     }
 
                     /*
@@ -529,8 +612,10 @@
                             cell(row, RequestsShell.named("queue.state", request.State));
                             cell(row, moment(request.RequestedAt));
                             cell(row, moment(request.StateChangedAt));
-                            cell(row, request.RequestedByUserId);
+                            cell(row, who(request));
+                            cell(row, waitingFor(request));
                             cell(row, held(request));
+                            cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
                             cell(row, request.RequesterNote || "");
                             cell(row, decided(request));
                             decide(row, request);
@@ -547,6 +632,31 @@
 
                         previous.disabled = answer.Skip <= 0;
                         next.disabled = last >= answer.MatchCount;
+                    }
+
+                    /*
+                     * The server's own user list, turned into names by identifier.
+                     *
+                     * This is the one call on this page that is not to this plugin. The queue answer
+                     * carries the identifier the request was made under, because that is what this
+                     * plugin holds; the name beside it belongs to the server, the dashboard is
+                     * already signed in to it, and asking for it here is what stops an operator
+                     * reading a column of identifiers and going to find out who they are.
+                     *
+                     * A failure is swallowed on purpose. The queue is readable without names and a
+                     * page that refused to draw because the user list was unavailable would trade a
+                     * worse column for no queue at all.
+                     */
+                    function known() {
+                        return ApiClient.getUsers()
+                            .then(function (users) {
+                                users.forEach(function (user) {
+                                    people[user.Id] = user.Name;
+                                });
+                            })
+                            .catch(function () {
+                                people = {};
+                            });
                     }
 
                     function read() {
@@ -605,6 +715,7 @@
                             .then(function () {
                                 return RequestsShell.load();
                             })
+                            .then(known)
                             .then(function () {
                                 RequestsShell.attach(page, "RequestsQueue");
                                 RequestsShell.draw(page);
