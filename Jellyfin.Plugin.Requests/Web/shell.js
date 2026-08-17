@@ -199,15 +199,26 @@ var RequestsShell = {
      * Puts a sentence where the operator is looking, named by its key rather than written by the
      * caller. An empty key clears it.
      *
+     * Values are optional and go through `fill`, so a sentence about one request says which one.
+     * The alternative is a caller joining a word to a value itself, which is a sentence built in
+     * the page out of pieces no translator can reorder.
+     *
      * `textContent` rather than any of the ways of writing markup. What is shown here can carry a
      * message the server built out of text a person typed, and rendering that as markup is a
      * scripting hole in the dashboard of a server reachable by anybody who can file a request.
      */
-    say: function (page, key) {
+    say: function (page, key, values) {
         var target = page.querySelector(".requestsMessage");
 
-        if (target) {
-            target.textContent = key ? RequestsShell.word(key) : "";
+        if (!target) {
+            return;
         }
+
+        if (!key) {
+            target.textContent = "";
+            return;
+        }
+
+        target.textContent = values ? RequestsShell.fill(key, values) : RequestsShell.word(key);
     },
 };
