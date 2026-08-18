@@ -19,6 +19,12 @@ namespace Jellyfin.Plugin.Requests.Tests.Configuration;
 public class ConfigurationRulesTests
 {
     /// <summary>
+    /// An address a notice could be posted to, for the rows whose subject is what happens once an
+    /// operator has typed one.
+    /// </summary>
+    private const string SomewhereToPostTo = "https://example.invalid/hook";
+
+    /// <summary>
     /// The last value each rule accepts, and the first one it refuses, with the setting the refusal
     /// has to name. One row per rule, and the row for the accepted kinds names both switches because
     /// either of them fixes it.
@@ -52,6 +58,28 @@ public class ConfigurationRulesTests
                     configuration.AcceptsSeries = false;
                 }),
                 [nameof(PluginConfiguration.AcceptsMovies), nameof(PluginConfiguration.AcceptsSeries)]
+            },
+            {
+                "the announcements",
+                Fresh(configuration =>
+                {
+                    configuration.OutboundNoticeAddress = SomewhereToPostTo;
+                    configuration.AnnouncesApprovals = false;
+                    configuration.AnnouncesDeclines = false;
+                    configuration.AnnouncesFulfilments = true;
+                }),
+                Fresh(configuration =>
+                {
+                    configuration.OutboundNoticeAddress = SomewhereToPostTo;
+                    configuration.AnnouncesApprovals = false;
+                    configuration.AnnouncesDeclines = false;
+                    configuration.AnnouncesFulfilments = false;
+                }),
+                [
+                    nameof(PluginConfiguration.AnnouncesApprovals),
+                    nameof(PluginConfiguration.AnnouncesDeclines),
+                    nameof(PluginConfiguration.AnnouncesFulfilments)
+                ]
             }
         };
 
@@ -130,7 +158,10 @@ public class ConfigurationRulesTests
             AcceptsMovies = false,
             AcceptsSeries = false,
             FinishedRequestRetentionDays = 0,
-            OutboundNoticeAddress = "example.invalid/hook"
+            OutboundNoticeAddress = "example.invalid/hook",
+            AnnouncesApprovals = false,
+            AnnouncesDeclines = false,
+            AnnouncesFulfilments = false
         };
 
         var declared = typeof(PluginConfiguration)

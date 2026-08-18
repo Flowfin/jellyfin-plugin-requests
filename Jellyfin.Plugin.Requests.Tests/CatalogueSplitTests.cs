@@ -85,9 +85,9 @@ public sealed class CatalogueSplitTests
     }
 
     /// <summary>
-    /// The controller takes six things and none of them can fetch anything. A metadata source
-    /// arrives as something injected, so the constructor is where one would appear first, and a
-    /// seventh parameter fails here before anybody writes the call.
+    /// The controller takes seven things and none of them can fetch anything. A metadata source
+    /// arrives as something injected, so the constructor is where one would appear first, and an
+    /// eighth parameter fails here before anybody writes the call.
     /// <para>
     /// Written as the exact list rather than as "nothing called a provider". A name test would pass
     /// the day somebody injects a fetcher under a name nobody predicted, which is the shape this
@@ -111,7 +111,8 @@ public sealed class CatalogueSplitTests
                 nameof(IIdentifierSource),
                 nameof(ICallerIdentity),
                 nameof(IInstallSettings),
-                nameof(IActivityJournal)),
+                nameof(IActivityJournal),
+                nameof(IOutboundSink)),
             string.Join(" | ", taken),
             StringComparer.Ordinal);
     }
@@ -146,5 +147,6 @@ public sealed class CatalogueSplitTests
             new SequentialIdentifierSource(),
             new FakeCallerIdentity(Operator),
             new FakeInstallSettings(),
-            new RecordingJournal());
+            new RecordingJournal(),
+            new RecordingSink());
 }

@@ -18,6 +18,9 @@ without this page moving with it, and again if the page cannot reach one of them
 | ---------------------------- | ------- |
 | AcceptsMovies                | true    |
 | AcceptsSeries                | true    |
+| AnnouncesApprovals           | true    |
+| AnnouncesDeclines            | true    |
+| AnnouncesFulfilments         | true    |
 | FinishedRequestRetentionDays | 365     |
 | OpenRequestsPerUser          | 10      |
 | OutboundNoticeAddress        |         |
@@ -73,15 +76,31 @@ eleventh open request today.**
 turned off. It is the only setting on this page that causes anything to leave this server, and it is
 the only one that holds text rather than a number or a switch.
 
-With an address in it, every movement in the queue is posted there as a small JSON document. What
-that document carries, what it deliberately does not, and what an operator is agreeing to by typing
-an address are in [notifications.md](notifications.md); the same fields are counted as what leaves
-the server in [personal-data.md](personal-data.md). Nothing waits for the post and nothing is
-retried, so a service that is down costs the messages sent while it was down and costs a request
-nothing.
+With an address in it, each movement the three switches below leave on is posted there as a small
+JSON document. What that document carries, what it deliberately does not, and what an operator is
+agreeing to by typing an address are in [notifications.md](notifications.md); the same fields are
+counted as what leaves the server in [personal-data.md](personal-data.md). Nothing waits for the post
+and nothing is retried, so a service that is down costs the messages sent while it was down and costs
+a request nothing.
 
 There is no second setting saying whether to use the address. Two ways to say off is one of them
 being wrong the day somebody sets the other, and an operator who wants it off empties the field.
+
+**AnnouncesApprovals**, **AnnouncesDeclines** and **AnnouncesFulfilments** are on, and they are what
+narrows a sink that already has somewhere to send to rather than a second way of turning one off. An
+install with no address is silent whatever they say, which is why they are on: an operator who has
+just typed an address and gets nothing has to read three more fields to find out why.
+
+They are three settings rather than one because the three are different messages. An automation that
+forwards the yeses and not the noes is an ordinary thing to want, and a fulfilment is the one nobody
+decides, so its volume follows how fast the library is filling rather than how often an operator
+looks at the queue. That is the switch most likely to be turned off first.
+
+**An arrival is not on this list and there is no switch for one.** A request is made over the
+endpoint and also over the seam the sibling plugin hands a want across, and a switch that caught the
+first and not the second would send some arrivals and look like it sent all of them. So nothing is
+announced when a request is made, and what an operator has instead is the queue and, when #76 lands,
+a message to a live administrator session.
 
 ## What is refused
 
@@ -90,12 +109,13 @@ arrives: an operator can edit that file, and a restore can put an older one back
 are read at both moments a configuration reaches this plugin, from the same list, in
 [`ConfigurationRules`](../Jellyfin.Plugin.Requests/Configuration/ConfigurationRules.cs).
 
-| Setting                      | Refused when                               | Because                                                                                         |
-| ---------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| OpenRequestsPerUser          | below 1                                    | nobody may have a request open, so every ask is refused by an install that still offers itself  |
-| AcceptsMovies, AcceptsSeries | both off                                   | there is nothing anybody can ask for                                                            |
-| FinishedRequestRetentionDays | below 30                                   | the history is removed while people are still asking about it                                   |
-| OutboundNoticeAddress        | set to something that is not http or https | a notice cannot be posted there, so the sink would send nothing while the page shows an address |
+| Setting                                                     | Refused when                               | Because                                                                                                     |
+| ----------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| OpenRequestsPerUser                                         | below 1                                    | nobody may have a request open, so every ask is refused by an install that still offers itself              |
+| AcceptsMovies, AcceptsSeries                                | both off                                   | there is nothing anybody can ask for                                                                        |
+| FinishedRequestRetentionDays                                | below 30                                   | the history is removed while people are still asking about it                                               |
+| OutboundNoticeAddress                                       | set to something that is not http or https | a notice cannot be posted there, so the sink would send nothing while the page shows an address             |
+| AnnouncesApprovals, AnnouncesDeclines, AnnouncesFulfilments | all three off while an address is set      | nothing would ever be posted to the address, which is a second way of saying off and the one nobody can see |
 
 **Nothing is corrected on the way in.** A quota of zero is not raised to one and a retention of five
 days is not raised to thirty. An install running a value it substituted does something other than
@@ -129,13 +149,18 @@ server runs today.
 as a per-user setting rather than a switch for the whole server, so a boolean here would be the
 wrong shape rather than an early version of the right one.
 
-**Notification switches.** Two paths exist and neither has a switch. The activity log is always on
-and is meant to be: it is a record rather than a message, it stays on the server, and an operator who
-could turn it off would be able to lose the answer to what happened to a request. The outbound sink
-is turned off by having nowhere to send to, which is `OutboundNoticeAddress` above rather than a
-switch beside it. The rest are unbuilt, and switches for paths that do not exist would be settings an
-operator can change with no effect, which is worse than their absence. They land with the paths, in
-#79.
+**A switch for the activity log.** It is always on and is meant to be: it is a record rather than a
+message, it stays on the server, and an operator who could turn it off would be able to lose the
+answer to what happened to a request.
+
+**A switch saying whether to use the address.** The outbound sink is off by having nowhere to send
+to, which is `OutboundNoticeAddress` above. The three announcement switches narrow a sink that
+already has somewhere to send to and are not a second way of saying off, which is why all three off
+with an address set is refused rather than treated as silence.
+
+**Switches for paths that do not exist.** A setting an operator can change with no effect is worse
+than its absence, so the set above names the three movements this plugin announces and grows when a
+path does.
 
 **A bridge address and a credential.** The only bridge in this tree is the one for a server that has
 none. A field for an address would be somewhere to type something nothing reads. #82 brings the

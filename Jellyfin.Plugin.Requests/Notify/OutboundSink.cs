@@ -24,7 +24,9 @@ namespace Jellyfin.Plugin.Requests.Notify;
 /// where nobody typed an address has no sink at all: <see cref="IsConfigured"/> is false, announcing
 /// does nothing, and no client is ever built. That is why the address is the setting and there is no
 /// second one beside it saying whether to use it, which would be two ways to express the same off
-/// and one of them wrong.
+/// and one of them wrong. The per-event switches are not that second one: they narrow a sink that
+/// has somewhere to send to, they are on until an operator turns one off, and an install with no
+/// address is silent whatever they say.
 /// </para>
 /// <para>
 /// <b>It gives up rather than waiting.</b> A send is bounded by <see cref="DefaultAnswerWithin"/>,
@@ -113,7 +115,7 @@ public sealed class OutboundSink : IOutboundSink, IDisposable
     {
         ArgumentNullException.ThrowIfNull(notice);
 
-        if (_disposed || Address() is not Uri address)
+        if (_disposed || Address() is not Uri address || !Wanted(notice.Event))
         {
             return;
         }
@@ -223,6 +225,37 @@ public sealed class OutboundSink : IOutboundSink, IDisposable
             && (address.Scheme == Uri.UriSchemeHttp || address.Scheme == Uri.UriSchemeHttps)
                 ? address
                 : null;
+    }
+
+    /// <summary>
+    /// Whether this install wants to hear about that kind of movement.
+    /// <para>
+    /// Read per notice from the same settings the address comes from, so an operator who switches an
+    /// event off stops getting it at the next movement rather than at the next restart.
+    /// </para>
+    /// <para>
+    /// <b>An event with no arm here is not announced.</b> A value added to <see cref="NoticeEvent"/>
+    /// reaches this with nobody having decided whether an operator wants it, and the two ways to be
+    /// wrong are not equal: an event withheld is a message somebody has to go and switch on, and an
+    /// event sent is a message that has already left the server. <see cref="NoticeEvent.Asked"/> is
+    /// in that arm today by the same rule and not by omission - nothing here announces an arrival,
+    /// because the endpoint is not the only way one is made and a switch that catches some arrivals
+    /// is worse than one that catches none.
+    /// </para>
+    /// </summary>
+    /// <param name="what">What the notice is about.</param>
+    /// <returns><see langword="true"/> where the operator has left that event switched on.</returns>
+    private bool Wanted(NoticeEvent what)
+    {
+        var settings = _settings.Current;
+
+        return what switch
+        {
+            NoticeEvent.Approved => settings.AnnouncesApprovals,
+            NoticeEvent.Declined => settings.AnnouncesDeclines,
+            NoticeEvent.Fulfilled => settings.AnnouncesFulfilments,
+            _ => false
+        };
     }
 
     /// <summary>

@@ -230,5 +230,6 @@ public sealed class WhatAPersonIsToldTests
             _identifiers,
             new FakeCallerIdentity(Asker),
             new FakeInstallSettings(new PluginConfiguration { OpenRequestsPerUser = allowed }),
-            new RecordingJournal());
+            new RecordingJournal(),
+            new RecordingSink());
 }

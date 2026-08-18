@@ -70,9 +70,10 @@ has typed an address, and the section below is what it sends.
 
 This is the only thing in this plugin that sends anything off the machine, and it is off until an
 operator sets `OutboundNoticeAddress` in the settings. Empty is the whole of how it is off; there is
-no second switch, for the reason in [configuration.md](configuration.md).
+no second switch that means off, for the reason in [configuration.md](configuration.md).
 
-With an address set, every movement in the queue is posted to it as one JSON document:
+With an address set, each movement the operator has left switched on is posted to it as one JSON
+document:
 
 ```json
 {
@@ -91,7 +92,8 @@ With an address set, every movement in the queue is posted to it as one JSON doc
 
 `event` is one of `Asked`, `Approved`, `Declined` and `Fulfilled`. It is a word rather than a number
 so that a value inserted into the middle of that list later cannot silently change what every past
-document meant, and `state` and `kind` are words for the same reason.
+document meant, and `state` and `kind` are words for the same reason. Three of the four are sent:
+`Asked` is in the vocabulary and nothing here announces one, which the section below says why.
 
 `movedByUserId` is absent where nobody moved it. An arrival was not moved by anybody, and fulfilment
 is decided by the library rather than by a person.
@@ -213,16 +215,41 @@ Nothing here reports anything to this project. No path sends anything anywhere b
 them sends anything to the maintainer at all, at any setting. That is not a property of the sink's
 design, it is a standing decision recorded on #113, and it has no opt-in.
 
-No path is meant to send anything until an operator turns it on, the activity log excepted because it
-is a record rather than a message. The outbound sink holds that today by having nowhere to send to on
-a fresh install. Making it a property of every path, switchable per event, is #79, and until that
-lands it is a plan for the other paths rather than a property of the code.
+No path sends anything until an operator turns it on, the activity log excepted because it is a
+record rather than a message. The outbound sink is off on a fresh install by having nowhere to send
+to, and what an operator narrows it with once it has somewhere is the section below.
+
+## Which movements are announced, and which are not
+
+`AnnouncesApprovals`, `AnnouncesDeclines` and `AnnouncesFulfilments` are three settings, each on
+until an operator turns it off, and they are read in the sink rather than at the paths that move a
+request. A path announces every movement it makes and the sink drops what this install does not
+want, so a fourth path added later is covered by the switches without anybody remembering to ask
+them.
+
+They are not a second way of expressing off. An install with no address sends nothing whatever they
+say, and they are on by default so that an operator who has just typed an address gets what they
+turned on rather than silence with three more fields to find.
+
+**An arrival is announced by nothing, and that is a decision rather than an omission.** A request is
+made over this plugin's endpoint and also over the seam a sibling plugin hands a want across, so a
+switch wired at the endpoint would forward some arrivals and read as though it forwarded all of them.
+The vocabulary carries `Asked` because the document's shape is a contract with somebody else's
+machine and removing a word from it is a change to that contract; nothing here sends one, and the
+sink refuses any movement it has no switch for rather than sending it under a default.
+
+Telling an administrator that something arrived is #76, on the path that is a message rather than a
+post off the machine.
 
 ## What this page does not do
 
 It does not say what the session message sends. That shape is #76's, and it is where the text a
 person actually reads on that path is decided. The activity entry and the sink's payload are both
 above, because those are the two paths that are built.
+
+It does not say what a fourth path would be switched with. The three settings above name the three
+movements this plugin announces, and a setting for a path nothing sends on is a field an operator can
+change with no effect.
 
 It does not decide what happens when a path fails. An outbound sink pointed at something that has
 stopped answering is #78's and #86's, and nothing here says a failure to notify may move a request.

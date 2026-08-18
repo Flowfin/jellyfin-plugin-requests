@@ -151,4 +151,36 @@ public sealed record OutboundNotice
             Year = request.DisplayYear
         };
     }
+
+    /// <summary>
+    /// The notice for a request that has just moved, or nothing where the state it moved into is not
+    /// one this plugin announces.
+    /// <para>
+    /// The mapping from a state to an event lives here rather than at the two paths that move a
+    /// request, because two copies of it are two answers the day a state is added, and the copy that
+    /// is wrong is the one that quietly sends the wrong word to somebody else's machine.
+    /// </para>
+    /// <para>
+    /// <b>A state with no arm is not announced, and that is the deliberate direction.</b>
+    /// <see cref="RequestState.Open"/> is the state a request is in before anybody has done
+    /// anything, and <see cref="RequestState.Failed"/> has no path that reaches it in this tree; a
+    /// state added later arrives here with nobody having decided what word it goes out as, and
+    /// withholding a message is recoverable where sending the wrong one is not.
+    /// </para>
+    /// </summary>
+    /// <param name="request">The request as the move left it.</param>
+    /// <returns>The document to send, or <see langword="null"/> where nothing is sent for it.</returns>
+    /// <exception cref="ArgumentNullException">Where there is no request to describe.</exception>
+    public static OutboundNotice? ForMove(MediaRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return request.State switch
+        {
+            RequestState.Approved => For(request, NoticeEvent.Approved),
+            RequestState.Declined => For(request, NoticeEvent.Declined),
+            RequestState.Fulfilled => For(request, NoticeEvent.Fulfilled),
+            _ => null
+        };
+    }
 }

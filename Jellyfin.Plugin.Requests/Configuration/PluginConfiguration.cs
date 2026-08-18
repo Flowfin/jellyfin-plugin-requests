@@ -22,9 +22,9 @@ namespace Jellyfin.Plugin.Requests.Configuration;
 /// boolean added now would be the wrong shape rather than an early version of the right one.
 /// </para>
 /// <para>
-/// There are no notification switches. One path is built and it is turned on by being pointed
-/// somewhere, which is <see cref="OutboundNoticeAddress"/> below; the rest are unbuilt, and #79 is
-/// where the switches land beside the paths they turn off rather than ahead of them.
+/// The notification switches below name the three movements this plugin announces outward and
+/// nothing else. A switch for a path that does not exist is a setting an operator can change with no
+/// effect, so the set grows when a path does rather than ahead of one.
 /// </para>
 /// <para>
 /// There is no bridge address and no credential. The only implementation of the bridge in this tree
@@ -120,4 +120,43 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </para>
     /// </summary>
     public string OutboundNoticeAddress { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether an approval is announced to the address above.
+    /// <para>
+    /// True, and the three switches below it are true for the same reason: what turns the outbound
+    /// path on is the address, and an operator who has just typed one expects the thing they turned
+    /// on to work. Defaulting these to false would make an install with an address set and nothing
+    /// arriving the ordinary case, which is a second way to express off and the wrong one of the two.
+    /// </para>
+    /// <para>
+    /// So a fresh install still sends nothing outward, because there is nowhere to send it, and these
+    /// are what an operator narrows a sink with once it has somewhere to go.
+    /// </para>
+    /// </summary>
+    public bool AnnouncesApprovals { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a decline is announced to the address above.
+    /// <para>
+    /// It is a switch of its own rather than sharing one with an approval, because the two are
+    /// different messages to an operator's automation: a decline is the answer somebody may have to
+    /// explain, and an install that wants only the yeses forwarded is a real install.
+    /// </para>
+    /// <para>
+    /// The reason a request was declined is not on the wire whichever way this is set, for the
+    /// reason <see cref="Notify.OutboundNotice"/> gives: it is free text somebody typed.
+    /// </para>
+    /// </summary>
+    public bool AnnouncesDeclines { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a fulfilment is announced to the address above.
+    /// <para>
+    /// This is the noisy one on a server whose library is filling, because nobody decides it: the
+    /// sweep moves a request the moment the title turns up, so the volume follows the library rather
+    /// than the operator. It is the switch most likely to be turned off, which is why it is one.
+    /// </para>
+    /// </summary>
+    public bool AnnouncesFulfilments { get; set; } = true;
 }

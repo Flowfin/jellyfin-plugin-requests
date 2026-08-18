@@ -36,6 +36,9 @@ public class PluginConfigurationTests
         {
             { "AcceptsMovies", "true" },
             { "AcceptsSeries", "true" },
+            { "AnnouncesApprovals", "true" },
+            { "AnnouncesDeclines", "true" },
+            { "AnnouncesFulfilments", "true" },
             { "FinishedRequestRetentionDays", "365" },
             { "OpenRequestsPerUser", "10" },
             { "OutboundNoticeAddress", string.Empty }

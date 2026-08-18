@@ -135,16 +135,20 @@ public sealed class OutboundSinkTests
 
         var stored = await store.AddAsync(Requested(), CancellationToken.None).ConfigureAwait(true);
 
-        sink.Announce(OutboundNotice.For(stored.Request, NoticeEvent.Asked));
-
-        // The endpoint has the send and is not going to answer it. Everything below happens anyway.
-        await endpoint.Entered.ConfigureAwait(true);
-
         var approved = RequestLifecycle.Move(
             stored.Request,
             RequestState.Approved,
             Noon,
             RequestCaller.Administrator(Operator));
+
+        // An approval rather than an arrival, because the sink sends only what an install can
+        // switch and #79 gave a switch to the three movements rather than to an arrival. It is
+        // announced before the write for the same reason as ever: what this leg watches is the
+        // write landing while the endpoint still has the send.
+        sink.Announce(OutboundNotice.For(approved, NoticeEvent.Approved));
+
+        // The endpoint has the send and is not going to answer it. Everything below happens anyway.
+        await endpoint.Entered.ConfigureAwait(true);
 
         var written = await store
             .ReplaceAsync(approved, stored.Revision, CancellationToken.None)

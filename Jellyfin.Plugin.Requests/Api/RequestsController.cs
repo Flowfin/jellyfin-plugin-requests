@@ -99,6 +99,7 @@ public sealed class RequestsController : RequestsControllerBase
     private readonly IIdentifierSource _identifiers;
     private readonly ICallerIdentity _callers;
     private readonly IActivityJournal _journal;
+    private readonly IOutboundSink _sink;
     private readonly RequestIntake _intake;
 
     /// <summary>
@@ -117,19 +118,26 @@ public sealed class RequestsController : RequestsControllerBase
     /// rather than something this controller reaches for, because a decision that is not written
     /// down is the failure #75 is about and a test has to be able to see the entry without a server.
     /// </param>
+    /// <param name="sink">
+    /// Where a movement is announced outward, on an install that has somewhere to announce it to.
+    /// Every movement is announced and the sink drops what the operator switched off, which is #79:
+    /// an endpoint that decided for itself would be one more place the switches have to be read.
+    /// </param>
     public RequestsController(
         IRequestStore store,
         IClock clock,
         IIdentifierSource identifiers,
         ICallerIdentity callers,
         IInstallSettings settings,
-        IActivityJournal journal)
+        IActivityJournal journal,
+        IOutboundSink sink)
     {
         _store = store;
         _clock = clock;
         _identifiers = identifiers;
         _callers = callers;
         _journal = journal;
+        _sink = sink;
 
         // Built here rather than injected, because it is this controller's use of the store rather
         // than one more thing the server has to supply. CatalogueSplitTests reads the list this
@@ -761,6 +769,15 @@ public sealed class RequestsController : RequestsControllerBase
             if (ActivityNote.For(held.Request, written.Request) is ActivityNote note)
             {
                 await _journal.WriteAsync(note, cancellationToken).ConfigureAwait(false);
+
+                // Under the same condition as the entry above and for the same reason: a state that
+                // did not move is not a movement to tell anybody about. Announcing is not awaited
+                // and cannot fail, so it costs the caller nothing, and the decision is already
+                // written whatever an operator's endpoint does with the message.
+                if (OutboundNotice.ForMove(written.Request) is OutboundNotice notice)
+                {
+                    _sink.Announce(notice);
+                }
             }
 
             return new DecidedRequest { Id = id, Request = Queued(written) };
