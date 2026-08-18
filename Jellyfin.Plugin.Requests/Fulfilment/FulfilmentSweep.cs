@@ -51,6 +51,7 @@ public sealed class FulfilmentSweep
     private readonly ILibrary _library;
     private readonly IClock _clock;
     private readonly IActivityJournal _journal;
+    private readonly IOutboundSink _sink;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -63,6 +64,11 @@ public sealed class FulfilmentSweep
     /// Where a move is written down. This path is the one nobody watched happen, so the entry is
     /// the only thing that tells an operator afterwards that a request moved on its own.
     /// </param>
+    /// <param name="sink">
+    /// Where the movement is announced outward. This path is the one an operator's automation is
+    /// most likely to want, because a fulfilment is what somebody was waiting for, and it is the one
+    /// they are most likely to switch off, because the library decides how many there are.
+    /// </param>
     /// <param name="logger">The server's log, where a refused write is reported.</param>
     /// <exception cref="ArgumentNullException">Where anything it needs is missing.</exception>
     public FulfilmentSweep(
@@ -70,18 +76,21 @@ public sealed class FulfilmentSweep
         ILibrary library,
         IClock clock,
         IActivityJournal journal,
+        IOutboundSink sink,
         ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(journal);
+        ArgumentNullException.ThrowIfNull(sink);
         ArgumentNullException.ThrowIfNull(logger);
 
         _store = store;
         _library = library;
         _clock = clock;
         _journal = journal;
+        _sink = sink;
         _logger = logger;
     }
 
@@ -259,6 +268,14 @@ public sealed class FulfilmentSweep
         if (ActivityNote.For(request, observed) is ActivityNote note)
         {
             await _journal.WriteAsync(note, cancellationToken).ConfigureAwait(false);
+
+            // Under the same condition as the entry, so an observation that changed availability
+            // without moving anything sends nothing. Announcing is not awaited: a sweep that waited
+            // on somebody's endpoint would take as long as the slowest of them per request.
+            if (OutboundNotice.ForMove(observed) is OutboundNotice notice)
+            {
+                _sink.Announce(notice);
+            }
         }
 
         return moves;

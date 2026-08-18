@@ -48,6 +48,28 @@
                             <div class="fieldDescription" data-i18n="config.outboundNoticeAddress.description"></div>
                         </div>
 
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="RequestsAnnouncesApprovals" />
+                                <span data-i18n="config.announcesApprovals.label"></span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription" data-i18n="config.announce.description"></div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="RequestsAnnouncesDeclines" />
+                                <span data-i18n="config.announcesDeclines.label"></span>
+                            </label>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="RequestsAnnouncesFulfilments" />
+                                <span data-i18n="config.announcesFulfilments.label"></span>
+                            </label>
+                        </div>
+
                         <div>
                             <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                                 <span data-i18n="config.save"></span>
@@ -95,6 +117,9 @@
                     var switches = {
                         AcceptsMovies: "#RequestsAcceptsMovies",
                         AcceptsSeries: "#RequestsAcceptsSeries",
+                        AnnouncesApprovals: "#RequestsAnnouncesApprovals",
+                        AnnouncesDeclines: "#RequestsAnnouncesDeclines",
+                        AnnouncesFulfilments: "#RequestsAnnouncesFulfilments",
                     };
 
                     // Read and written as typed, with no trimming and no default put in its place.

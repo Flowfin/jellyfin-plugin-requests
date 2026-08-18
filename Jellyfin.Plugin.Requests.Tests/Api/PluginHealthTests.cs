@@ -370,7 +370,7 @@ public sealed class PluginHealthTests
     /// <param name="clock">What the moment of a run is read from.</param>
     /// <returns>The sweep.</returns>
     private static FulfilmentSweep SweepOver(IRequestStore store, TestClock clock)
-        => new FulfilmentSweep(store, new FakeLibrary(), clock, new RecordingJournal(), new RecordingLogger());
+        => new FulfilmentSweep(store, new FakeLibrary(), clock, new RecordingJournal(), new RecordingSink(), new RecordingLogger());
 
     /// <summary>
     /// One request, added to the store.

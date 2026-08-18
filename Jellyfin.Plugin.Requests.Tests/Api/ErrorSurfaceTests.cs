@@ -391,7 +391,7 @@ public sealed class ErrorSurfaceTests
     /// <param name="settings">What this install is set to.</param>
     /// <returns>The controller under test.</returns>
     private RequestsController ControllerFor(IRequestStore store, Guid? caller, IInstallSettings settings)
-        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), settings, new RecordingJournal());
+        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), settings, new RecordingJournal(), new RecordingSink());
 
     /// <summary>
     /// A second request in the store, so one of them can be moved out of the way.

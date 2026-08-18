@@ -434,5 +434,6 @@ public sealed class QueueContextTests
             new SequentialIdentifierSource(),
             new FakeCallerIdentity(Operator),
             new FakeInstallSettings(),
-            new RecordingJournal());
+            new RecordingJournal(),
+            new RecordingSink());
 }

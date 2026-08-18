@@ -101,6 +101,20 @@ public static class ConfigurationRules
             });
         }
 
+        // An address with every announcement switched off is the second way of saying off, which is
+        // the thing the sink is built not to have. All three are named because turning any one of
+        // them back on fixes it, and so does emptying the address, which is the answer the settings
+        // page recommends because it is the one a reader can see at a glance.
+        if (!string.IsNullOrWhiteSpace(configuration.OutboundNoticeAddress)
+            && !configuration.AnnouncesApprovals
+            && !configuration.AnnouncesDeclines
+            && !configuration.AnnouncesFulfilments)
+        {
+            problems.Add(NothingLeftToAnnounce(nameof(PluginConfiguration.AnnouncesApprovals)));
+            problems.Add(NothingLeftToAnnounce(nameof(PluginConfiguration.AnnouncesDeclines)));
+            problems.Add(NothingLeftToAnnounce(nameof(PluginConfiguration.AnnouncesFulfilments)));
+        }
+
         return problems;
     }
 
@@ -145,6 +159,13 @@ public static class ConfigurationRules
             throw new InvalidConfigurationException(problems);
         }
     }
+
+    private static ConfigurationProblem NothingLeftToAnnounce(string setting)
+        => new ConfigurationProblem
+        {
+            Setting = setting,
+            Why = "AnnouncesApprovals, AnnouncesDeclines and AnnouncesFulfilments are all off while OutboundNoticeAddress holds an address, so nothing would ever be posted to it. Switch one of them on, or empty the address, which is the way of saying off that a reader of this page can see.",
+        };
 
     private static ConfigurationProblem NoKindAccepted(string setting)
         => new ConfigurationProblem

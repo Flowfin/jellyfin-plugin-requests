@@ -141,6 +141,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<ILibrary>(),
             provider.GetRequiredService<IClock>(),
             provider.GetRequiredService<IActivityJournal>(),
+            provider.GetRequiredService<IOutboundSink>(),
             provider.GetRequiredService<ILogger<FulfilmentSweep>>()));
 
         // The event half of the fulfilment check. A hosted service rather than something built when

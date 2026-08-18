@@ -621,5 +621,6 @@ public sealed class ListRequestsTests
             _identifiers,
             new FakeCallerIdentity(caller),
             new FakeInstallSettings(),
-            new RecordingJournal());
+            new RecordingJournal(),
+            new RecordingSink());
 }

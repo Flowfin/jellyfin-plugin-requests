@@ -34,6 +34,12 @@ public interface IOutboundSink
     /// <summary>
     /// Sends the notice, eventually, or does not. Returns as soon as the delivery is under way and
     /// never raises anything the caller has to handle.
+    /// <para>
+    /// <b>Whether an install wants that kind of movement is decided here and never by the caller.</b>
+    /// A caller that asked first would be a caller that can forget to ask, and the switch would then
+    /// hold for the paths somebody remembered rather than for the path. So every path announces
+    /// every movement it makes, and what an operator switched off is dropped in one place.
+    /// </para>
     /// </summary>
     /// <param name="notice">What to say.</param>
     void Announce(OutboundNotice notice);
