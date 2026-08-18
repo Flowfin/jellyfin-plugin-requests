@@ -6,6 +6,10 @@ Use GitHub's private vulnerability reporting for this repository: the **Security
 tab, then **Report a vulnerability**. It is enabled here, and it opens a draft
 advisory only you and the maintainer can read.
 
+The form is here, without navigating:
+
+<https://github.com/Flowfin/jellyfin-plugin-requests/security/advisories/new>
+
 That is the route. Do not open a public issue for a security problem, and do not
 put one in a pull request body: both are readable by anybody the moment they are
 written, including by whoever would use what you found.
