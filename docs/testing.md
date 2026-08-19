@@ -85,9 +85,17 @@ a test endpoint needs its certificate trusted, which means writing to a machine 
 is the third condition and the second one at once.
 
 What replaces it is an in-process HTTP double, so the client under test is exercised through its
-own handler pipeline and no socket is opened. It is #35. Until it exists there is no outbound call
-to test: #80 defines the backend interface with a null implementation behind it, and #87 is the
-proof that this plugin is complete with no backend at all.
+own handler pipeline and no socket is opened. It is
+`Jellyfin.Plugin.Requests.Tests/Doubles/ASinkEndpoint.cs`, and the outbound call it stands in front
+of is the notification sink, which posts a document to the one address an operator typed and reads
+a status back. What no double here reaches is a response body, because nothing in this plugin
+parses one, and the cases that need a client which does are what #35 is still open for.
+
+This paragraph named an issue rather than a file until #251, and went on saying the double did not
+exist for as long as it took somebody to read both.
+`TheRefusalListNamesTheDoubleThatReplacesARealOutboundCall` reds if the type is renamed or removed
+while this document names it. It reads the name and not the sentence around it, so prose naming the
+double and saying the wrong thing about it still passes.
 
 **A call refused by the server's authorisation policy.** Refused: the policy is evaluated by the
 server, so a test that a signed-in caller who is not an administrator is turned away from the queue
@@ -107,7 +115,8 @@ claims to be: what they leave open is that the server evaluates `RequiresElevati
 endpoints are evaluated under it. That is #51.
 
 Every replacement named above exists, either as something already in the tree or as an issue on
-this board:
+this board. The states move, and a paste taken once reads afterwards as a claim about today, so
+this one carries the commit it was read at, `1f5ad56`:
 
     for n in 20 35 50 51 52 54 56 61 64 115; do gh issue view $n --json number,state,title --jq '"\(.number)  \(.state)  \(.title)"'; done
     20  CLOSED  Prove the built plugin loads on a server of each claimed line
@@ -115,11 +124,11 @@ this board:
     50  CLOSED  Lay out the controller, the route prefix and the version rule
     51  OPEN  Decide the authorisation policy for every endpoint
     52  CLOSED  Create a request over the API
-    54  OPEN  Act on a request over the API
-    56  OPEN  Fix the error shape and the status codes
-    61  OPEN  Act on one request from the page
-    64  OPEN  Hold the page to the same rules as the rest of the tree
-    115  OPEN  Make the headless rule refusable rather than written down
+    54  CLOSED  Act on a request over the API
+    56  CLOSED  Fix the error shape and the status codes
+    61  CLOSED  Act on one request from the page
+    64  CLOSED  Hold the page to the same rules as the rest of the tree
+    115  CLOSED  Make the headless rule refusable rather than written down
 
     git ls-files scripts/
     scripts/verify-plugin-loads.sh
