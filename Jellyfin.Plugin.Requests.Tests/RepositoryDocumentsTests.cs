@@ -145,6 +145,32 @@ public sealed class RepositoryDocumentsTests
     }
 
     /// <summary>
+    /// The refusal list names the double that replaces a real outbound call, and the double is still
+    /// called that.
+    /// <para>
+    /// The document went on saying that replacement did not exist yet, long after it did, because it
+    /// named the issue that would build it rather than the file that had been built. An issue number
+    /// stops being an address the moment the thing arrives, and nothing read the sentence. The repair
+    /// was to name the type, and this is what holds that name true: rename the double and
+    /// <c>nameof</c> follows it while the document does not, so the two disagree here rather than in
+    /// front of somebody looking for what to write instead of a real HTTPS call.
+    /// </para>
+    /// <para>
+    /// It reads the name and not the sentence around it. Prose naming the double and saying the wrong
+    /// thing about it passes, which is stated in the document rather than hidden by this leg.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheRefusalListNamesTheDoubleThatReplacesARealOutboundCall()
+    {
+        const string Testing = "docs/testing.md";
+
+        var document = File.ReadAllText(Beside(Testing.Replace('/', Path.DirectorySeparatorChar)));
+
+        Assert.Contains(nameof(Doubles.ASinkEndpoint), document, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// One file as it sits next to the suite.
     /// </summary>
     /// <param name="name">Its path, relative to the repository root.</param>

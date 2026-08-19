@@ -61,6 +61,10 @@
     <!-- The configuration document, for the same reason again: the settings and the value a fresh
          install runs for each are printed for an operator out of the class the plugin reads. -->
     <None Include="../docs/configuration.md" Link="docs/configuration.md" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The testing document, because its refusal list names what replaces each refused test and
+         one of those replacements is a type in this project. A document naming an issue number goes
+         stale silently; a document naming a type can be read against the type. -->
+    <None Include="../docs/testing.md" Link="docs/testing.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
