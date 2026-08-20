@@ -100,6 +100,7 @@ public sealed class RequestsController : RequestsControllerBase
     private readonly ICallerIdentity _callers;
     private readonly IActivityJournal _journal;
     private readonly IOutboundSink _sink;
+    private readonly IRequesterNotice _told;
     private readonly RequestIntake _intake;
 
     /// <summary>
@@ -123,6 +124,12 @@ public sealed class RequestsController : RequestsControllerBase
     /// Every movement is announced and the sink drops what the operator switched off, which is #79:
     /// an endpoint that decided for itself would be one more place the switches have to be read.
     /// </param>
+    /// <param name="told">
+    /// Where the person who asked is told that their own request moved, on whatever they are signed
+    /// in on right now. It is a dependency for the reason the journal is one: what a test of this
+    /// endpoint has to be able to see is that exactly one person was told and which one, and that
+    /// is not visible through a server nothing here runs.
+    /// </param>
     public RequestsController(
         IRequestStore store,
         IClock clock,
@@ -130,7 +137,8 @@ public sealed class RequestsController : RequestsControllerBase
         ICallerIdentity callers,
         IInstallSettings settings,
         IActivityJournal journal,
-        IOutboundSink sink)
+        IOutboundSink sink,
+        IRequesterNotice told)
     {
         _store = store;
         _clock = clock;
@@ -138,6 +146,7 @@ public sealed class RequestsController : RequestsControllerBase
         _callers = callers;
         _journal = journal;
         _sink = sink;
+        _told = told;
 
         // Built here rather than injected, because it is this controller's use of the store rather
         // than one more thing the server has to supply. CatalogueSplitTests reads the list this
@@ -777,6 +786,15 @@ public sealed class RequestsController : RequestsControllerBase
                 if (OutboundNotice.ForMove(written.Request) is OutboundNotice notice)
                 {
                     _sink.Announce(notice);
+                }
+
+                // The person who asked, on whatever they are signed in on right now. Under the same
+                // condition as the two above, and last of the three on purpose: it is the one that
+                // reaches somebody who is not the operator making this call, and a message about a
+                // decision the store had not taken would be the worst of the three to have sent.
+                if (RequesterMessage.ForMove(written.Request, StringCatalogue.Shipped) is RequesterMessage message)
+                {
+                    _told.Tell(message);
                 }
             }
 

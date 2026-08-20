@@ -159,12 +159,18 @@ public sealed class PageWordsTests
     /// declared, and it is read off that class rather than repeated here so a fourth sentence is
     /// covered the first time the suite runs.
     /// </para>
+    /// <para>
+    /// <see cref="LiveSentences"/> is the second such class and is here for a stronger version of
+    /// the same reason. No page draws any of those at all: they are pushed to a person's client
+    /// when their request moves, so there is no asset for the first leg to find them in, and
+    /// without this the second leg would read every one of them as a string nobody shows.
+    /// </para>
     /// </summary>
     /// <returns>The keys.</returns>
     private static string[] Declared()
     {
-        var declared = typeof(Sentences)
-            .GetFields(BindingFlags.Public | BindingFlags.Static)
+        var declared = new[] { typeof(Sentences), typeof(LiveSentences) }
+            .SelectMany(declaring => declaring.GetFields(BindingFlags.Public | BindingFlags.Static))
             .Where(field => field.IsLiteral && field.FieldType == typeof(string))
             .Select(field => (string?)field.GetRawConstantValue())
             .Where(key => !string.IsNullOrEmpty(key))

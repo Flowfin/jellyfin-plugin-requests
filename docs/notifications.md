@@ -47,10 +47,10 @@ This is the path that is always on, because it is a record rather than a message
 interrupted by it and it is the thing an operator reads afterwards when somebody asks what happened.
 It is built, and what an entry says is the section below.
 
-**A message to a live session.** An administrator with the dashboard open is told that something
-arrived, through the connection the server already holds to that session. It reaches nobody who is
-not looking and it leaves nothing behind, which is exactly right for "there is something in the
-queue" and exactly wrong for anything that matters after the tab is closed. The server carries it:
+**A message to a live session.** Somebody with a client open is told something through the
+connection the server already holds to it. It reaches nobody who is not signed in at that moment and
+it leaves nothing behind, which is exactly right for news and exactly wrong for anything that matters
+after the tab is closed. The server carries it twice, once per audience:
 
     git grep -n "Task SendMessageToAdminSessions" origin/release-10.11.z -- MediaBrowser.Controller/Session/ISessionManager.cs
     origin/release-10.11.z:MediaBrowser.Controller/Session/ISessionManager.cs:196:        Task SendMessageToAdminSessions<T>(SessionMessageType name, T data, CancellationToken cancellationToken);
@@ -58,7 +58,18 @@ queue" and exactly wrong for anything that matters after the tab is closed. The 
     git grep -n "Task SendMessageToAdminSessions" origin/master -- MediaBrowser.Controller/Session/ISessionManager.cs
     origin/master:MediaBrowser.Controller/Session/ISessionManager.cs:196:        Task SendMessageToAdminSessions<T>(SessionMessageType name, T data, CancellationToken cancellationToken);
 
-Issue #76 writes it, and telling the person who asked that their own request moved is #77.
+The second one names people rather than a role, and it is the one this plugin uses. Read at the same
+two commits as the section above, `1fbd873` and `ae87230`, the latter being where the 12.0 line
+stands now rather than where it stood when the measurement above was taken:
+
+    git grep -n "Task SendMessageToUserSessions<T>(List<Guid> userIds, SessionMessageType name, T data" origin/release-10.11.z -- MediaBrowser.Controller/Session/ISessionManager.cs
+    origin/release-10.11.z:MediaBrowser.Controller/Session/ISessionManager.cs:207:        Task SendMessageToUserSessions<T>(List<Guid> userIds, SessionMessageType name, T data, CancellationToken cancellationToken);
+
+    git grep -n "Task SendMessageToUserSessions<T>(List<Guid> userIds, SessionMessageType name, T data" origin/master -- MediaBrowser.Controller/Session/ISessionManager.cs
+    origin/master:MediaBrowser.Controller/Session/ISessionManager.cs:207:        Task SendMessageToUserSessions<T>(List<Guid> userIds, SessionMessageType name, T data, CancellationToken cancellationToken);
+
+Telling the person who asked that their own request moved is built, and the section below is what
+they are told. Telling a live administrator that something arrived is #76 and is not built.
 
 **One outbound sink.** An operator who wants a request to reach something outside the server points
 this at whatever they already run. It is one sink with a defined payload rather than a service this
@@ -201,6 +212,97 @@ would not take a line about it. The failure is reported to the server's log with
 the call carries on. What is lost is the line an operator would have read in the dashboard, and this
 plugin holds nothing that would let it be written later.
 
+## What the person who asked is told
+
+The one message this plugin pushes at a person is about their own request, and it is sent when that
+request is approved, declined or fulfilled.
+
+**It reaches whoever is signed in at that moment and nobody else, and nothing remembers who was
+missed.** Somebody whose client is closed when an operator answers them is told nothing here, and no
+second attempt is made later. That is the right trade for a courtesy and the wrong one for an answer
+somebody is waiting on, which is why the answer they can rely on is their own page in
+[surface.md](surface.md): it shows the state of every request they made whenever they next look, it
+is there after a restart, and it is where the operator's note beside a decline is. Nothing about a
+request depends on the message arriving.
+
+**One person is named and there is nowhere to put a second.** The message carries a single user
+identifier, it is read off the request rather than passed in by whoever moved it, and the only thing
+it can be is whoever asked. So an operator answering one person's request cannot reach anybody else
+from here, and the person who is told learns nothing about anybody else's queue.
+
+### What it says
+
+| Movement  | What the person reads                          |
+| --------- | ---------------------------------------------- |
+| Approved  | that their request for that title was approved |
+| Declined  | that it was declined, and the reason           |
+| Fulfilled | that the title is in the library now           |
+
+The reason on a decline is read out of the same catalogue entry a surface draws it under, so somebody
+who sees the message and then opens their own page is told one thing twice rather than two things.
+
+The title is cut to a line, because it is a snapshot of what whoever asked typed and nothing caps it
+on the way here. What is cut is replaced by an ellipsis so the reader can see that something was.
+
+**It carries neither note.** The operator's note beside a decline can be five hundred characters and
+this is one line that goes away by itself, so that note is on the page rather than here. The
+requester's own note tells them nothing they do not already know. Nobody else waiting for the same
+title is in it either, and no name of any person appears anywhere, for the reason in
+[personal-data.md](personal-data.md).
+
+**A movement nobody wrote a sentence for sends nothing.** A state added to the model arrives here
+with nobody having decided what a person should read, and a decline that carries no reason would
+produce a sentence with a hole where the reason goes. Both send nothing, because a message withheld
+is recoverable by opening the page and a wrong one is not.
+
+### How it reaches a client, and what that is not proof of
+
+A plugin cannot add a name to the server's own list of session message types, so this borrows the one
+a client already acts on: the message goes out as a `GeneralCommand` carrying `DisplayMessage`, which
+is the shape the server itself builds when something asks it to show somebody a message. Read at
+`1fbd873` and `ae87230`:
+
+    git grep -n 'generalCommand.Arguments\["Header"\]' origin/release-10.11.z -- Emby.Server.Implementations/Session/SessionManager.cs
+    origin/release-10.11.z:Emby.Server.Implementations/Session/SessionManager.cs:1225:            generalCommand.Arguments["Header"] = command.Header;
+
+    git grep -n 'generalCommand.Arguments\["Header"\]' origin/master -- Emby.Server.Implementations/Session/SessionManager.cs
+    origin/master:Emby.Server.Implementations/Session/SessionManager.cs:1279:            generalCommand.Arguments["Header"] = command.Header;
+
+The web client subscribes to that name and draws the message, and whether it draws a notice or a
+dialog depends on one argument. Read at `5389bba` in `jellyfin/jellyfin-web`:
+
+    ref=5389bbad37d178ef5ebeaac8860403527c0e4121
+    gh api "repos/jellyfin/jellyfin-web/contents/src/scripts/serverNotifications.js?ref=$ref" -H "Accept: application/vnd.github.raw" |
+      grep -nE "TimeoutMs|toast|alert|case 'DisplayMessage'|OutboundWebSocketMessageType.GeneralCommand"
+    3:import alert from 'components/alert';
+    8:import toast from 'components/toast/toast';
+    22:    if (args.TimeoutMs) {
+    23:        toast({ title: args.Header, text: args.Text });
+    25:        alert({ title: args.Header, text: args.Text });
+    125:        case 'DisplayMessage':
+    197:        apiClient.subscribe([OutboundWebSocketMessageType.GeneralCommand], ({ Data }) => processGeneralCommand(Data, apiClient)),
+
+So the timeout this plugin always sets is not decoration: without one that client shows a dialog
+somebody has to dismiss, and a courtesy that sits over what a person was doing until they click it is
+worse than not sending it.
+
+**What that is not.** One file of one client was read, at one commit, and no client was run. It is
+not a claim about what any other Jellyfin client does with the same message, and it is not a claim
+that anybody saw anything. The suite asserts what this plugin asked the server to send, to whom, and
+that no other way of reaching anybody was used; the headless rule in [testing.md](testing.md) is why
+it stops there.
+
+### When the push fails
+
+**Nothing that reaches a request.** The move is in the store before anybody is told, telling somebody
+hands nothing back for a caller to check, and every way a push can fail costs the same: a line in the
+server's log and nothing else. Nothing is retried and nothing is queued.
+
+**There is no setting for it.** The three switches below narrow the outbound sink and none of them
+reaches this, and the activity log has no switch either. Whether an operator or the person themself
+should be the one to turn this off is a question nobody has taken, and it is written here rather than
+answered by adding a field.
+
 ## Why there is no fourth
 
 Because the fourth is the first of six. Growing an integration per messaging service is how a plugin
@@ -215,9 +317,11 @@ Nothing here reports anything to this project. No path sends anything anywhere b
 them sends anything to the maintainer at all, at any setting. That is not a property of the sink's
 design, it is a standing decision recorded on #113, and it has no opt-in.
 
-No path sends anything until an operator turns it on, the activity log excepted because it is a
-record rather than a message. The outbound sink is off on a fresh install by having nowhere to send
-to, and what an operator narrows it with once it has somewhere is the section below.
+Nothing leaves the machine until an operator turns it on. The outbound sink is off on a fresh
+install by having nowhere to send to, and what an operator narrows it with once it has somewhere is
+the section below. The other two paths have no switch and neither leaves the machine: the activity
+log is a record in the server's own database, and the message to the person who asked goes down a
+connection that server already holds to their client.
 
 ## Which movements are announced, and which are not
 
@@ -239,16 +343,18 @@ machine and removing a word from it is a change to that contract; nothing here s
 sink refuses any movement it has no switch for rather than sending it under a default.
 
 Telling an administrator that something arrived is #76, on the path that is a message rather than a
-post off the machine.
+post off the machine. What the person who asked is told when their own request moves is the section
+above, and it is not narrowed by these three either.
 
 ## What this page does not do
 
-It does not say what the session message sends. That shape is #76's, and it is where the text a
-person actually reads on that path is decided. The activity entry and the sink's payload are both
-above, because those are the two paths that are built.
+It does not say what a message to a live administrator would send. That half of the session path is
+#76's and is unbuilt, and its own question, what such a message is for on a dashboard that does not
+listen for one, is open there. The half that is built is the message to the person who asked, and it
+is above.
 
 It does not say what a fourth path would be switched with. The three settings above name the three
-movements this plugin announces, and a setting for a path nothing sends on is a field an operator can
+movements the sink announces, and a setting for a path nothing sends on is a field an operator can
 change with no effect.
 
 It does not decide what happens when a path fails. An outbound sink pointed at something that has

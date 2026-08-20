@@ -225,7 +225,8 @@ public sealed class QueueViewTests
             new FakeCallerIdentity(new Guid("c1000000-0000-0000-0000-0000000000ad")),
             new FakeInstallSettings(),
             new RecordingJournal(),
-            new RecordingSink());
+            new RecordingSink(),
+            new RecordingRequesterNotice());
 
         var answered = await controller.QueueAsync(
             [Enum.Parse<RequestState>(SelectedValueOf(body, "RequestsQueueState"), false)],

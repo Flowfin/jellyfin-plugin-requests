@@ -136,10 +136,11 @@ fulfilled.
 
 Nothing leaves the server. The outbound notification sink exists and has nowhere to send to, because
 `OutboundNoticeAddress` is empty until an operator types one; there is no credential to hold and no
-other path that could carry anything, since the bridge adapter is #82 and is not built. What does
-happen on a fresh install is that every transition is written to the server's own activity log, which
-stays on the machine and is a record rather than a message. What an entry says is
-[`notifications.md`](notifications.md).
+other path that could carry anything, since the bridge adapter is #82 and is not built. Two things do
+happen on a fresh install and neither is a path off the machine. Every transition is written to the
+server's own activity log, which is a record rather than a message. And the person who asked is told
+on whatever they are signed in on when their own request is answered, down the connection the server
+already holds to their client. Both are [`notifications.md`](notifications.md).
 `NoRequestBackend` is what a server without an external request service runs, and it is what every
 server runs today.
 
@@ -159,8 +160,13 @@ already has somewhere to send to and are not a second way of saying off, which i
 with an address set is refused rather than treated as silence.
 
 **Switches for paths that do not exist.** A setting an operator can change with no effect is worse
-than its absence, so the set above names the three movements this plugin announces and grows when a
-path does.
+than its absence, so the set above names the three movements the sink announces and grows when a path
+does.
+
+**A switch for the message to the person who asked.** There is none. It reaches only the person the
+request belongs to and only while they are signed in, and whether an operator or that person should
+be the one to turn it off is a question nobody has taken. It is written down in
+[`notifications.md`](notifications.md) rather than answered by adding a field here.
 
 **A bridge address and a credential.** The only bridge in this tree is the one for a server that has
 none. A field for an address would be somewhere to type something nothing reads. #82 brings the
