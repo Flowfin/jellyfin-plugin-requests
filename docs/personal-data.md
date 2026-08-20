@@ -179,8 +179,11 @@ the record is old, whoever it names, and a deleted person's identifier sits in t
 
 ## What leaves the server
 
-**Nothing leaves the server on a fresh install, and one path can be turned on.** The plugin makes
-exactly one outbound call, and it is the notification sink:
+**Nothing goes to anybody else's machine on a fresh install, and one path can be turned on.** What
+does travel on a fresh install is a person's own request, to that person, over the connection the
+server already holds to whatever they are signed in on; the table at the end of this section is
+where that sits. Beyond that the plugin makes exactly one outbound call, and it is the notification
+sink:
 
     git grep -ln 'HttpClient\|IHttpClientFactory\|WebRequest' -- Jellyfin.Plugin.Requests/
     Jellyfin.Plugin.Requests/Notify/OutboundSink.cs
@@ -215,7 +218,7 @@ operator can find out what turning one on would mean before it exists:
 | ------------------- | ----- | ------------------------------------------------------------------------------- | ----------------- | ----- |
 | The outbound sink   | #78   | the identifiers of the asker and the answerer, the title, the year, the request | an address is set | yes   |
 | The bridge          | #82   | a title, and an external account for the person who asked                       | a backend is set  | no    |
-| The session message | #76   | nothing off the machine, a message to a dashboard session                       | not decided yet   | no    |
+| The session message | #77   | nothing off the machine, a message to the asker's own signed-in clients         | never off         | yes   |
 
 The bridge names a person to the external service by an account the operator wrote into a table, and
 never by their name. That is the decision in [bridge.md](bridge.md), and the table is empty on a
@@ -223,7 +226,12 @@ fresh install, so a bridge configured and nothing else sends no attribution at a
 in #75 is the fourth path and it is not in the table because it writes into the server's own log,
 which does not leave the machine.
 
-**Only the first is built.** The other two rows say what each one is for, not what it does.
+The session message is in the table for what it is rather than for what it sends off the machine,
+which is nothing: it goes to whatever the person who asked is signed in on, over the connection the
+server already holds, and it carries the title they asked for and what happened to it. The
+administrator half of that path is #76 and is not built.
+
+**The bridge row is the one that is not built.** The other two say what happens today.
 
 ## What arrives from another plugin, and what this side trusts
 

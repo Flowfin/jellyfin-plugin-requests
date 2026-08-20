@@ -97,6 +97,18 @@ exist for as long as it took somebody to read both.
 while this document names it. It reads the name and not the sentence around it, so prose naming the
 double and saying the wrong thing about it still passes.
 
+**A message arriving on somebody's client.** Refused: it needs a running Jellyfin holding a session
+for that person and a client signed in to it, which is the fourth condition and the first one at
+once.
+
+What replaces it is a double over the server's own session manager, in
+`Jellyfin.Plugin.Requests.Tests/Doubles/ASessionManagerThatOnlyDelivers.cs`. It has exactly one
+method with a body, which is the one call this plugin is allowed to make, and every other way of
+pushing something at somebody raises. So what is asserted is that one person was named, which one,
+what the message said, and that nothing reaching anybody else was used. What it cannot reach is a
+client drawing anything, and `notifications.md` carries the reading of the one client whose source
+says what it does with such a message, with the same limit stated there.
+
 **A call refused by the server's authorisation policy.** Refused: the policy is evaluated by the
 server, so a test that a signed-in caller who is not an administrator is turned away from the queue
 endpoint needs a running Jellyfin holding a session for that person. That is the fourth condition,

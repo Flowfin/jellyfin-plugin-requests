@@ -287,7 +287,7 @@ public sealed class QuietByDefaultTests
 
         Assert.Equal(
             1,
-            await new FulfilmentSweep(store, library, clock, journal, sink, new RecordingLogger())
+            await new FulfilmentSweep(store, library, clock, journal, sink, new RecordingRequesterNotice(), new RecordingLogger())
                 .SweepAsync(CancellationToken.None)
                 .ConfigureAwait(true));
 
@@ -330,7 +330,8 @@ public sealed class QuietByDefaultTests
             new FakeCallerIdentity(Operator),
             settings,
             journal,
-            sink);
+            sink,
+            new RecordingRequesterNotice());
 
     /// <summary>
     /// One open request, with a provider identifier the library can match.

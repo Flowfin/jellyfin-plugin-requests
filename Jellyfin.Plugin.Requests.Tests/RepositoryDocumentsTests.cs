@@ -171,6 +171,26 @@ public sealed class RepositoryDocumentsTests
     }
 
     /// <summary>
+    /// The refusal list names the double that replaces a message arriving on somebody's client, and
+    /// the double is still called that.
+    /// <para>
+    /// The same guard as the one above and for the same reason. A refusal that names a file rather
+    /// than an issue is an address that keeps working, and what keeps it an address is that renaming
+    /// the double moves <c>nameof</c> and leaves the document behind, so the two disagree here
+    /// rather than in front of somebody looking for what to write instead of a real client.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheRefusalListNamesTheDoubleThatReplacesAMessageArrivingOnAClient()
+    {
+        const string Testing = "docs/testing.md";
+
+        var document = File.ReadAllText(Beside(Testing.Replace('/', Path.DirectorySeparatorChar)));
+
+        Assert.Contains(nameof(Doubles.ASessionManagerThatOnlyDelivers), document, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// One file as it sits next to the suite.
     /// </summary>
     /// <param name="name">Its path, relative to the repository root.</param>

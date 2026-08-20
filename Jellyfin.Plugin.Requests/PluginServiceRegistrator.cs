@@ -12,6 +12,7 @@ using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
+using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -127,6 +128,15 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<ILogger<OutboundSink>>(),
             OutboundSink.DefaultAnswerWithin));
 
+        // The path that tells the person who asked that their own request moved, on whatever they
+        // are signed in on right now. Registered beside the two above rather than instead of either:
+        // the journal is the record an operator reads afterwards, the sink is what leaves the
+        // machine on an install that has somewhere to send to, and this is the only one of the three
+        // aimed at the person waiting.
+        serviceCollection.AddSingleton<IRequesterNotice>(provider => new ServerRequesterNotice(
+            provider.GetRequiredService<ISessionManager>(),
+            provider.GetRequiredService<ILogger<ServerRequesterNotice>>()));
+
         // The server's library, as the two questions this plugin asks of it. One per server, because
         // the instance subscribes to the library's own events and a second subscription would look
         // at every arrival twice.
@@ -142,6 +152,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<IClock>(),
             provider.GetRequiredService<IActivityJournal>(),
             provider.GetRequiredService<IOutboundSink>(),
+            provider.GetRequiredService<IRequesterNotice>(),
             provider.GetRequiredService<ILogger<FulfilmentSweep>>()));
 
         // The event half of the fulfilment check. A hosted service rather than something built when

@@ -73,7 +73,7 @@ public sealed class ActivityJournalTests
 
         Assert.Equal(
             1,
-            await new FulfilmentSweep(store, library, clock, journal, new RecordingSink(), new RecordingLogger())
+            await new FulfilmentSweep(store, library, clock, journal, new RecordingSink(), new RecordingRequesterNotice(), new RecordingLogger())
                 .SweepAsync(CancellationToken.None)
                 .ConfigureAwait(true));
 
@@ -176,7 +176,7 @@ public sealed class ActivityJournalTests
 
         Assert.Equal(
             0,
-            await new FulfilmentSweep(store, library, clock, journal, new RecordingSink(), new RecordingLogger())
+            await new FulfilmentSweep(store, library, clock, journal, new RecordingSink(), new RecordingRequesterNotice(), new RecordingLogger())
                 .SweepAsync(CancellationToken.None)
                 .ConfigureAwait(true));
 
@@ -270,7 +270,8 @@ public sealed class ActivityJournalTests
             new FakeCallerIdentity(Operator),
             new FakeInstallSettings(),
             journal,
-            new RecordingSink());
+            new RecordingSink(),
+            new RecordingRequesterNotice());
 
     /// <summary>
     /// One open request in the store, with a provider identifier so the library can match it.

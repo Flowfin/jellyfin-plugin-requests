@@ -17,6 +17,14 @@ what came before it. What landed before this file existed is in the git history,
 where it carries the pull request and the issue it came from, and rewriting it
 from memory into entries would be a description nobody measured.
 
+- The person who asked is told when their own request is answered. Approving,
+  declining or fulfilling a request pushes one message to that person's
+  signed-in clients and to nobody else's, carrying the title and, on a decline,
+  the reason. It reaches whoever is connected at that moment and nothing
+  remembers who was missed, so the answer to rely on is still their own page,
+  which shows the state whenever they next look. There is no setting for it and
+  nothing leaves the machine.
+
 - `FinishedRequestRetentionDays` is enforced. A scheduled task removes a request
   that has been fulfilled, declined or failed for longer than that number of
   days, counted from the move that finished it, and it runs daily and at
