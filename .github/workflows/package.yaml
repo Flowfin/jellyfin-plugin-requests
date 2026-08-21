@@ -22,9 +22,11 @@
 # than a file in this tree, #30 is where it is written down and applied, so a
 # red job here does not by itself hold a merge today.
 #
-# What this does not do is install the package on a server. That needs a
-# container engine, which docs/testing.md keeps out of the ordinary suite, and
-# it is a deliberate run whose output goes in that document beside the others.
+# WHAT IT ALSO DOES IS INSTALL WHAT IT BUILT. The last step of each line puts
+# the archive it just produced on a server of that line, in a container, and
+# asks the server what it has. That closes the gap between a package that builds
+# and a package that loads, which is where an artifact list missing a dependency
+# the host does not provide shows up and nowhere earlier.
 name: Package
 
 on:
@@ -214,3 +216,31 @@ jobs:
           path: |
             ${{ steps.jprm.outputs.artifact }}
             ${{ steps.jprm.outputs.artifact }}.meta.json
+
+      - name: Install this package on a server of the line it was built for
+        # THE ARCHIVE, NOT A PUBLISH. Everything above this step reasons about
+        # what the package contains; this one starts a server of the line the
+        # package declares, puts the package's own bytes in its plugin directory
+        # and asks the server what it has. An artifact list missing a dependency
+        # the host does not provide produces a plugin that installs and throws on
+        # first use, and only a server that started with it says so.
+        #
+        # The image is read out of scripts/server-lines.tsv rather than written
+        # here, because the container check beside this one needs the same pair
+        # and two copies of it disagree the first time a line moves.
+        #
+        # It ends non-zero unless the server reports the plugin Active, fetches
+        # the configuration page and takes a setting back, which is the procedure
+        # docs/testing.md records rather than a second one written here.
+        env:
+          ARTIFACT: ${{ steps.jprm.outputs.artifact }}
+          FRAMEWORK: ${{ matrix.framework }}
+        run: |
+          set -euo pipefail
+          staged="${RUNNER_TEMP}/packaged-plugin"
+          rm -rf "${staged}"
+          mkdir -p "${staged}"
+          unzip -o "${ARTIFACT}" -d "${staged}"
+          ls -1 "${staged}"
+          image=$(./scripts/server-image-for.sh "${FRAMEWORK}")
+          PLUGIN_FROM_DIRECTORY="${staged}" ./scripts/verify-plugin-loads.sh "${image}" "${FRAMEWORK}" 18096
