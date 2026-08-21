@@ -360,6 +360,10 @@ install is refusing and why is the diagnostics view in #63.
 Named here so the absence is read as absence rather than as a decision nobody wrote down. Each is
 the closing condition of the issue beside it.
 
-- What a request records about having arrived over the seam, and which caller handed it over. The
-  contract carries no field naming the caller, so the second half of that is a question for the
-  contract rather than for this side. #118.
+- What a request records about having arrived over the seam. Which caller handed it over is settled
+  and is not part of it: the contract grows no field naming the caller, decided on #118, because a
+  field carrying it would be the sender saying who they are, and a history that records an
+  unverified self-declaration as fact is worse than one that records less. That cost is permanent in
+  one direction. If a second handing sibling ever ships, the rows written before it do not carry the
+  distinction and cannot be backfilled, so the question becomes unanswerable for everything already
+  landed. What is still owed here is the history itself, which does not exist yet. #118.
