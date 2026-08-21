@@ -271,7 +271,8 @@ public sealed class ActivityJournalTests
             new FakeInstallSettings(),
             journal,
             new RecordingSink(),
-            new RecordingRequesterNotice());
+            new RecordingRequesterNotice(),
+            new FakeLibrary());
 
     /// <summary>
     /// One open request in the store, with a provider identifier so the library can match it.

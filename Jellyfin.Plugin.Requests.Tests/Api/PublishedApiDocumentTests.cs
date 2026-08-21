@@ -552,7 +552,7 @@ public sealed class PublishedApiDocumentTests
     /// <param name="settings">What this install is set to.</param>
     /// <returns>The controller under test.</returns>
     private RequestsController ControllerFor(IRequestStore store, Guid? caller, IInstallSettings settings)
-        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), settings, new RecordingJournal(), new RecordingSink(), new RecordingRequesterNotice());
+        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), settings, new RecordingJournal(), new RecordingSink(), new RecordingRequesterNotice(), new FakeLibrary());
 
     /// <summary>
     /// The health endpoint over one store, with nothing behind the bridge and no sweep having run,

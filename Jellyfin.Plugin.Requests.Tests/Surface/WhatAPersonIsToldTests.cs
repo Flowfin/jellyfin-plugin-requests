@@ -232,5 +232,6 @@ public sealed class WhatAPersonIsToldTests
             new FakeInstallSettings(new PluginConfiguration { OpenRequestsPerUser = allowed }),
             new RecordingJournal(),
             new RecordingSink(),
-            new RecordingRequesterNotice());
+            new RecordingRequesterNotice(),
+            new FakeLibrary());
 }

@@ -287,6 +287,33 @@ themselves.
 The history is not in the answer. Every entry names the administrator who made the move, and a list a
 user reads is not an audit trail.
 
+### What a person may learn about a title here
+
+The row says whether what they asked for has arrived. That sentence is answered for the person
+reading it and not for the server, and this is the rule the whole surface is held to.
+
+A reader may learn, of a title they asked for themselves, whether the server holds something they
+would be allowed to open. They may learn nothing about a title they did not ask for, because nothing
+this API serves aggregates across people: there is no count of who else is waiting, no row belonging
+to anybody else, and no answer that says a title has already been asked for.
+
+**Why the availability is not simply read off the record.** The value stored on a request is what the
+server holds, which is what the fulfilment check needs and is a fact about the server's libraries. A
+person restricted by a parental rating, or without access to the library a file sits in, is not
+entitled to it: "it is here" about a title they cannot open tells them what is in that library and
+what somebody set for them. So the row carries a second answer, from a library lookup made as the
+reader, and a title they may not see reads exactly like a title the server does not have. That is the
+answer the server gives them everywhere else.
+
+**The lookup is per row, per reader, and bounded by the page.** It is made over the rows being
+returned rather than over everything the store matched, because with a year of retention the second
+of those is not bounded by anything. A request naming no provider identifier is not looked up at all
+and its row says nothing: absent would be the answer of something that looked.
+
+**What is not claimed.** Which items a user record narrows a query to is the server's own rule. This
+plugin hands the record to the server's query and believes what comes back; no test here exercises a
+rating, and `ServerLibrary` is the one part of that path nothing in this repository runs.
+
 ## The page a browser opens
 
     GET MediaRequests/v1/Page
@@ -644,7 +671,10 @@ asked for, which is a weaker disclosure than a row and still a disclosure, is op
 
 ## What is not decided here
 
-- Whether a user may ever be told that a title has already been asked for is open between #51 and #71.
+- Whether a user may ever be told that a title has already been asked for. #51 and #71 disagreed
+  about it and both closed without adding the feature, so nothing here aggregates across people and
+  the question does not arise against anything that ships. It becomes live again the day something
+  does aggregate, and it is not settled by either issue having closed.
 - The capability endpoint is #55.
 - Which of these a page calls, and what an operator sees while an action on several is running, is
   the administrator surface rather than this document. The endpoints promise what is written above

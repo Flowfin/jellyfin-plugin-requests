@@ -368,7 +368,8 @@ public sealed class CreateRequestTests
             new FakeInstallSettings(),
             new RecordingJournal(),
             new RecordingSink(),
-            new RecordingRequesterNotice());
+            new RecordingRequesterNotice(),
+            new FakeLibrary());
 
     /// <summary>
     /// The answer, with the status code checked, so a leg cannot pass on a body that came back under

@@ -436,5 +436,6 @@ public sealed class QueueContextTests
             new FakeInstallSettings(),
             new RecordingJournal(),
             new RecordingSink(),
-            new RecordingRequesterNotice());
+            new RecordingRequesterNotice(),
+            new FakeLibrary());
 }
