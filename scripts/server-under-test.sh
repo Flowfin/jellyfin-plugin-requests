@@ -99,14 +99,27 @@ server_start() {
     dk exec "$CONTAINER" ls -1 "$plugin_dir"
 
     step "wait for the server to answer"
-    for _ in $(seq 1 90); do
-        if curl --silent --fail --max-time 5 "$BASE/System/Info/Public" >/dev/null 2>&1; then
-            break
+    # THREE ANSWERS IN A ROW RATHER THAN ONE. The first run of this on a hosted runner ended here
+    # with curl 56, a connection reset: the port accepts while the server is still coming up, so one
+    # answer is not the server being ready and the next call is refused. What gets printed is the
+    # body of the last answer, so nothing calls the endpoint again afterwards to have something to
+    # show and races the same way.
+    local info="" settled=0
+    for _ in $(seq 1 120); do
+        if info=$(curl --silent --fail --max-time 5 "$BASE/System/Info/Public" 2>/dev/null); then
+            settled=$((settled + 1))
+            if [ "$settled" -ge 3 ]; then
+                break
+            fi
+            sleep 1
+            continue
         fi
+        settled=0
+        info=""
         sleep 2
     done
-    curl --silent --fail --max-time 10 "$BASE/System/Info/Public"
-    printf '\n'
+    test "$settled" -ge 3
+    printf '%s\n' "$info"
 
     step "complete the startup wizard"
     # These are open on a server whose wizard has not been completed. Completing it is what makes an

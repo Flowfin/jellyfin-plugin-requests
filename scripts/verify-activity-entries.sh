@@ -118,7 +118,19 @@ import json, sys
 request_id, title, admin_id = sys.argv[1], sys.argv[2], sys.argv[3]
 items = json.load(sys.stdin)["Items"]
 
-mine = [e for e in items if request_id in (e.get("ShortOverview") or "")]
+
+def plain(value):
+    """An identifier with the dashes and the case taken off it.
+
+    The server hands a plugin its own shapes back with the dashes stripped and writes them into an
+    entry with the dashes in, so the two spellings of one identifier have to be compared as one
+    thing. The first run of this check compared them as strings and found no entries for a request
+    that had two.
+    """
+    return (value or "").replace("-", "").lower()
+
+
+mine = [e for e in items if plain(request_id) in plain(e.get("ShortOverview"))]
 
 wanted = {
     "MediaRequestApproved": "Request approved: " + title,
@@ -132,7 +144,7 @@ for kind, name in sorted(wanted.items()):
     entry = found[0]
     if entry.get("Name") != name:
         sys.exit("the {0} entry is named {1!r} rather than {2!r}.".format(kind, entry.get("Name"), name))
-    if (entry.get("UserId") or "").replace("-", "").lower() != admin_id.replace("-", "").lower():
+    if plain(entry.get("UserId")) != plain(admin_id):
         sys.exit("the {0} entry names {1} rather than the operator who decided it.".format(kind, entry.get("UserId")))
     print("{0}: {1} / {2}".format(kind, entry.get("Name"), entry.get("ShortOverview")))
 
