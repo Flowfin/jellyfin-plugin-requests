@@ -645,3 +645,121 @@ rules:
         - "Jellyfin.Plugin.Requests/**/*.js"
         - "tools/opengrep/fixtures/words/**/*.html"
         - "tools/opengrep/fixtures/words/**/*.js"
+
+  # Invariant (identity, #16): three named leftovers of the plugin template, each
+  # refused by the expression that names it. The rename moved three separate
+  # things, and a leftover of any one of them is a different failure: the root
+  # namespace is what the embedded configuration page's resource path is built
+  # from at run time, the page's script object is what the markup and the script
+  # agree on, and the identifier is what the server and the packaging metadata
+  # agree on. Each was put back on its own and watched being refused, and the
+  # tree was restored after each.
+  #
+  # WHY THREE NAMED EXPRESSIONS RATHER THAN THE WORD. A tree-wide search for
+  # `template` matches the name of a zizmor audit, the description analyzer rule
+  # CA2254 gives of itself, a changelog paragraph saying what a version number
+  # replaced, and the ordinary vocabulary of ASP.NET routing, where a route
+  # template is what the path an endpoint answers under is called. Every one of
+  # those is correct text, and a rule carrying an exception for each is a rule
+  # whose exception list is where somebody eventually puts the real leftover to
+  # make the build pass.
+  #
+  # WHAT THIS DOES NOT REACH, AND IT IS WRITTEN HERE RATHER THAN LEFT TO BE
+  # ASSUMED. These three check three known things rather than a class, so a
+  # fourth kind of leftover that none of them names passes. When a fourth is
+  # found it becomes a fourth rule with its own fixture and its own
+  # put-it-back demonstration, so the set grows by proof rather than by guess.
+  - id: no-template-namespace-left
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      This names the template's root namespace. The embedded configuration
+      page's resource path is built from the namespace at run time, so a
+      leftover here is a page that is empty on a server rather than a build that
+      fails (#16).
+    patterns:
+      - pattern-regex: 'Jellyfin\.Plugin\.Template'
+    paths:
+      include:
+        - "**/*.cs"
+        - "**/*.csproj"
+        - "**/*.css"
+        - "**/*.html"
+        - "**/*.js"
+        - "**/*.json"
+        - "**/*.md"
+        - "**/*.props"
+        - "**/*.py"
+        - "**/*.ruleset"
+        - "**/*.sh"
+        - "**/*.sln"
+        - "**/*.txt"
+        - "**/*.xml"
+        - "**/*.yaml"
+        - "**/*.yml"
+
+  # Invariant (identity, #16), the second of the three. See the block above for
+  # why the set is three expressions and what it does not reach.
+  - id: no-template-config-object-left
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      This names the template's configuration page script object. The markup and
+      the script have to agree on it, and a half rename leaves a page that loads
+      and does nothing (#16).
+    patterns:
+      # The character class is what stops this expression from matching the line it is written on.
+      # This file is inside the paths below, the repository scan excludes only the fixture
+      # directory, and a rule that refuses its own text refuses the tree forever.
+      - pattern-regex: 'Template[C]onfig'
+    paths:
+      include:
+        - "**/*.cs"
+        - "**/*.csproj"
+        - "**/*.css"
+        - "**/*.html"
+        - "**/*.js"
+        - "**/*.json"
+        - "**/*.md"
+        - "**/*.props"
+        - "**/*.py"
+        - "**/*.ruleset"
+        - "**/*.sh"
+        - "**/*.sln"
+        - "**/*.txt"
+        - "**/*.xml"
+        - "**/*.yaml"
+        - "**/*.yml"
+
+  # Invariant (identity, #16), the third of the three. See the block above for
+  # why the set is three expressions and what it does not reach.
+  - id: no-template-identifier-left
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      This is the identifier that was in use before this plugin minted its own.
+      The server and the packaging metadata have to agree on one identifier, and
+      a page asking the server about the old one gets no configuration back
+      (#16).
+    patterns:
+      # Broken by a character class for the reason given at the rule above: written out, this
+      # expression would match itself and red the gate on the file that declares it.
+      - pattern-regex: 'eb5d7894[-]8eef-4b36-aa6f-5d124e828ce1'
+    paths:
+      include:
+        - "**/*.cs"
+        - "**/*.csproj"
+        - "**/*.css"
+        - "**/*.html"
+        - "**/*.js"
+        - "**/*.json"
+        - "**/*.md"
+        - "**/*.props"
+        - "**/*.py"
+        - "**/*.ruleset"
+        - "**/*.sh"
+        - "**/*.sln"
+        - "**/*.txt"
+        - "**/*.xml"
+        - "**/*.yaml"
+        - "**/*.yml"

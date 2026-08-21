@@ -307,6 +307,82 @@ The 12.0 line, `scripts/verify-plugin-loads.sh jellyfin/jellyfin:12.0-rc4 net10.
     == done
     Requests loaded and answered on jellyfin/jellyfin:12.0-rc4 (net10.0)
 
+### The recorded run after the check learned to save a setting
+
+The run above predates two things and reads as though neither had happened. It was made before this
+plugin minted its own identifier, so the plugin it reports is carrying the template's, and before
+the configuration surface had a single setting, so the configuration it reads and writes is `{}`. It
+is kept rather than replaced, because it is what was seen on the day it was made.
+
+What the check does now is write two settings whose values are neither field's default and read the
+configuration back out of the server, which is the difference between an endpoint that answers a
+write and a setting that survives one. This run is from the gate rather than from a machine: the job
+that has to know the plugin loaded before it asks anything else runs the same script on every pull
+request.
+
+Run on `ca059d2`, 2026-08-21, in run `32516343601`, jobs `96878727285` and `96878727539`.
+
+The 10.11 line, `scripts/verify-plugin-loads.sh jellyfin/jellyfin:10.11.11 net9.0 18098`:
+
+    == what the server says about its plugins
+    Name=AudioDB  Version=10.11.11.0  Status=Active  Id=a629c0dafac54c7e931a7174223f14c8
+    Name=MusicBrainz  Version=10.11.11.0  Status=Active  Id=8c95c4d2e50c4fb0a4f36c06ff0f9a1a
+    Name=OMDb  Version=10.11.11.0  Status=Active  Id=a628c0dafac54c7e9d1a7134223f14c8
+    Name=Requests  Version=0.1.0.0  Status=Active  Id=0f9c9107b31b459e81fa6d35dac25e79
+    Name=Studio Images  Version=10.11.11.0  Status=Active  Id=872a78491171458da6fb3de3d442ad30
+    Name=TMDb  Version=10.11.11.0  Status=Active  Id=b8715ed16c4745289ad3f72deb539cd4
+
+    == verdict
+    Requests is Active, id 0f9c9107b31b459e81fa6d35dac25e79
+
+    == the configuration page the dashboard would fetch
+    GET /web/ConfigurationPage?name=Requests -> 200
+    <!doctype html>
+    <html lang="en">
+        <head>
+            <meta charset="utf-8" />
+            <title data-i18n="config.title"></title>
+
+    == the configuration the page reads and writes
+    {"OpenRequestsPerUser":10,"AcceptsMovies":true,"AcceptsSeries":true,"FinishedRequestRetentionDays":365,"OutboundNoticeAddress":"","AnnouncesApprovals":true,"AnnouncesDeclines":true,"AnnouncesFulfilments":true}
+    POST /Plugins/<id>/Configuration -> 204
+
+    == what the server hands back after the save
+    {"OpenRequestsPerUser":7,"AcceptsMovies":true,"AcceptsSeries":true,"FinishedRequestRetentionDays":90,"OutboundNoticeAddress":"","AnnouncesApprovals":true,"AnnouncesDeclines":true,"AnnouncesFulfilments":true}
+    OpenRequestsPerUser=7 and FinishedRequestRetentionDays=90 read back after the save
+
+    == done
+    Requests loaded and answered on jellyfin/jellyfin:10.11.11 (net9.0)
+
+The 12.0 line, `scripts/verify-plugin-loads.sh jellyfin/jellyfin:12.0-rc4 net10.0 18099`:
+
+    == what the server says about its plugins
+    Name=AudioDB  Version=12.0.0.0  Status=Active  Id=a629c0dafac54c7e931a7174223f14c8
+    Name=ListenBrainz Similarity Provider  Version=12.0.0.0  Status=Active  Id=a5b2e8c19d4f4a3b8c7e6f1a2b3c4d5e
+    Name=MusicBrainz  Version=12.0.0.0  Status=Active  Id=8c95c4d2e50c4fb0a4f36c06ff0f9a1a
+    Name=OMDb  Version=12.0.0.0  Status=Active  Id=a628c0dafac54c7e9d1a7134223f14c8
+    Name=Requests  Version=0.1.0.0  Status=Active  Id=0f9c9107b31b459e81fa6d35dac25e79
+    Name=Studio Images  Version=12.0.0.0  Status=Active  Id=872a78491171458da6fb3de3d442ad30
+    Name=TMDb  Version=12.0.0.0  Status=Active  Id=b8715ed16c4745289ad3f72deb539cd4
+
+    == verdict
+    Requests is Active, id 0f9c9107b31b459e81fa6d35dac25e79
+
+    == the configuration the page reads and writes
+    {"OpenRequestsPerUser":10,"AcceptsMovies":true,"AcceptsSeries":true,"FinishedRequestRetentionDays":365,"OutboundNoticeAddress":"","AnnouncesApprovals":true,"AnnouncesDeclines":true,"AnnouncesFulfilments":true}
+    POST /Plugins/<id>/Configuration -> 204
+
+    == what the server hands back after the save
+    {"OpenRequestsPerUser":7,"AcceptsMovies":true,"AcceptsSeries":true,"FinishedRequestRetentionDays":90,"OutboundNoticeAddress":"","AnnouncesApprovals":true,"AnnouncesDeclines":true,"AnnouncesFulfilments":true}
+    OpenRequestsPerUser=7 and FinishedRequestRetentionDays=90 read back after the save
+
+    == done
+    Requests loaded and answered on jellyfin/jellyfin:12.0-rc4 (net10.0)
+
+**The values written back are left on that server and nowhere else.** Each run is a container of its
+own, removed when the run ends, so the setting saved here is not a setting anybody's install now
+carries.
+
 ### That the check bites
 
 A procedure that cannot fail proves nothing, so the mismatch it exists to catch was fed to it. The
