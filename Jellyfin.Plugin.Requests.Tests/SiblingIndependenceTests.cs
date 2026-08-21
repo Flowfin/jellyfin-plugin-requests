@@ -42,9 +42,14 @@ public class SiblingIndependenceTests
 
         // The seam refuses a handover naming somebody this server does not have, in #118, and the
         // only member of the server's user manager that answers on both claimed lines hands back the
-        // user record. Nothing here reads that record: the answer is thrown away and its presence is
-        // the whole result. The reference is the price of asking, it arrives with the server's own
+        // user record. The reference is the price of asking, it arrives with the server's own
         // libraries, and it is excluded from the install with them.
+        //
+        // This comment said nothing here reads that record, which stopped being true with #71. A
+        // request row on somebody's own page says whether what they asked for has arrived, and that
+        // is answered by a library query made as them; the server's query takes the record rather
+        // than an identifier, so the record is handed straight to it. Nothing reads a field on it
+        // either way.
         "Jellyfin.Database.Implementations",
         "MediaBrowser.Common",
         "MediaBrowser.Controller",

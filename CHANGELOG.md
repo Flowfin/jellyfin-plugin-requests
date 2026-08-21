@@ -17,6 +17,14 @@ what came before it. What landed before this file existed is in the git history,
 where it carries the pull request and the issue it came from, and rewriting it
 from memory into entries would be a description nobody measured.
 
+- Whether the title somebody asked for has arrived is now answered for them
+  rather than for the server. Their own list asks the library on their behalf, so
+  a person restricted by a parental rating or without access to the library a
+  file sits in is told the same thing about that title as somebody whose server
+  does not have it. Until now the row carried what the server holds, which said
+  that a library they cannot open has something in it. The lookup is made only
+  for the rows on the page being returned.
+
 - The person who asked is told when their own request is answered. Approving,
   declining or fulfilling a request pushes one message to that person's
   signed-in clients and to nobody else's, carrying the title and, on a decline,

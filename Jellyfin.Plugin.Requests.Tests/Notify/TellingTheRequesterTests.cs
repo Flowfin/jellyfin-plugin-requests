@@ -319,7 +319,8 @@ public sealed class TellingTheRequesterTests
             new FakeInstallSettings(),
             new RecordingJournal(),
             new RecordingSink(),
-            told);
+            told,
+            new FakeLibrary());
 
     /// <summary>
     /// A sweep telling the path handed in.

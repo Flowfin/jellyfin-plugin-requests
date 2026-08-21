@@ -137,6 +137,14 @@ gets nothing from it.
 **A client that does not render channels gets nothing from the channel**, and there is no fallback
 for it inside this plugin beyond the API.
 
+**A person is never told a title is here when they would not be allowed to open it.** Both surfaces
+draw the same rows from the same endpoint, so what each class of user may learn about a title is one
+rule in one place rather than one per surface, and it is written down under "What a person may learn
+about a title here" in [`docs/api.md`](api.md). What is worth carrying here is the shape of it: a
+title the reader may not see reads exactly like a title the server does not have, so neither surface
+can say more than the other, and neither can be widened without widening the endpoint underneath
+both.
+
 **On a server with no browsing sibling installed, there is no way to ask for anything from a
 television client at all.** This is the sharpest one and it is certain rather than a claim about
 clients. This plugin ships no way to find a title the server does not have, decided on #113, because

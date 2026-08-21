@@ -52,4 +52,33 @@ public interface ILibrary
         RequestedItemKind kind,
         IReadOnlyDictionary<string, string> providerIds,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// What the server holds of one title, as one person is allowed to see it.
+    /// <para>
+    /// This is the same question as <see cref="HoldingOfAsync"/> asked on somebody's behalf, and the
+    /// two are separate members because the answers are different facts. The sweep asks what the
+    /// server has, because that decides whether a request was fulfilled and that is not a fact about
+    /// any reader. A surface asks what a reader may see, because "it is here" about a title in a
+    /// library that reader cannot open is a statement about that library, which is #71.
+    /// </para>
+    /// </summary>
+    /// <param name="userId">The person the answer is for.</param>
+    /// <param name="kind">What sort of thing is being asked about.</param>
+    /// <param name="providerIds">
+    /// The external identifiers to look it up by, keyed by provider name, matched the same way
+    /// <see cref="HoldingOfAsync"/> matches them.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>
+    /// What that person may see of it, or <see cref="LibraryHolding.Nothing"/> where they may see
+    /// none of it. A title the server holds and this person may not open is answered exactly like a
+    /// title the server does not hold, because that is the answer the server gives them everywhere
+    /// else.
+    /// </returns>
+    Task<LibraryHolding> HoldingSeenByAsync(
+        Guid userId,
+        RequestedItemKind kind,
+        IReadOnlyDictionary<string, string> providerIds,
+        CancellationToken cancellationToken);
 }

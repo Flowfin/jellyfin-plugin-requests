@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
+using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.Requests.Model;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
@@ -27,17 +28,25 @@ namespace Jellyfin.Plugin.Requests.Fulfilment;
 public sealed class ServerLibrary : ILibrary, IDisposable
 {
     private readonly ILibraryManager _library;
+    private readonly IUserManager _users;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ServerLibrary"/> class.
     /// </summary>
     /// <param name="library">The server's library.</param>
-    /// <exception cref="ArgumentNullException">Where no library was given.</exception>
-    public ServerLibrary(ILibraryManager library)
+    /// <param name="users">
+    /// The server's users, so a lookup made on somebody's behalf can be made as them. It is the
+    /// user record the server's own query takes, which is why this reference is here rather than a
+    /// user identifier being enough.
+    /// </param>
+    /// <exception cref="ArgumentNullException">Where no library or no users were given.</exception>
+    public ServerLibrary(ILibraryManager library, IUserManager users)
     {
         ArgumentNullException.ThrowIfNull(library);
+        ArgumentNullException.ThrowIfNull(users);
 
         _library = library;
+        _users = users;
         _library.ItemAdded += OnItemChanged;
         _library.ItemRemoved += OnItemChanged;
     }
@@ -50,6 +59,47 @@ public sealed class ServerLibrary : ILibrary, IDisposable
         RequestedItemKind kind,
         IReadOnlyDictionary<string, string> providerIds,
         CancellationToken cancellationToken)
+        => Holding(kind, providerIds, null, cancellationToken);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// A user identifier the server does not have is answered with nothing rather than with the
+    /// unrestricted answer. Falling back to the wider lookup is the failure this whole member exists
+    /// to prevent, and it would happen exactly when the caller is least known.
+    /// </remarks>
+    public Task<LibraryHolding> HoldingSeenByAsync(
+        Guid userId,
+        RequestedItemKind kind,
+        IReadOnlyDictionary<string, string> providerIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(providerIds);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var reader = userId == Guid.Empty ? null : _users.GetUserById(userId);
+
+        return reader is null
+            ? Task.FromResult(LibraryHolding.Nothing)
+            : Holding(kind, providerIds, reader, cancellationToken);
+    }
+
+    /// <summary>
+    /// The one lookup, made as the server or as one of its users.
+    /// </summary>
+    /// <param name="kind">What sort of thing is being asked about.</param>
+    /// <param name="providerIds">The identifiers to match on.</param>
+    /// <param name="reader">
+    /// The person to ask as, or <see langword="null"/> to ask as the server. The server's own query
+    /// carries what it applies to a user, so handing it the record is what applies the rating and
+    /// the library access rather than anything decided here.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>What is held.</returns>
+    private Task<LibraryHolding> Holding(
+        RequestedItemKind kind,
+        IReadOnlyDictionary<string, string> providerIds,
+        User? reader,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(providerIds);
         cancellationToken.ThrowIfCancellationRequested();
@@ -61,7 +111,7 @@ public sealed class ServerLibrary : ILibrary, IDisposable
 
         var wanted = kind == RequestedItemKind.Series ? BaseItemKind.Series : BaseItemKind.Movie;
 
-        var found = _library.GetItemList(new InternalItemsQuery
+        var query = new InternalItemsQuery
         {
             IncludeItemTypes = [wanted],
             HasAnyProviderId = new Dictionary<string, string>(providerIds, StringComparer.OrdinalIgnoreCase),
@@ -73,7 +123,14 @@ public sealed class ServerLibrary : ILibrary, IDisposable
             // The server creates rows for media it knows about and does not have, and counting one
             // of those as arrived is the exact failure this whole path exists to avoid.
             IsVirtualItem = false
-        });
+        };
+
+        if (reader is not null)
+        {
+            query.SetUser(reader);
+        }
+
+        var found = _library.GetItemList(query);
 
         if (found.Count == 0)
         {

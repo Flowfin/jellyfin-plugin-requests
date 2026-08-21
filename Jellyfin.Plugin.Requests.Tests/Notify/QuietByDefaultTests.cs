@@ -331,7 +331,8 @@ public sealed class QuietByDefaultTests
             settings,
             journal,
             sink,
-            new RecordingRequesterNotice());
+            new RecordingRequesterNotice(),
+            new FakeLibrary());
 
     /// <summary>
     /// One open request, with a provider identifier the library can match.

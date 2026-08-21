@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Configuration;
+using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Intake;
 using Jellyfin.Plugin.Requests.Localisation;
@@ -101,6 +102,7 @@ public sealed class RequestsController : RequestsControllerBase
     private readonly IActivityJournal _journal;
     private readonly IOutboundSink _sink;
     private readonly IRequesterNotice _told;
+    private readonly ILibrary _library;
     private readonly RequestIntake _intake;
 
     /// <summary>
@@ -130,6 +132,11 @@ public sealed class RequestsController : RequestsControllerBase
     /// endpoint has to be able to see is that exactly one person was told and which one, and that
     /// is not visible through a server nothing here runs.
     /// </param>
+    /// <param name="library">
+    /// The server's library, asked what one person may see of a title. A request row on somebody's
+    /// own page says whether what they asked for has arrived, and that sentence is answered for the
+    /// reader rather than for the server, which is #71.
+    /// </param>
     public RequestsController(
         IRequestStore store,
         IClock clock,
@@ -138,7 +145,8 @@ public sealed class RequestsController : RequestsControllerBase
         IInstallSettings settings,
         IActivityJournal journal,
         IOutboundSink sink,
-        IRequesterNotice told)
+        IRequesterNotice told,
+        ILibrary library)
     {
         _store = store;
         _clock = clock;
@@ -147,6 +155,7 @@ public sealed class RequestsController : RequestsControllerBase
         _journal = journal;
         _sink = sink;
         _told = told;
+        _library = library;
 
         // Built here rather than injected, because it is this controller's use of the store rather
         // than one more thing the server has to supply. CatalogueSplitTests reads the list this
@@ -327,13 +336,61 @@ public sealed class RequestsController : RequestsControllerBase
 
         var page = query.PageOf(theirs);
 
+        var rows = new List<MyRequest>(page.Requests.Count);
+
+        foreach (var stored in page.Requests)
+        {
+            rows.Add(Mine(
+                stored.Request,
+                reader,
+                await SeenByAsync(stored.Request, reader, cancellationToken).ConfigureAwait(false)));
+        }
+
         return Ok(new RequestsPage<MyRequest>
         {
-            Requests = [.. page.Requests.Select(stored => Mine(stored.Request, reader))],
+            Requests = rows,
             MatchCount = page.MatchCount,
             Skip = query.Skip,
             Take = query.Take
         });
+    }
+
+    /// <summary>
+    /// What one person may see of the title a request names.
+    /// <para>
+    /// <b>The lookup is per row and per reader, and the page is the bound on it.</b> It is made over
+    /// the rows being returned rather than over everything the store matched, so the cost is the page
+    /// size and not the length of somebody's history. With a year of retention the second of those is
+    /// unbounded, and a per-row lookup over it is the shape that is fine in a suite and slow on the
+    /// server that uses this plugin most.
+    /// </para>
+    /// <para>
+    /// <b>A request naming no identifier is not looked up.</b> Nothing can be matched on, so the
+    /// answer stays <see cref="LibraryAvailability.Unknown"/>, which is the same thing
+    /// <c>FulfilmentSweep</c> leaves such a request at. Answering
+    /// <see cref="LibraryAvailability.Absent"/> would say the server does not have it, and nothing
+    /// looked.
+    /// </para>
+    /// </summary>
+    /// <param name="request">The request being shown.</param>
+    /// <param name="reader">The person it is being shown to.</param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>What that person may see of it.</returns>
+    private async Task<LibraryAvailability> SeenByAsync(
+        MediaRequest request,
+        Guid reader,
+        CancellationToken cancellationToken)
+    {
+        if (request.ProviderIds.Count == 0)
+        {
+            return LibraryAvailability.Unknown;
+        }
+
+        var holding = await _library
+            .HoldingSeenByAsync(reader, request.Kind, request.ProviderIds, cancellationToken)
+            .ConfigureAwait(false);
+
+        return FulfilmentRule.AvailabilityOf(request, holding);
     }
 
     /// <summary>
@@ -1009,8 +1066,13 @@ public sealed class RequestsController : RequestsControllerBase
     /// </summary>
     /// <param name="request">The stored request.</param>
     /// <param name="reader">Who is reading it.</param>
+    /// <param name="availability">
+    /// What this reader may see of the title, answered for them rather than read off the record. The
+    /// value on the record is what the server holds, which is a fact about the server's libraries
+    /// and not one this person is entitled to.
+    /// </param>
     /// <returns>The row.</returns>
-    private static MyRequest Mine(MediaRequest request, Guid reader)
+    private static MyRequest Mine(MediaRequest request, Guid reader, LibraryAvailability availability)
     {
         var asked = request.RequestedByUserId == reader;
 
@@ -1031,7 +1093,7 @@ public sealed class RequestsController : RequestsControllerBase
             YourNote = asked ? request.RequesterNote : null,
             DeclineReason = request.DeclineReason,
             DeclineNote = request.DeclineNote,
-            Availability = request.Availability
+            Availability = availability
         };
     }
 

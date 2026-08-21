@@ -623,5 +623,6 @@ public sealed class ListRequestsTests
             new FakeInstallSettings(),
             new RecordingJournal(),
             new RecordingSink(),
-            new RecordingRequesterNotice());
+            new RecordingRequesterNotice(),
+            new FakeLibrary());
 }
