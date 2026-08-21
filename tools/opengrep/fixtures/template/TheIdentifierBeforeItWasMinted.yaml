@@ -1,0 +1,16 @@
+# Fixture for no-template-identifier-left. Nothing packages this file; it exists
+# so the rule can be watched refusing the mistake it names.
+#
+# The near-miss is a second packaging file added for another server line and
+# started from a copy of something older than the mint. The server and the
+# packaging metadata have to agree on one identifier, and a page asking the
+# server about the old one is handed no configuration back, which looks like a
+# page that lost its settings rather than like an identifier that is wrong.
+name: "Requests"
+
+# Legal neighbour, left here on purpose: this is the identifier this plugin
+# minted for itself and the rule has to stay quiet on it.
+guid: "0f9c9107-b31b-459e-81fa-6d35dac25e79"
+
+# The regression.
+oldGuid: "eb5d7894-8eef-4b36-aa6f-5d124e828ce1"

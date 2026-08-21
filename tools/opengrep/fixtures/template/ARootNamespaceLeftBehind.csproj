@@ -1,0 +1,19 @@
+<!--
+    Fixture for no-template-namespace-left. Nothing builds this file; it exists
+    so the rule can be watched refusing the mistake it names.
+
+    The near-miss is the one the rename actually leaves. Every other name in the
+    project file moves in one pass, and this one sits inside an element a reader
+    skims past because it looks like it follows the assembly name. It does not:
+    it is what the embedded configuration page's resource path is built from at
+    run time, so the build stays green and the page is empty on a server.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Legal neighbour, left here on purpose: the rule has to stay quiet on the name this plugin actually uses. -->
+    <AssemblyName>Jellyfin.Plugin.Requests</AssemblyName>
+
+    <!-- The regression. -->
+    <RootNamespace>Jellyfin.Plugin.Template</RootNamespace>
+  </PropertyGroup>
+</Project>
