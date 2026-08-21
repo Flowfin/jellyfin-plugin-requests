@@ -230,13 +230,23 @@ nobody agreed. Adding it would also be an argument rather than a field: a want u
 it was expressed and one undone a week after an operator has already acted on it are not the same
 event, and the second is not something a gesture on a browsing surface can decide alone.
 
-Taking back an ask on this side's own surfaces is a separate thing and is not covered by this
-document. It is #68, it needs a state a request can be withdrawn into, and the model records that
-there is none:
+Taking back an ask on this side's own surfaces is a separate thing, and the answer is that a user
+cannot. There is no state a request can be withdrawn into, and the model records why:
 
     git grep -n 'Cancelled' -- Jellyfin.Plugin.Requests/Model/
     Jellyfin.Plugin.Requests/Model/RequestActor.cs:43:    /// is no state for a user withdrawing, refused with the <c>Cancelled</c> state on #113. The
     Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs:69:/// user withdrawing has no state to move to because <c>Cancelled</c> was refused on #113. An
+
+**What a person does instead is ask an operator, who declines the request.** That is written here
+rather than left to be found, because it is the one errand this plugin exists to remove, and an
+absence a user meets without warning is worse than one they were told about.
+
+The cheaper-looking alternative is worse than the absence. Routing a withdrawal through
+`Open -> Declined` would leave the history saying an operator declined a request the person
+withdrew, which is false about both of them. Giving a user a state of their own costs rows in the
+transition table, cells in the mapping table and a case on every surface, and it reopens a decision
+already taken on #113. So the absence stands, and it is the first thing to revisit if the state set
+is ever reopened for another reason rather than a reason to reopen it.
 
 ## What happens to the wants recorded before this plugin was installed
 
@@ -353,6 +363,3 @@ the closing condition of the issue beside it.
 - What a request records about having arrived over the seam, and which caller handed it over. The
   contract carries no field naming the caller, so the second half of that is a question for the
   contract rather than for this side. #118.
-- What a person taking back their own ask does on this side's own surfaces. That an undone gesture
-  does not cross the seam is above; what this document still does not hold is the other half, which
-  needs a state a request can be withdrawn into and has none. #68.
