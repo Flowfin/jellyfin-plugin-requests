@@ -49,14 +49,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The images and frameworks are the pairs `docs/testing.md` records its runs against. The
-          # 12.0 line is a release candidate, which `docs/compatibility.md` says in its own words.
+          # The image is not written here. It is one half of a pair the package check needs too,
+          # and two copies of that pair disagree the first time a line moves, so it lives in
+          # `scripts/server-lines.tsv` and the steps below ask for it by framework.
           - line: '10.11'
-            image: 'jellyfin/jellyfin:10.11.11'
             framework: 'net9.0'
             port: '18098'
           - line: '12.0'
-            image: 'jellyfin/jellyfin:12.0-rc4'
             framework: 'net10.0'
             port: '18099'
 
@@ -85,19 +84,19 @@ jobs:
         # injectable today; what the shape buys is that it stays that way when a later matrix takes
         # a value from somewhere else.
         env:
-          IMAGE: ${{ matrix.image }}
           FRAMEWORK: ${{ matrix.framework }}
           PORT: ${{ matrix.port }}
         run: |
           set -euo pipefail
+          IMAGE=$(./scripts/server-image-for.sh "$FRAMEWORK")
           ./scripts/verify-plugin-loads.sh "$IMAGE" "$FRAMEWORK" "$PORT"
 
       - name: Does an operator see the moves
         env:
-          IMAGE: ${{ matrix.image }}
           FRAMEWORK: ${{ matrix.framework }}
           PORT: ${{ matrix.port }}
         run: |
           set -euo pipefail
+          IMAGE=$(./scripts/server-image-for.sh "$FRAMEWORK")
           ./scripts/verify-activity-entries.sh "$IMAGE" "$FRAMEWORK" "$PORT"
 

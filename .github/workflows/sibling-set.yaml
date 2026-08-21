@@ -70,13 +70,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The image is not written here. It is one half of a pair three checks need, and copies
+          # of it disagree the first time a line moves, so it lives in `scripts/server-lines.tsv`
+          # and the step below asks for it by the framework it already carries.
           - line: '10.11'
-            image: 'jellyfin/jellyfin:10.11.11'
             framework: 'net9.0'
             abi: '10.11.0.0'
             port: '18100'
           - line: '12.0'
-            image: 'jellyfin/jellyfin:12.0-rc4'
             framework: 'net10.0'
             abi: '12.0.0.0'
             port: '18101'
@@ -104,11 +105,11 @@ jobs:
         # The token reads the sibling boards' public releases to find the package for this line. It
         # is the job's own read-only token and it writes nothing anywhere.
         env:
-          IMAGE: ${{ matrix.image }}
           FRAMEWORK: ${{ matrix.framework }}
           ABI: ${{ matrix.abi }}
           PORT: ${{ matrix.port }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          IMAGE=$(./scripts/server-image-for.sh "$FRAMEWORK")
           ./scripts/verify-sibling-set.sh "$IMAGE" "$FRAMEWORK" "$ABI" "$PORT"

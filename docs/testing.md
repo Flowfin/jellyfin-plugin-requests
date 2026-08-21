@@ -420,9 +420,13 @@ ruleset setting and is #107.
 
 The 12.0 line is a release candidate. `12.0-rc4` is what exists today and the tag will move.
 
-The packages are not what a catalogue would serve. This installs the assembly the build produces
-into the plugin directory; it does not build the zip, publish a manifest, or exercise the install
-path an operator uses. Those are M14.
+What this check installs is the assembly the build produces, put into the plugin directory. The
+archive an operator would download is installed by the package job instead, which unzips what it
+just built into a server of that line and runs this same procedure over it, so the two differ in
+the bytes they install and not in what they then ask the server.
+
+Neither is the install path an operator uses. Nothing here publishes a manifest or asks a server to
+fetch and install from one, which is M14.
 
 Nothing here plays media, so the container's transcoding dependencies are never touched, and a
 failure that needs a real library to show would not show here.

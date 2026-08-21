@@ -11,6 +11,12 @@
 # container, is reached over plain HTTP on the loopback interface, and is removed by the caller's
 # trap when the run ends. The one credential it creates lives for the length of that container.
 #
+# WHAT IS INSTALLED IS A PUBLISH BY DEFAULT AND A DIRECTORY WHERE ONE IS NAMED. Setting
+# `PLUGIN_FROM_DIRECTORY` to a directory makes `server_start` install what is in it rather than
+# publishing the project, and copy all of it rather than the assembly alone. That is how a package
+# built by the gate is put on a server: the bytes a person would install are the ones under test,
+# and a publish is a different set of files from a package.
+#
 # What a caller gets, after `server_start`:
 #
 #   $BASE       the address to call, on the loopback interface
@@ -54,7 +60,7 @@ server_start() {
     CONTAINER="$name"
     BASE="http://127.0.0.1:$port"
 
-    local repo_root project publish_dir host_dll plugin_dir
+    local repo_root project publish_dir host_dll host_dir plugin_dir
     repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
     project="$repo_root/$ASSEMBLY/$ASSEMBLY.csproj"
     plugin_dir="/config/plugins/$ASSEMBLY"
@@ -66,14 +72,25 @@ server_start() {
 
     AUTH_HEADER='MediaBrowser Client="plugin-load-check", Device="load-check", DeviceId="plugin-load-check", Version="1.0.0.0"'
 
-    step "publish $ASSEMBLY for $framework"
-    # Under the repository rather than in the temporary directory, because this path is handed to
-    # both dotnet and docker and those two disagree about what an absolute path looks like on this
-    # platform.
-    publish_dir="$repo_root/artifacts/load-check/$framework"
-    rm -rf "$publish_dir"
-    dotnet publish "$project" -c Release -f "$framework" -o "$publish_dir" --nologo -v quiet
-    ls -1 "$publish_dir"
+    if [ -n "${PLUGIN_FROM_DIRECTORY:-}" ]; then
+        step "take the plugin from $PLUGIN_FROM_DIRECTORY instead of building one"
+        # WHAT IS INSTALLED IS WHAT WOULD BE SHIPPED, WHICH IS THE POINT OF THIS MODE. A publish and
+        # a package are two different sets of bytes: the package carries the files the artifact list
+        # names and nothing else, so a dependency the host does not provide is absent from it and
+        # present in a publish. Installing the publish would answer a question nobody asked.
+        publish_dir=$PLUGIN_FROM_DIRECTORY
+        test -d "$publish_dir"
+        ls -1 "$publish_dir"
+    else
+        step "publish $ASSEMBLY for $framework"
+        # Under the repository rather than in the temporary directory, because this path is handed to
+        # both dotnet and docker and those two disagree about what an absolute path looks like on this
+        # platform.
+        publish_dir="$repo_root/artifacts/load-check/$framework"
+        rm -rf "$publish_dir"
+        dotnet publish "$project" -c Release -f "$framework" -o "$publish_dir" --nologo -v quiet
+        ls -1 "$publish_dir"
+    fi
     host_dll=$(cygpath --windows "$publish_dir/$ASSEMBLY.dll" 2>/dev/null || printf '%s' "$publish_dir/$ASSEMBLY.dll")
 
     step "start a server from $image"
@@ -91,9 +108,16 @@ server_start() {
         sleep 1
     done
     dk exec "$CONTAINER" mkdir -p "$plugin_dir"
-    # Only the assembly. The rest of the publish output is a symbol file and a documentation file,
-    # and a package shipping those would be shipping what a server has no use for.
-    dk cp "$host_dll" "$CONTAINER:$plugin_dir/$ASSEMBLY.dll"
+    if [ -n "${PLUGIN_FROM_DIRECTORY:-}" ]; then
+        # Everything the package holds, because leaving a file out here would be this check deciding
+        # what a server gets rather than the artifact list deciding it.
+        host_dir=$(cygpath --windows "$publish_dir" 2>/dev/null || printf '%s' "$publish_dir")
+        dk cp "$host_dir/." "$CONTAINER:$plugin_dir"
+    else
+        # Only the assembly. The rest of the publish output is a symbol file and a documentation file,
+        # and a package shipping those would be shipping what a server has no use for.
+        dk cp "$host_dll" "$CONTAINER:$plugin_dir/$ASSEMBLY.dll"
+    fi
     # Plugins are read at start, so the server has to come up again with the plugin already in place.
     dk restart "$CONTAINER" >/dev/null
     dk exec "$CONTAINER" ls -1 "$plugin_dir"
