@@ -198,12 +198,54 @@ The request identifier is in the text rather than in the entity's `ItemId`. That
 item on the server's side and the dashboard offers it as a link, so a request identifier there is a
 link to an item that does not exist.
 
-### What the entry is not proof of
+### Read back on a real server of each claimed line
 
-That an operator can read it in the dashboard. Nothing in the suite runs a server, which the headless
-rule in [`docs/testing.md`](testing.md) settles, so what is asserted is what this plugin asked to be
-written. Reading the entries back on a running server of each claimed line is the second condition of
-#75 and is a procedure somebody runs where a server can be started.
+Nothing in the suite runs a server, which the headless rule in [`docs/testing.md`](testing.md)
+settles, so what the suite asserts is what this plugin asked to be written. Whether the server kept
+it, and whether it comes back where an operator looks, is a different question and is answered by a
+job rather than by a test.
+
+`.github/workflows/activity-entries.yaml` starts a Jellyfin of each line, installs the plugin, asks
+for something over this plugin's own API, approves it and declines it, then reads
+`GET /System/ActivityLog/Entries`, which is the endpoint the dashboard's activity page draws. It runs
+`scripts/verify-activity-entries.sh`, on every pull request and nightly.
+
+Run `32490605857` at `64bc924ea5650becf44f1e56537b237378f25d24`. On `jellyfin/jellyfin:10.11.11`:
+
+    == read the activity entries the dashboard draws
+    Type=MediaRequestDeclined  Name=Request declined: A film for the activity check  ShortOverview=Approved to Declined. Request 2d03fdb9-d113-452e-95ff-94e58d437e77.  UserId=3ce3b30b838944cab978503c3732d199
+    Type=MediaRequestApproved  Name=Request approved: A film for the activity check  ShortOverview=Open to Approved. Request 2d03fdb9-d113-452e-95ff-94e58d437e77.  UserId=3ce3b30b838944cab978503c3732d199
+    Type=AuthenticationSucceeded  Name=verify successfully authenticated  ShortOverview=IP address: 172.17.0.1  UserId=3ce3b30b838944cab978503c3732d199
+    Type=SessionStarted  Name=verify is online from load-check  ShortOverview=IP address: 172.17.0.1  UserId=3ce3b30b838944cab978503c3732d199
+    Type=UserPasswordChanged  Name=Password has been changed for user verify  ShortOverview=None  UserId=3ce3b30b838944cab978503c3732d199
+
+    == done
+    two transitions, two entries, read back from jellyfin/jellyfin:10.11.11 (net9.0)
+
+And on `jellyfin/jellyfin:12.0-rc4`:
+
+    == read the activity entries the dashboard draws
+    Type=MediaRequestDeclined  Name=Request declined: A film for the activity check  ShortOverview=Approved to Declined. Request cb9afc31-7ca3-415d-83e3-37d38ddaae75.  UserId=2b4870e65ab3463d91b3b5e890897ed8
+    Type=MediaRequestApproved  Name=Request approved: A film for the activity check  ShortOverview=Open to Approved. Request cb9afc31-7ca3-415d-83e3-37d38ddaae75.  UserId=2b4870e65ab3463d91b3b5e890897ed8
+    Type=AuthenticationSucceeded  Name=verify successfully authenticated  ShortOverview=IP address: 172.17.0.1  UserId=2b4870e65ab3463d91b3b5e890897ed8
+    Type=SessionStarted  Name=verify is online from load-check  ShortOverview=IP address: 172.17.0.1  UserId=2b4870e65ab3463d91b3b5e890897ed8
+    Type=UserPasswordChanged  Name=Password has been changed for user verify  ShortOverview=None  UserId=2b4870e65ab3463d91b3b5e890897ed8
+
+The three entries under the plugin's two are the server's own, from the same run, and they are left
+in the paste rather than cut: what the check asserts is that exactly two entries name the request,
+and a paste showing only those two would read as a server that logged nothing else.
+
+The check bites. Its own first run went red twice for two different reasons, neither of them about
+the plugin: one line reset the connection while the server was still coming up, and the other read
+both entries correctly and matched neither, because the identifier is handed back without dashes and
+written into an entry with them. Both are repaired and both are why the transcript above is a second
+run rather than a first.
+
+### What the entry is still not proof of
+
+That the dashboard draws it. Nothing above opens a browser, which is the first refusal in
+[`docs/testing.md`](testing.md), so what is proven is that the entries reach the endpoint the
+dashboard reads and not that the page renders them.
 
 ### When the activity log itself refuses
 

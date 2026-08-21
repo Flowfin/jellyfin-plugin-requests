@@ -75,10 +75,12 @@ and is written one way, and it says nothing about whether the markup is correct 
 **Installing the plugin into a real server, as part of the ordinary suite.** Refused: it needs a
 server and a container engine on the machine, which is the fourth condition.
 
-What replaces it is the recorded first-load procedure, `scripts/verify-plugin-loads.sh`, run
-deliberately rather than on every change. It is #20, it is closed, and the runs it produced are in
-the section below together with the mismatch that was fed to it to show it can fail. What that
-costs is stated there too: nothing on a merge route runs it.
+What replaces it is the first-load procedure, `scripts/verify-plugin-loads.sh`. It is #20, it is
+closed, and the runs it produced by hand are in the section below together with the mismatch that
+was fed to it to show it can fail. It is no longer only a procedure somebody remembers to run:
+`Activity entries on a real server` runs it on every pull request and nightly, on both claimed
+lines, ahead of the check it exists for. What that leaves uncovered is stated in the section below
+rather than here.
 
 **A real HTTPS call to an external request service.** Refused: a real endpoint needs a socket, and
 a test endpoint needs its certificate trusted, which means writing to a machine trust store. That
@@ -330,8 +332,15 @@ the shape a reader should expect when this fails.
 
 ### What this does not cover
 
-The run above happened on one machine, by hand. Nothing on a merge route runs it, so a change that
-breaks loading reaches the mainline the same way a change that does not.
+The run above happened on one machine, by hand. This paragraph said nothing on a merge route runs
+it, and that ended with #75: `.github/workflows/activity-entries.yaml` runs this script on both
+lines on every pull request, ahead of the activity check that needs the same server. The transcript
+above is still a hand run at the commit it names and has not been retaken from a job.
+
+What that job is not is a required check. It reports, and a merge is not held on it, so a change
+that breaks loading still reaches the mainline; what has changed is that somebody sees it happen on
+the pull request rather than finding out later. Which contexts hold a merge here is a branch
+ruleset setting and is #107.
 
 The 12.0 line is a release candidate. `12.0-rc4` is what exists today and the tag will move.
 
