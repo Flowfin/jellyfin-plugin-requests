@@ -174,7 +174,7 @@ for somebody to infer from the first.
 `IRequestStore` is public, and the plugin registers it into the container the server hands it:
 
     git grep -n 'AddSingleton<IRequestStore>' -- Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs
-    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:52:        serviceCollection.AddSingleton<IRequestStore>(provider => new FileRequestStore(
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:63:        serviceCollection.AddSingleton<IRequestStore>(provider => new FileRequestStore(
 
 That collection is the server's own, not one this plugin keeps to itself, so the registration sits
 where everything else in the process can be resolved from. What the interface answers is not
@@ -184,9 +184,28 @@ a query over all of them.
 What this does not say is that another plugin can reach it. Naming a type means having the type, and
 whether a second plugin in one process can name this one is the assembly-loading question #117 asks
 and nobody here has measured. So what is written down is an exposure of unmeasured reachability,
-which is neither a leak that has been shown nor a safety anybody has earned. The rule the API keeps,
-that a caller reads their own requests and never another person's, is enforced at the endpoints in
-`docs/api.md` and not by the store beneath them.
+which is neither a leak that has been shown nor a safety anybody has earned.
+
+**The boundary is the endpoints, and the store beneath them is not one.** The rule the API keeps,
+that a caller reads their own requests and never another person's, is enforced where those calls
+arrive and is written down in `docs/api.md`. A caller already inside the server process is outside
+that rule, and this document says so instead of leaving it to be worked out from the registration
+above.
+
+That sentence is here in its own right because it is wider than the position it follows from. What
+"What this side trusts, and what it checks anyway" argues below is about one handover: a caller in
+this process can read this plugin's store and write its files whatever the seam does, so a check on
+the seam would protect against nothing that is not already possible. Reading that as covering
+everything this plugin puts into the server's container is an extension of it, and an extension
+nobody wrote down is the kind somebody discovers later and disagrees with.
+
+What taking it gives up is the narrower answer, which is to make the store's contract internal to
+the assembly or to hand the container something smaller. Either removes an exposure nobody has
+shown is reachable, and either reaches through `Jellyfin.Plugin.Requests/Storage/` and the whole
+suite derived from `RequestStoreContract`. It becomes the right change the day somebody measures
+the reachability and finds it, and that measurement is cheap: a second assembly in the same process
+trying to resolve the type answers it. Until then this rests on an argument rather than on a fact,
+and it should read that way.
 
 ## An undone gesture does not cross the seam
 
