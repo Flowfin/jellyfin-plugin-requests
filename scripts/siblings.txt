@@ -1,0 +1,18 @@
+# The sibling boards this plugin is checked beside, one per line.
+#
+# THE LIST IS OF CANDIDATES AND NOT OF MEMBERS. A board on this list joins the
+# supported set on the day it publishes a version for a server line, and is
+# skipped on the lines it has published nothing for. That rule is why no version
+# is written here: pinning one would make the set a thing somebody has to
+# remember to update, and a matrix that installs a version nobody ships fails
+# for a reason that has nothing to do with interoperability. The run prints which
+# boards it installed and which it skipped, so a green matrix cannot be read as
+# covering a board that was not in it.
+#
+# Format: <owner>/<repo> <directory the server installs it under>
+#
+# The directory is the name the plugin's own package uses under
+# /config/plugins, which is what the collision scan over configuration files
+# compares. It is written here rather than derived, because it comes out of the
+# other board's packaging metadata and not out of its repository name.
+Flowfin/jellyfin-plugin-sso Community SSO for Jellyfin

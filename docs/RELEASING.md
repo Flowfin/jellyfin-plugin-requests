@@ -12,9 +12,27 @@ name.
 
 ## Cutting a release
 
-1. Update `version` in `build.yaml` on the release branch and merge it.
-2. Check that the commit you want to release is on that branch.
-3. Push the tag for that commit:
+1. Check that `Works alone, works with the sibling set` is green on the commit you
+   are about to release, on both claimed lines. It boots a server of each line with
+   this plugin alone and again with the supported sibling set installed, and scans
+   for collisions over routes, scheduled task names and plugin configuration. A red
+   matrix is not released around: either the collision is fixed, or the
+   incompatibility is written into [compatibility.md](compatibility.md) as a known
+   limitation with its reason, and then this is green because the set no longer
+   claims what it cannot do.
+
+    **Nothing enforces this step.** The workflow reports and holds no merge and no
+    tag, so what stands between a collision and a release is somebody reading this
+    line. Which contexts hold anything here is a branch ruleset setting rather than
+    a file in this tree, and it is #107.
+
+    The run also prints which boards were in the set and which were skipped for
+    having published nothing on that line. Read it: green over one board is not
+    green over the family.
+
+2. Update `version` in `build.yaml` on the release branch and merge it.
+3. Check that the commit you want to release is on that branch.
+4. Push the tag for that commit:
 
     ```
     git tag 1.4.0-stable <commit>
