@@ -1,0 +1,2 @@
+Requests	0.1.0.0	Active	0f9c9107-b31b-459e-81fa-6d35dac25e79
+Community SSO for Jellyfin	4.3.0.40	Active	505ce9d1-d916-42fa-86ca-673ef241d7df

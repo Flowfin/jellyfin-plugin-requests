@@ -84,7 +84,7 @@ io.open(sys.argv[2], "w", encoding="utf-8").write("\n".join(rows))
     python3 -c '
 import io, json, sys
 plugins = json.load(io.open(sys.argv[1], encoding="utf-8"))
-rows = ["{0}\t{1}\t{2}".format(p.get("Name"), p.get("Version"), p.get("Status")) for p in plugins]
+rows = ["{0}\t{1}\t{2}\t{3}".format(p.get("Name"), p.get("Version"), p.get("Status"), p.get("Id")) for p in plugins]
 for row in sorted(rows):
     print("  " + row)
 io.open(sys.argv[2], "w", encoding="utf-8").write("\n".join(rows))
@@ -172,76 +172,11 @@ step "run two: this plugin and the set"
 facts together
 
 step "verdict"
-python3 -c '
-import io, sys
-
-alone, together, installed = sys.argv[1], sys.argv[2], sys.argv[3]
-
-
-def lines(path):
-    try:
-        return [l for l in io.open(path, encoding="utf-8").read().splitlines() if l.strip()]
-    except IOError:
-        return []
-
-
-def duplicates(values):
-    seen, twice = set(), []
-    for value in values:
-        if value in seen and value not in twice:
-            twice.append(value)
-        seen.add(value)
-    return twice
-
-
-problems = []
-
-# Every plugin the second run lists has to be running. A sibling the server refused is not an
-# interoperability result on its own, and it is reported here rather than swallowed.
-for row in lines(together + "/plugins.txt"):
-    name, _version, status = row.split("\t")
-    if status != "Active":
-        problems.append("{0} is {1} rather than Active with the set installed".format(name, status))
-
-if not any(row.split("\t")[0] == "Requests" for row in lines(together + "/plugins.txt")):
-    problems.append("this plugin is not in the list with the set installed")
-
-# ROUTES. Two plugins answering one path is the collision, and the document lists a path once
-# however many methods it carries, so a repeat in it is the server having been handed two.
-for path in duplicates(lines(together + "/paths.txt")):
-    problems.append("two declarations of the route {0}".format(path))
-
-# A route this plugin served alone and does not serve beside the set is the same failure seen from
-# the other end: something took it.
-lost = sorted(set(lines(alone + "/paths.txt")) - set(lines(together + "/paths.txt")))
-for path in lost:
-    if "MediaRequests" in path:
-        problems.append("the route {0} is served alone and not beside the set".format(path))
-
-# SCHEDULED TASKS. The key is what the server stores a trigger against and the name is what an
-# operator reads, so a repeat of either is a collision even where the other differs.
-rows = [row.split("\t") for row in lines(together + "/tasks.txt")]
-for key in duplicates([row[0] for row in rows]):
-    problems.append("two scheduled tasks under the key {0}".format(key))
-for name in duplicates([row[1] for row in rows if len(row) > 1]):
-    problems.append("two scheduled tasks named {0}".format(name))
-
-# CONFIGURATION FILES. A plugin keeps its settings in a file of its own under one directory, so two
-# plugins writing one file is the fight this category is about.
-for name in duplicates(lines(together + "/configs.txt")):
-    problems.append("two plugins writing the configuration file {0}".format(name))
-
-print("the set, per board:")
-for row in lines(installed):
-    print("  " + row)
-
-if problems:
-    for problem in problems:
-        print("COLLISION: " + problem)
-    sys.exit("{0} collision(s).".format(len(problems)))
-
-print("no collision over routes, scheduled task names and keys, or configuration files")
-' "$work/alone" "$work/together" "$installed"
+# The scan is a file of its own and `scripts/prove-collision-scan.sh` runs it over one fixture per
+# collision kind. That is the difference between a guard and a claim: this call passes on a clean
+# server, which is also what a scan that does nothing does, and the fixtures are where each rule is
+# watched refusing something.
+python3 "$here/sibling-collision-scan.py" "$work/alone" "$work/together" "$installed"
 
 step "done"
 echo "this plugin alone and beside the set, on $image ($framework)"

@@ -35,6 +35,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prove:
+    # THE SCAN IS WATCHED REFUSING SOMETHING BEFORE IT IS TRUSTED TO PASS. A collision scan that has
+    # never said no is a claim: it passes on a clean server, which is also what a scan that does
+    # nothing does. This runs it over one fixture per collision kind and over a clean set, and needs
+    # no container, no server and no network, so it answers in seconds.
+    name: the scan refuses what it says it refuses
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, so do not leave the token in .git/config.
+          persist-credentials: false
+
+      - name: Every collision kind, refused for its own reason
+        run: |
+          set -euo pipefail
+          ./scripts/prove-collision-scan.sh
+
   set:
     name: set ${{ matrix.line }}
     runs-on: ubuntu-latest
