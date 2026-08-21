@@ -1,0 +1,103 @@
+# Does an operator actually see a move in the dashboard, on a real server of each claimed line.
+#
+# #75 asks for one activity entry per transition and for those entries to be readable in the
+# dashboard on both claimed server lines. The first half is the suite's, against a double over the
+# server's activity manager. The second half cannot be: a double can say the plugin made the call and
+# it cannot say the server kept the entry or that the entry comes back where an operator looks.
+#
+# So this job starts a Jellyfin of each line, installs the plugin into it, walks a request from open
+# through approved to declined over the plugin's own API, and reads the entries back out of
+# `GET /System/ActivityLog/Entries`, which is the endpoint the dashboard's activity page draws.
+#
+# What it does not do is render a page. Nothing here opens a browser, which is the headless rule in
+# `docs/testing.md`, so what this proves is that the entries reach the endpoint the dashboard reads
+# and not that the dashboard draws them.
+#
+# It runs on pull requests as well as on a schedule. A check of this shape that only runs nightly
+# tells you about a defect after it has landed, and the cost of running it is one container per line.
+name: Activity entries on a real server
+
+on:
+  pull_request:
+    branches: ["**"]
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+# Explicit deny-all at workflow level; the job grants what it needs.
+permissions: {}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  entries:
+    name: entries ${{ matrix.line }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    strategy:
+      # Both lines are run whatever the other one does. A failure on one is a fact about that line,
+      # and cancelling the other would leave nobody knowing whether it is a fact about both.
+      fail-fast: false
+      matrix:
+        include:
+          # The images and frameworks are the pairs `docs/testing.md` records its runs against. The
+          # 12.0 line is a release candidate, which `docs/compatibility.md` says in its own words.
+          - line: '10.11'
+            image: 'jellyfin/jellyfin:10.11.11'
+            framework: 'net9.0'
+            port: '18098'
+          - line: '12.0'
+            image: 'jellyfin/jellyfin:12.0-rc4'
+            framework: 'net10.0'
+            port: '18099'
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, so do not leave the token in .git/config.
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Restore in locked mode
+        run: dotnet restore Jellyfin.Plugin.Requests.sln --locked-mode
+
+      - name: Does the plugin load at all
+        # First, because everything below it is meaningless on a server that did not load the plugin
+        # and this says so in one line instead of as a confusing refusal from an endpoint that is not
+        # there. It is the procedure `docs/testing.md` records, run here rather than by hand.
+        #
+        # The matrix values arrive as environment variables rather than as expressions inside the
+        # script. They are written in this file and are not somebody's input, so nothing here is
+        # injectable today; what the shape buys is that it stays that way when a later matrix takes
+        # a value from somewhere else.
+        env:
+          IMAGE: ${{ matrix.image }}
+          FRAMEWORK: ${{ matrix.framework }}
+          PORT: ${{ matrix.port }}
+        run: |
+          set -euo pipefail
+          ./scripts/verify-plugin-loads.sh "$IMAGE" "$FRAMEWORK" "$PORT"
+
+      - name: Does an operator see the moves
+        env:
+          IMAGE: ${{ matrix.image }}
+          FRAMEWORK: ${{ matrix.framework }}
+          PORT: ${{ matrix.port }}
+        run: |
+          set -euo pipefail
+          ./scripts/verify-activity-entries.sh "$IMAGE" "$FRAMEWORK" "$PORT"
+
