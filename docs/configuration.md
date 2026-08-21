@@ -209,6 +209,13 @@ installation and by operating system, and this document does not name it, for th
 [storage.md](storage.md) gives: the server is the authority for its own paths. Run these from
 inside it, with the server stopped.
 
+An operator who does not know where that directory is on their install should not have to go
+looking. Jellyfin documents it under "Server Paths" in
+[its own configuration page](https://jellyfin.org/docs/general/administration/configuration/), per
+operating system and per installation method, and that is the answer to read rather than anything
+written here. A copy of those paths on this page would be this repository going stale about somebody
+else's program, which is worse than a link because it would be wrong with authority.
+
 On Linux and macOS:
 
     rm -rf ./plugins/Jellyfin.Plugin.Requests

@@ -41,12 +41,12 @@ tooling would be a claim about a process nobody outside it can see.
 
 ## Checked against this repository
 
-| What the route needs                               | Where that is decided                        | Here          |
-| -------------------------------------------------- | -------------------------------------------- | ------------- |
-| A name beginning `jellyfin-plugin-`                | `update_submodules.py:59`, `build_all.sh:18` | met           |
-| A repository in the `jellyfin` organisation        | `update_submodules.py:43`                    | not met, #113 |
-| A `build.yaml` at the root carrying `version`      | `build_plugin.sh`                            | met           |
-| One plugin per repository, built from `build.yaml` | `build_plugin.sh`                            | not met, #110 |
+| What the route needs                               | Where that is decided                        | Here                      |
+| -------------------------------------------------- | -------------------------------------------- | ------------------------- |
+| A name beginning `jellyfin-plugin-`                | `update_submodules.py:59`, `build_all.sh:18` | met                       |
+| A repository in the `jellyfin` organisation        | `update_submodules.py:43`                    | not met, declined on #110 |
+| A `build.yaml` at the root carrying `version`      | `build_plugin.sh`                            | met                       |
+| One plugin per repository, built from `build.yaml` | `build_plugin.sh`                            | not met, #110             |
 
 The name is met, and it is met by accident rather than by decision: this repository is called
 `jellyfin-plugin-requests` because that is what a Jellyfin plugin repository is called.
@@ -132,25 +132,22 @@ than in the table above.
 
 ## The submission decision
 
-**It has not been taken.** It is decision 11 on #113 and no answer to that number has been written
-there.
+**Declined.** This repository does not move into the `jellyfin` organisation, and the plugin is
+distributed from a manifest under Flowfin's control instead. That was settled on #110, together with
+the shape of that manifest, and the two are one answer rather than two: the enumeration above is the
+only route into the official catalogue, so declining the move is declining the catalogue.
 
-The decision is not whether to send an entry somewhere, because there is nowhere to send one. It is
-whether this repository moves into the `jellyfin` organisation, which is the only thing the
-enumeration above reaches. That carries who owns the repository, who can publish a release from it
-and under whose rules it is maintained, and none of those is a packaging question.
+The decision was never whether to send an entry somewhere, because there is nowhere to send one. It
+is whether this repository moves, which carries who owns it, who can publish a release from it and
+under whose rules it is maintained. None of those is a packaging question, which is why the answer
+is recorded here rather than read off the table above.
 
-What each answer costs, so that the decision is made against the costs rather than against a
-preference:
+**What it costs is that most people never find this plugin.** The list every Jellyfin server already
+shows will not carry it, so an operator reaches it only by being told the manifest URL and adding it
+by hand. That price is accepted rather than argued away, and it is the larger half of what the
+decision buys.
 
-**Staying outside.** The plugin is not in the list every server already shows, so an operator finds
-it only by being told the manifest URL and adding it by hand. That is most people never finding it.
-Nothing else changes: the release route in [RELEASING.md](RELEASING.md) already publishes without
-feeding any catalogue, and the two-line packaging problem above stays this board's own.
-
-**Moving in.** The plugin appears wherever a Jellyfin server does. The repository is no longer this
-account's, releases are made under that organisation's process, and the version an operator installs
-is the timestamp the build script writes rather than the one minted here.
-
-This page records that the question is open and what it costs. Answering it is not something a
-document in this repository can do.
+What it keeps is the repository, the release route already in [RELEASING.md](RELEASING.md), and
+version numbers minted here rather than replaced by the timestamp the catalogue's build script
+writes over them. The two-line packaging problem in the table above stays this board's own, which it
+would have been under either answer.
