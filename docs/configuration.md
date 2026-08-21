@@ -69,8 +69,20 @@ front of them, which is why it ships from the start rather than later. Ten is a 
 to be trying to reach. It counts what is open rather than what was ever asked, so a person whose
 requests are answered can keep asking.
 
-Where the quota is enforced is #114, and that is not built yet either. **Nothing refuses an
-eleventh open request today.**
+The quota is enforced where a request is created, in
+[`RequestIntake`](../Jellyfin.Plugin.Requests/Intake/RequestIntake.cs), which is the one path both
+the HTTP endpoint and the seam take, so a surface cannot get past it by forgetting to ask. An
+administrator and the plugin itself are not counted against it.
+
+**There is no off switch.** A quota is always set, and a value below 1 is refused rather than read
+as unlimited: by the settings page, and again by the server on a save and on a read. An operator
+whose users are their own household sets a number above anything anybody will reach, and that
+number is a limit rather than an absence.
+
+Naming that workaround is not the same as offering the setting, and the difference is why there is
+no empty field here. A field that means no limit when it is empty is a field whose meaning has to
+be known, and one cleared by accident removes the limit silently. A quota that fails open on a typo
+is worse than a quota somebody has to work around.
 
 **OutboundNoticeAddress** is empty, and empty is the whole of how the outbound notification path is
 turned off. It is the only setting on this page that causes anything to leave this server, and it is
