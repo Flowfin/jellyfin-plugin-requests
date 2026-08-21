@@ -1,0 +1,92 @@
+# Works alone, works with every supported sibling.
+#
+# #119 is the family rule: this plugin comes up clean on a stock server on its own, and it comes up
+# clean with the supported set installed beside it, with no collision over routes, scheduled task
+# names or configuration files. Two plugins in one server process share a route table, a task list
+# and a configuration directory, and none of that is visible to a suite that runs one plugin.
+#
+# So this boots a server of each claimed line twice, once with this plugin alone and once with the
+# set, and compares what the two runs declare. `scripts/verify-sibling-set.sh` is what it runs and
+# `scripts/siblings.txt` is the candidate list.
+#
+# WHAT THE SET IS, AND WHAT A GREEN RUN THEREFORE DOES NOT COVER. A board joins the set on the day
+# it publishes a release for a line's ABI, and is skipped on the lines it has published nothing for.
+# The run prints both lists on every run, because a matrix green over one board that does not say so
+# is read as a matrix over the family. The sibling this repository's seam is written against has
+# published nothing, so it is not in the set and this says nothing about it.
+name: Works alone, works with the sibling set
+
+on:
+  pull_request:
+    branches: ["**"]
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+
+# Explicit deny-all at workflow level; the job grants what it needs.
+permissions: {}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  set:
+    name: set ${{ matrix.line }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    strategy:
+      # Both lines whatever the other does. A collision on one line is a fact about that line, and
+      # cancelling the other would leave nobody knowing whether it is a fact about both.
+      fail-fast: false
+      matrix:
+        include:
+          - line: '10.11'
+            image: 'jellyfin/jellyfin:10.11.11'
+            framework: 'net9.0'
+            abi: '10.11.0.0'
+            port: '18100'
+          - line: '12.0'
+            image: 'jellyfin/jellyfin:12.0-rc4'
+            framework: 'net10.0'
+            abi: '12.0.0.0'
+            port: '18101'
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, so do not leave the token in .git/config.
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Restore in locked mode
+        run: dotnet restore Jellyfin.Plugin.Requests.sln --locked-mode
+
+      - name: Alone, then with the set
+        # The matrix values arrive as environment variables rather than as expressions inside the
+        # script, for the reason the activity job gives: nothing here is injectable today and the
+        # shape keeps it that way when a later matrix takes a value from somewhere else.
+        #
+        # The token reads the sibling boards' public releases to find the package for this line. It
+        # is the job's own read-only token and it writes nothing anywhere.
+        env:
+          IMAGE: ${{ matrix.image }}
+          FRAMEWORK: ${{ matrix.framework }}
+          ABI: ${{ matrix.abi }}
+          PORT: ${{ matrix.port }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ./scripts/verify-sibling-set.sh "$IMAGE" "$FRAMEWORK" "$ABI" "$PORT"
