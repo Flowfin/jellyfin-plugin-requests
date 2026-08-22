@@ -61,10 +61,13 @@ that never arrives leaves an object nobody asks. `TheSinkWorksOnAServerWithNoSib
 that state, asserted while `SiblingIndependenceTests` holds that no sibling assembly is loaded at
 all.
 
-**Being reachable is a different claim and is not made here.** Naming a type means having the type,
-and whether a second plugin in one server process can name this one is #117, which nobody has
-measured on either claimed line. Resolving the sink from inside this assembly, which is what the
-suite does, says the registration is there and says nothing about who else can ask for it.
+**Being reachable is a different claim and it is measured rather than assumed.** Naming a type
+means having the type, and whether a second plugin in one server process can name this one was the
+open half of #117. A second plugin installed beside this one, shipping no copy of anything this
+plugin declares, finds the type and is handed the registration by the container, on a server of each
+claimed line. The answer and the commands are under "Where the shared type comes from" below.
+Resolving the sink from inside this assembly, which is what the suite does, is still a different
+claim and still says nothing about who else can ask for it.
 
 ### Two obligations that come with being a sink
 
@@ -122,6 +125,32 @@ the thing #117's fourth condition is about: a mismatch stops being a compile err
 runtime one, so "no sibling installed" and "sibling installed, type did not match" collapse back
 into the same silence. A compile-time contract is what keeps those two states different.
 
+### What a server of each line actually does
+
+The choice above rests on a plugin being able to name a type whose assembly ships in another
+plugin's directory. That is a fact about the host rather than about either tree, and the two claimed
+lines are different major versions of it, so an answer taken from one is a claim about the other.
+Both were asked, at `5b96f57`, by `.github/workflows/seam-probe.yaml`:
+
+    gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/96989583236/logs | grep -a "SEAM-PROBE" | sed -E 's/.*ContainerReport: //' | sort -u
+    SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests: 1
+    SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.dll
+    SEAM-PROBE the container returned 1 implementation(s) of it
+    SEAM-PROBE the type Jellyfin.Plugin.Requests.Seam.IWantHandover is reachable from this plugin
+
+That job is the 10.11 line. The 12.0 line is job `96989583387` and the same command returns the same
+four lines. Both servers held two plugins while answering, this one and the probe.
+
+So one shipped copy is available on both lines. The assembly is loaded once, in a context a second
+plugin can see, and the container hands that second plugin the implementation this one registered.
+
+What it does not say, because the distance between the two is where this would be misread. The probe
+finds the type by name through reflection, so what is measured is that the assembly is loaded once
+and that its type resolves and answers a lookup from elsewhere in the process. Whether the runtime
+binds a compile-time reference to that same loaded assembly is a further step and is not measured
+here. And nothing above installs two copies of one contract assembly, so the premise the first
+rejected option rests on is still unmeasured, which is what that option's own paragraph says.
+
 ### What the tree does today is not yet the choice above
 
 The type the sibling would name is declared in this plugin's own assembly, and this project
@@ -139,15 +168,12 @@ and the decision above is a thing to build rather than a description of what shi
 section as the arrangement being in place is the one misreading it could produce, which is why the
 commands are here.
 
-**Three things #117 asks for are still not done, and none of them is softened by the choice being
-taken.** What the server's loader does with two plugin directories each carrying an assembly of one
-simple name is unmeasured on both claimed lines; a run needs a container engine, an image per line,
-and two throwaway plugins built for the purpose, and none of that has been done from this tree.
-Nothing proves that the sibling's container lookup finds this plugin's implementation, in the shape
-that will actually ship, on either line; what the suite resolves is this assembly's own
-registration, which is a different claim and is written as one above. And nothing separates a
-container that found no implementation from one that found none because the type did not match, so
-an operator meeting either one meets the same silence.
+**Two things #117 asks for are still not done, and neither is softened by the choice being
+taken.** Nothing proves that the sibling's container lookup finds this plugin's implementation in
+the shape that will actually ship, on either line; what the suite resolves is this assembly's own
+registration and what the probe resolves it finds by name, and neither of those is a contract
+package. And nothing separates a container that found no implementation from one that found none
+because the type did not match, so an operator meeting either one meets the same silence.
 
 ## Both sides watch the library, and neither tells the other
 
