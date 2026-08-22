@@ -586,8 +586,14 @@ added, and #2 asks the same of them: a run in which the guard went red for the r
 a run in which the tree passes it. Nothing in this tree recorded either, so what follows is that
 record rather than a claim that it already existed.
 
-Six of the twelve have both. Six do not, and the table says which rather than leaving a reader to
+Eight of the twelve have both. Four do not, and the table says which rather than leaving a reader to
 take a full-looking column for a full one.
+
+**Two of those cells said the guard had no red run of this kind and both were wrong.** They were
+filled from the three most recent failures of each workflow rather than from its whole history, which
+is a claim about a population made from the nearest part of it to hand. Listing every failure instead
+finds a `proof/` branch under `build.yaml` and a run of `activity-entries.yaml` that stopped at the
+step it exists for. Both cells are corrected below and the correction is what this paragraph is.
 
 Every green run below is the same head, `110abde`, which is the last change to land, and every
 workflow that ran on it succeeded:
@@ -621,8 +627,8 @@ their own and carry their own head.
 | Workflow                      | Red run                                                                                                                                               | Green run                 |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
 | `abi-floor.yaml`              | 31095776433, `proof/23-floor-bites`, job `floor 10.11.0.0` red at `Build the plugin against the floor`                                                | 32603611274               |
-| `activity-entries.yaml`       | none of this kind, below                                                                                                                              | 32603611247               |
-| `build.yaml` with `gate.yaml` | none of this kind, below                                                                                                                              | 32603611416               |
+| `activity-entries.yaml`       | 32490301669, `notify/75-activity-entries-on-a-real-server`, job `entries 10.11` red at `Does an operator see the moves`                               | 32603611247               |
+| `build.yaml` with `gate.yaml` | 31083336296, `proof/22-gate-bites`, jobs `call / build` and `call / test` red at `Build every claimed target framework`                               | 32603611416               |
 | `invariant-lint.yaml`         | 31265005320, `proof/28-invariants-refuse`, red at `Refuse an invariant broken anywhere in the tree`                                                   | 32603611261               |
 | `mutation.yaml`               | none at all, below                                                                                                                                    | 31996260260, at `0482b29` |
 | `package.yaml`                | 32554832287, `proof/1-a-version-the-tree-does-not-hold-is-refused`, both lines red at `Install this package on a server of the line it was built for` | 32603611237               |
@@ -643,17 +649,46 @@ The job and step of each red run are read off the run rather than off a log:
 `user-isolation.yaml` is the one whose log has been read, and `docs/testing.md` carries the two lines
 of it rather than this page holding a second copy.
 
-### The six empty cells, one reason each
+### The two cells that were wrong
 
-**`activity-entries.yaml`.** One red run exists, 32547852608 on `throwaway/263-page-not-served`, and
-both its jobs are red at `Does the plugin load at all`. That is the first-load procedure this
-workflow runs ahead of the check it exists for, so the run records the load procedure refusing and
-says nothing about whether the activity check refuses what it names.
+**`activity-entries.yaml` has two red runs and this page named the one that says less.**
+32547852608 on `throwaway/263-page-not-served` is red at `Does the plugin load at all`, which is the
+first-load procedure this workflow runs ahead of the check it exists for, so that run records the
+load procedure refusing. The other one is the guard itself:
 
-**`build.yaml` with `gate.yaml`.** Every red run in that workflow's history is a change that did not
-compile or a test that failed, which is the guard doing its job on real work rather than a near-miss
-written to be red. `gate.yaml` produces no run of its own: it is called by `build.yaml` and is where
-the two names the ruleset matches literally come from.
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/actions/runs/32490301669/jobs \
+        --jq '.jobs[] | select(.conclusion=="failure")
+              | "\(.name)  |  \([.steps[]|select(.conclusion=="failure")|.name]|join("; "))"'
+    entries 12.0  |  Does the plugin load at all
+    entries 10.11  |  Does an operator see the moves
+
+One line per line, and they are red at different steps. The 10.11 job reached the verdict this check
+exists for and refused there, which is the reason this guard names. The 12.0 job did not get that
+far, so what that half records is the load procedure again.
+
+**`build.yaml` has a `proof/` branch and this page said it had none.** The claim was that every red
+run of it is a change that did not compile or a test that failed. Ten exist and two of them are a
+near-miss written to be red, on two heads of one branch exercising two different legs:
+
+    $ gh run list --repo Flowfin/jellyfin-plugin-requests --workflow build.yaml \
+        --status failure --limit 100 --json databaseId,headBranch,headSha \
+        --jq '.[] | "\(.databaseId)\t\(.headBranch)\t\(.headSha[0:7])"' | grep proof/22
+    31083336296	proof/22-gate-bites	174ba94
+    31083013536	proof/22-gate-bites	0a96f5c
+
+    $ for r in 31083336296 31083013536; do \
+        gh api repos/Flowfin/jellyfin-plugin-requests/actions/runs/$r/jobs \
+          --jq '.jobs[] | select(.conclusion=="failure")
+                | "\(.name)  |  \([.steps[]|select(.conclusion=="failure")|.name]|join("; "))"'; done
+    call / test  |  Build every claimed target framework
+    call / build  |  Build every claimed target framework
+    call / test  |  Restore in locked mode
+    call / build  |  Restore in locked mode
+
+`gate.yaml` produces no run of its own: it is called by `build.yaml` and is where the two names the
+ruleset matches literally come from, which is why both rows above are `call /` jobs.
+
+### The four empty cells, one reason each
 
 **`mutation.yaml` and `sibling-set.yaml`.** No red run at all, in either.
 
@@ -663,9 +698,12 @@ the two names the ruleset matches literally come from.
     0
     0
 
-**`scan-codeql.yaml`.** Its one red run, 31265837166 on `proof/34-clock-and-identifier-refuse`, is
-red at `Build for the analysis`. A build that did not compile is not the analysis finding anything,
-so that run says nothing about this guard.
+**`scan-codeql.yaml`.** Five red runs, and none of them is the analysis refusing code. Four are red
+at `Build for the analysis`, which is a change that did not compile rather than anything the scan
+found, and the fifth, 32254241498, is red at `Analyze`, which is the analysis failing to run rather
+than a finding either. What a finding does here is upload to the code-scanning tab, and the check
+that reports it is `CodeQL`, which the set at the top of this page declines to require for a
+different reason. Nothing has been watched refusing on a finding.
 
 **`seam-probe.yaml`.** 32555537635 is red on both lines at `Ask a second plugin what it can see`, on
 a branch that was building the probe rather than proving it. The workflow's own file says what reds
