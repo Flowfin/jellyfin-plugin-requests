@@ -327,7 +327,7 @@ public sealed class RequestsController : RequestsControllerBase
 
         try
         {
-            theirs = await _store.FindForUserAsync(reader, cancellationToken).ConfigureAwait(false);
+            theirs = await _store.GetAllAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (RequestStoreLoadException)
         {
