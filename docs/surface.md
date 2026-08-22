@@ -120,6 +120,78 @@ are reachable only under a name registered as a plugin page, and those are serve
 administrator, so a user asking for one would meet a refusal instead of a stylesheet. The page
 carries its own.
 
+## Whether one person's requests reach another, asked of a running server
+
+The suite runs the controller over a double. What it holds is that the action serving a person's own
+list reads the store for that person and nothing wider, and that the queue action carries the
+elevation attribute:
+
+    git grep -n "public async Task NothingButTheCallersOwnRequestsComesBackWhateverIsAskedFor" -- Jellyfin.Plugin.Requests.Tests/Api/ListRequestsTests.cs
+    Jellyfin.Plugin.Requests.Tests/Api/ListRequestsTests.cs:61:    public async Task NothingButTheCallersOwnRequestsComesBackWhateverIsAskedFor()
+
+A double has no session, no authorisation pipeline and no cache, so two things it cannot answer are
+whether the server enforces an attribute written on an action and whether an answer stays one
+person's after the server has handed it out. `scripts/verify-user-isolation.sh` asks a running
+server of each claimed line instead, and `.github/workflows/user-isolation.yaml` runs it on every
+pull request and nightly.
+
+It creates two ordinary accounts, has each of them ask for a title of its own and both of them ask
+for a third, which is joined into a single row rather than asked for twice. That row is the one two
+people are both entitled to see and the notes written on it are not, which is why it is there.
+
+**The order of the three list calls is the part that is about caching.** One call as one person and
+one as another says nothing: an answer cached against the route rather than against the caller only
+comes back to the wrong person when the second caller arrives after the first. So the second
+person's list is read immediately after the first person's, and the first person's is read again
+once the server has answered both. Every assertion reads the raw bytes as well as the parsed rows,
+because a leak arriving in a field the script does not name is the one worth catching.
+
+Taken at `c9dd8d2` on the 10.11 line, job `97001703609`:
+
+    the first person was given ['A film both of them asked for', 'A film only the first person asked for']
+    the second person was given ['A film both of them asked for', 'A film only the second person asked for']
+    the first person, asking again was given ['A film both of them asked for', 'A film only the first person asked for']
+    the queue answered 403
+    the queue refused with 403 and carried nothing that belongs to anybody.
+    the administrator is served 3 rows and all three titles are among them.
+    the page served to the first person carries no title and no note.
+    the page served to the second person carries no title and no note.
+
+The 12.0 line is job `97001703695` and returns the same eight lines.
+
+The queue is asked for twice on purpose. A queue that is broken for everybody would satisfy the
+refusal on its own, so it is asked again as the administrator and has to answer with all three
+titles; the refusal above means the endpoint is closed to that person rather than closed.
+
+### That the check bites
+
+Two branches carry the mistakes it exists to catch. Neither is for merging and neither has a pull
+request.
+
+`proof/67-one-persons-list-is-not-everybodys` replaces `FindForUserAsync` with `GetAllAsync` in the
+action serving a person's own list, which compiles and passes every suite leg that runs the
+controller over a double. Run `32560869939`, both lines red at the first list:
+
+    the first person was given ['A film both of them asked for', 'A film only the first person asked for', 'A film only the second person asked for'] and what belongs to that caller is ['A film both of them asked for', 'A film only the first person asked for'].
+
+`proof/67-the-queue-is-not-closed-to-everybody` takes the elevation off the queue action and leaves
+the authorisation attribute, which is one word. Run `32560880189`, both lines red at the queue and
+green at everything before it:
+
+    the queue answered 200
+    the queue was served to somebody who is not an administrator.
+
+### What this does not reach
+
+It is the API and the page. The channel is not in the tree, and the leak #67 is written about is a
+property of that surface specifically: the server materialising what a channel returns into its
+library database, where an item is ordinarily visible to whoever can see the folder holding it.
+Nothing above says anything about that, and the fallback stated under what the channel costs is
+unchanged.
+
+Nothing here opens a browser. What is measured is what the server hands back, including the bytes of
+the page itself, and not what a client draws from them.
+
 ## What is not reached
 
 Nothing here is softened, and the parts that are claims rather than measurements say so.
