@@ -111,7 +111,10 @@ and closes the case where one is not:
                  unverified: (map(select(. == false)) | length)}'
     {"total":39,"unverified":0,"verified":39}
 
-Three checks that run here are deliberately not in the list.
+Three checks that ran here when this list was written are deliberately not in
+it, and the three paragraphs under this one are those three. What has arrived
+since is further down, because it is a different statement: not decided against,
+just never looked at.
 
 `Scorecard analysis` runs on a push to the default branch, on a schedule and on
 a branch-protection change, and never on a pull request. Requiring it would
@@ -129,6 +132,73 @@ A required check whose verdict is neither pass nor fail is a requirement nobody
 can read. The jobs behind those two, the three `Analyze` legs and
 `Audit workflows (zizmor)`, are in the list instead, and they are the ones that
 go red for a reason this repository wrote.
+
+### Six of these fifteen cannot report on a change that is only markdown
+
+This is the `Scorecard analysis` failure above arriving from a second direction,
+and the list was written without it. `abi-floor.yaml` and `scan-codeql.yaml` both
+decline a change that touches nothing but markdown:
+
+    $ git grep -n -A 1 "^    paths-ignore:" origin/master -- .github/workflows/abi-floor.yaml .github/workflows/scan-codeql.yaml
+    origin/master:.github/workflows/abi-floor.yaml:35:    paths-ignore:
+    origin/master:.github/workflows/abi-floor.yaml-36-      - '**/*.md'
+    --
+    origin/master:.github/workflows/abi-floor.yaml:39:    paths-ignore:
+    origin/master:.github/workflows/abi-floor.yaml-40-      - '**/*.md'
+    --
+    origin/master:.github/workflows/scan-codeql.yaml:24:    paths-ignore:
+    origin/master:.github/workflows/scan-codeql.yaml-25-      - '**/*.md'
+    --
+    origin/master:.github/workflows/scan-codeql.yaml:28:    paths-ignore:
+    origin/master:.github/workflows/scan-codeql.yaml-29-      - '**/*.md'
+
+So the six contexts those two produce never appear on such a head. Measured at
+`36eccab`, the head of a pull request that changed one markdown file and nothing
+else, against the list above read out of this page rather than retyped:
+
+    $ git show origin/master:docs/quality-parity.md \
+        | sed -n '/^Fifteen contexts/,/^There are no bypass actors/p' \
+        | sed -n 's/^    \([^ ].*\)$/\1/p' | sort > declared.txt
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/commits/36eccab/check-runs \
+        --jq '.check_runs[].name' | sort -u > reported.txt
+    $ comm -23 declared.txt reported.txt
+    Analyze (actions, none)
+    Analyze (csharp, manual)
+    Analyze (javascript-typescript, none)
+    floor 10.11.0.0
+    floor 12.0.0.0
+    lines
+
+A required context that does not report leaves a pull request pending rather than
+failing it, so requiring those six as they stand would hold every markdown-only
+change on this board open. Two repairs exist and this page takes neither: drop
+the six from the set, or take the `paths-ignore` off those two workflows and pay
+their runtime on every change. That is #30's to decide, and nothing here applies
+either of them.
+
+### What has arrived since this list was written
+
+Eleven contexts report at that same head and are in no part of the set above:
+
+    $ comm -13 declared.txt reported.txt
+    entries 10.11
+    entries 12.0
+    isolation 10.11
+    isolation 12.0
+    package 10.11.0.0
+    package 12.0.0.0
+    package-lines
+    set 10.11
+    set 12.0
+    the scan refuses what it says it refuses
+    zizmor
+
+`zizmor` is the code-scanning tab's own check, named above and deliberately out.
+The other ten are checks this repository built after the set was written, and
+whether each of them joins it is #30 rather than something this page settles. Six
+of the ten carry a server line in their own name, which is the part a rule about
+required contexts has to answer for first: a name that moves with a build matrix
+is a name a ruleset cannot follow.
 
 What is live is printed rather than described, and where the two disagree the
 command is right:
@@ -189,46 +259,57 @@ merge.
 Named by file, because two files can produce one context and one file can
 produce several.
 
-| File there                  | Here            | Reasoning                                                                                                                                                                                                                                                      |
-| --------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build.yml`                 | adopted, #108   | It is the reusable packaging leg, and packaging on a pull request is what catches a broken package before release day instead of on it.                                                                                                                        |
-| `codeql.yml`                | adopted, landed | `scan-codeql.yaml` names this repository's own language set and branch triggers rather than the default that would have covered the default branch and nothing else.                                                                                           |
-| `dco.yml`                   | adopted, landed | It arrived with this tree, it runs on every pull request, and the record that it refuses a commit with no sign-off is below.                                                                                                                                   |
-| `dependency-review.yml`     | adopted, landed | It arrived with this tree and refuses a newly introduced dependency carrying a published advisory, which is the one supply-chain failure a diff can be judged for.                                                                                             |
-| `dotnet.yml`                | adopted, landed | It carries the build, test and floor legs there; here they are `gate.yaml` and `abi-floor.yaml`, because the shared workflows know nothing about this tree's multi-targeting.                                                                                  |
-| `e2e-login.yml`             | adopted, landed | There is no authentication flow here to drive end to end. Its shape is adopted for a different subject in `activity-entries.yaml`: a real server of each line, this plugin installed, and something read back out of the server that no double can answer for. |
-| `fuzz.yml`                  | declined        | The untrusted input here is authenticated JSON from the server's own API rather than an anonymous credential, and round-trip tests over the persisted schema in #47 cover it.                                                                                  |
-| `manifest-freshness.yml`    | adopted, #111   | A publish that reports success and leaves the manifest untouched ships nothing installable, and nothing else would notice.                                                                                                                                     |
-| `nightly-betas.yml`         | declined        | Nothing is shipping yet and a nightly channel before a first release is a channel with nothing in it; nothing covers that risk here because there is no risk to cover yet.                                                                                     |
-| `opengrep.yml`              | adopted, landed | Some rules here are patterns a compiler cannot refuse and a document can only ask for; `invariant-lint.yaml` refuses them, and fails unless every rule fired on a fixture written to be refused.                                                               |
-| `pr-hygiene.yml`            | adopted, landed | It reasons about the change rather than about the code, which nothing else here does; `pr-hygiene.yaml` carries the two blocking checks and the two advisory ones, and not its commit-message pair.                                                            |
-| `prettier.yml`              | adopted, landed | This plugin ships HTML, CSS and JavaScript inside the assembly and no .NET analyzer reaches any of it, and the markdown is where everything here is argued.                                                                                                    |
-| `publish-beta.yml`          | declined        | It publishes to a beta channel this repository has not decided to have, and nothing covers that risk here because no channel exists to protect; #110 is where that is decided.                                                                                 |
-| `publish-failure-alert.yml` | adopted, #111   | A freshness check whose failure sits unread in a run log is not a check.                                                                                                                                                                                       |
-| `publish-jf12-beta.yml`     | declined        | Same beta channel, second line, and the same absence of anything to protect.                                                                                                                                                                                   |
-| `publish-jf12-stable.yml`   | adopted, #110   | The 12.0 line is claimed in `build-jf12.yaml` and a claimed line with no release path is a claim nobody can install.                                                                                                                                           |
-| `publish.yml`               | adopted, #110   | The 10.11 line's release path, and the `publish.yaml` here is inherited and knows nothing about two lines.                                                                                                                                                     |
-| `regenerate-manifest.yml`   | adopted, #110   | The manifest is regenerated by the release path rather than edited by hand, because a hand-edited manifest drifts against what was actually published.                                                                                                         |
-| `scorecard.yml`             | adopted, landed | It arrived with this tree and its push trigger named a branch this repository does not have, so until #25 it did not run on the default branch once.                                                                                                           |
-| `stryker-mutation.yml`      | adopted, landed | The transition table and the authorisation checks are exactly the small branchy code where line coverage says little and a surviving mutant is a missing negative test.                                                                                        |
-| `unicode-guard.yml`         | adopted, landed | It arrived with this tree, it is the one inherited guard already in the required set, and the record that it refuses a bidirectional control character is below.                                                                                               |
-| `wiki-lint.yml`             | declined        | There is no wiki here and the documentation lives in the tree, where the ordinary gate already reaches it.                                                                                                                                                     |
-| `zizmor.yml`                | adopted, landed | It arrived with this tree, its push trigger named a branch this repository does not have, and it was red on the tree as it stood until the inherited callers were pinned.                                                                                      |
+| File there                  | Here            | Reasoning                                                                                                                                                                                                                                                                                                 |
+| --------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build.yml`                 | adopted, landed | It is the reusable packaging leg, and packaging on a pull request is what catches a broken package before release day instead of on it. `package.yaml` is it here, one job per claimed line, with the lines read out of the packaging files rather than listed in a job.                                  |
+| `codeql.yml`                | adopted, landed | `scan-codeql.yaml` names this repository's own language set and branch triggers rather than the default that would have covered the default branch and nothing else.                                                                                                                                      |
+| `dco.yml`                   | adopted, landed | It arrived with this tree, it runs on every pull request, and the record that it refuses a commit with no sign-off is below.                                                                                                                                                                              |
+| `dependency-review.yml`     | adopted, landed | It arrived with this tree and refuses a newly introduced dependency carrying a published advisory, which is the one supply-chain failure a diff can be judged for.                                                                                                                                        |
+| `dotnet.yml`                | adopted, landed | It carries the build, test and floor legs there; here they are `gate.yaml` and `abi-floor.yaml`, because the shared workflows know nothing about this tree's multi-targeting.                                                                                                                             |
+| `e2e-login.yml`             | adopted, landed | There is no authentication flow here to drive end to end. Its shape is adopted for a different subject in `activity-entries.yaml`: a real server of each line, this plugin installed, and something read back out of the server that no double can answer for.                                            |
+| `fuzz.yml`                  | declined        | The untrusted input here is authenticated JSON from the server's own API rather than an anonymous credential, and round-trip tests over the persisted schema in #47 cover it.                                                                                                                             |
+| `manifest-freshness.yml`    | adopted, #111   | A publish that reports success and leaves the manifest untouched ships nothing installable, and nothing else would notice.                                                                                                                                                                                |
+| `nightly-betas.yml`         | declined        | Nothing is shipping yet and a nightly channel before a first release is a channel with nothing in it; nothing covers that risk here because there is no risk to cover yet.                                                                                                                                |
+| `opengrep.yml`              | adopted, landed | Some rules here are patterns a compiler cannot refuse and a document can only ask for; `invariant-lint.yaml` refuses them, and fails unless every rule fired on a fixture written to be refused.                                                                                                          |
+| `perf-baseline.yml`         | declined        | Its subject is login latency and there is no login here to time. What it stands for, a cost watched rather than assumed, is held in the ordinary suite by `FileRequestStoreQueryCostTests`, which bounds each query path at a size worth caring about, so declining the harness leaves nothing uncovered. |
+| `pr-hygiene.yml`            | adopted, landed | It reasons about the change rather than about the code, which nothing else here does; `pr-hygiene.yaml` carries the two blocking checks and the two advisory ones, and not its commit-message pair.                                                                                                       |
+| `prettier.yml`              | adopted, landed | This plugin ships HTML, CSS and JavaScript inside the assembly and no .NET analyzer reaches any of it, and the markdown is where everything here is argued.                                                                                                                                               |
+| `publish-beta.yml`          | declined        | It publishes to a beta channel this repository has not decided to have, and nothing covers that risk here because no channel exists to protect; #110 is where that is decided.                                                                                                                            |
+| `publish-failure-alert.yml` | adopted, #111   | A freshness check whose failure sits unread in a run log is not a check.                                                                                                                                                                                                                                  |
+| `publish-jf12-beta.yml`     | declined        | Same beta channel, second line, and the same absence of anything to protect.                                                                                                                                                                                                                              |
+| `publish-jf12-stable.yml`   | adopted, #110   | The 12.0 line is claimed in `build-jf12.yaml` and a claimed line with no release path is a claim nobody can install.                                                                                                                                                                                      |
+| `publish.yml`               | adopted, #110   | The 10.11 line's release path, and the `publish.yaml` here is inherited and knows nothing about two lines.                                                                                                                                                                                                |
+| `regenerate-manifest.yml`   | adopted, #110   | The manifest is regenerated by the release path rather than edited by hand, because a hand-edited manifest drifts against what was actually published.                                                                                                                                                    |
+| `scorecard.yml`             | adopted, landed | It arrived with this tree and its push trigger named a branch this repository does not have, so until #25 it did not run on the default branch once.                                                                                                                                                      |
+| `stryker-mutation.yml`      | adopted, landed | The transition table and the authorisation checks are exactly the small branchy code where line coverage says little and a surviving mutant is a missing negative test.                                                                                                                                   |
+| `unicode-guard.yml`         | adopted, landed | It arrived with this tree, it is the one inherited guard already in the required set, and the record that it refuses a bidirectional control character is below.                                                                                                                                          |
+| `wiki-lint.yml`             | declined        | There is no wiki here and the documentation lives in the tree, where the ordinary gate already reaches it.                                                                                                                                                                                                |
+| `zizmor.yml`                | adopted, landed | It arrived with this tree, its push trigger named a branch this repository does not have, and it was red on the tree as it stood until the inherited callers were pinned.                                                                                                                                 |
 
 ## One row per workflow here with no counterpart there
 
-Eleven files here map onto a file there and are placed by the table above:
+Twelve files here map onto a file there and are placed by the table above:
 `dco.yml`, `dependency-review.yml`, `invariant-lint.yaml`, `mutation.yaml`,
-`prettier.yml`, `pr-hygiene.yaml`, `publish.yaml`, `scan-codeql.yaml`,
-`scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Three of the rows below
-are the rest, and eleven plus three is what the directory holds:
+`package.yaml`, `prettier.yml`, `pr-hygiene.yaml`, `publish.yaml`,
+`scan-codeql.yaml`, `scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Seven
+of the rows below name a file that is present, and twelve plus seven is what the
+directory holds:
 
     $ ls .github/workflows/ | wc -l
-    14
+    19
 
-Those three do have a counterpart there and are listed here anyway, because what
-they are is not what it is: `dotnet.yml` is one file there and three here, and
-the split is the point rather than an accident.
+This paragraph said eleven and three and pasted 14, and the three numbers were
+wrong in one way: `package.yaml`, `seam-probe.yaml` and `user-isolation.yaml` had
+landed with no row and no placement, and the arithmetic went on adding up because
+nothing compared it against the directory.
+`EveryWorkflowInTheTreeHasARowInTheParityDocument` reds now when a workflow file
+is not named on this page, and it named those three on the run that wrote them in.
+What it reaches is membership and nothing else: a row whose reasoning is wrong
+passes it, and the counts in this paragraph are not read by it at all.
+
+Three of the rows below do have a counterpart there and are listed here anyway,
+because what they are is not what it is: `dotnet.yml` is one file there and three
+here, and the split is the point rather than an accident.
 
 The four rows under them are files this repository declined and then deleted.
 The rows stay because the reasoning is what the table is for, and a file that
@@ -236,17 +317,19 @@ vanishes without one is a question somebody asks again. `Disposition` says which
 of the two a row is, so no reader has to infer presence from a table that no
 longer tracks it.
 
-| File here               | Disposition       | Reasoning                                                                                                                                                                                                                 |
-| ----------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `abi-floor.yaml`        | adopted, landed   | The floor leg, split out because the lines and their floors are read out of the packaging files rather than listed in a job, so adding a line is adding a file.                                                           |
-| `activity-entries.yaml` | adopted, landed   | A request walked through its life on a real server of each line, with the activity entries read back out of the endpoint the dashboard draws. It reports and holds no merge; #107 is where required contexts are decided. |
-| `sibling-set.yaml`      | adopted, landed   | This plugin alone and beside the supported sibling set, on a real server of each line, with a collision scan over routes, scheduled task names and plugin configuration. #119.                                            |
-| `build.yaml`            | adopted, landed   | The trigger surface and the two check names the ruleset matches literally; the legs themselves moved into `gate.yaml`.                                                                                                    |
-| `gate.yaml`             | adopted, landed   | The build and test legs, in this repository rather than called from another organisation, because a called workflow knows nothing about this tree's lockfiles.                                                            |
-| `changelog.yaml`        | declined, deleted | It drafts a release changelog against a version scheme this repository has not fixed, and nothing covers that risk here because there is nothing to release yet; #107.                                                    |
-| `command-dispatch.yaml` | declined, deleted | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                                                               |
-| `command-rebase.yaml`   | declined, deleted | Same comment-driven surface, the half that rewrites pull request branches on command, and the same absence.                                                                                                               |
-| `sync-labels.yaml`      | declined, deleted | It overwrites the label vocabulary from a file in another organisation, and the vocabulary here is this board's own, so adopting it would delete what it is meant to keep.                                                |
+| File here               | Disposition       | Reasoning                                                                                                                                                                                                                                                                  |
+| ----------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `abi-floor.yaml`        | adopted, landed   | The floor leg, split out because the lines and their floors are read out of the packaging files rather than listed in a job, so adding a line is adding a file.                                                                                                            |
+| `activity-entries.yaml` | adopted, landed   | A request walked through its life on a real server of each line, with the activity entries read back out of the endpoint the dashboard draws. It reports and holds no merge; #107 is where required contexts are decided.                                                  |
+| `sibling-set.yaml`      | adopted, landed   | This plugin alone and beside the supported sibling set, on a real server of each line, with a collision scan over routes, scheduled task names and plugin configuration. #119.                                                                                             |
+| `build.yaml`            | adopted, landed   | The trigger surface and the two check names the ruleset matches literally; the legs themselves moved into `gate.yaml`.                                                                                                                                                     |
+| `gate.yaml`             | adopted, landed   | The build and test legs, in this repository rather than called from another organisation, because a called workflow knows nothing about this tree's lockfiles.                                                                                                             |
+| `seam-probe.yaml`       | adopted, landed   | What a second plugin in the same server process can see of this one, measured on a real server of each line with `tools/seam-probe` as the second plugin. It records an answer rather than holding a merge, so what reds it is a run that produced no answer at all. #117. |
+| `user-isolation.yaml`   | adopted, landed   | Two ordinary accounts on a real server of each line, each asking for something and reading back what they are given, with the queue asked as somebody who is not an administrator. The server's own evaluation of a policy is the half no double here reaches. #67.        |
+| `changelog.yaml`        | declined, deleted | It drafts a release changelog against a version scheme this repository has not fixed, and nothing covers that risk here because there is nothing to release yet; #107.                                                                                                     |
+| `command-dispatch.yaml` | declined, deleted | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                                                                                                                |
+| `command-rebase.yaml`   | declined, deleted | Same comment-driven surface, the half that rewrites pull request branches on command, and the same absence.                                                                                                                                                                |
+| `sync-labels.yaml`      | declined, deleted | It overwrites the label vocabulary from a file in another organisation, and the vocabulary here is this board's own, so adopting it would delete what it is meant to keep.                                                                                                 |
 
 ## Mutation testing is adopted, fuzzing is declined
 

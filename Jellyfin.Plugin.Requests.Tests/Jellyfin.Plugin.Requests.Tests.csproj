@@ -83,6 +83,10 @@
     <None Include="../DCO" Link="DCO" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../docs/quality-parity.md" Link="docs/quality-parity.md" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../.github/workflows/dco.yml" Link="dco.yml" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Every workflow file, next to the suite, so the parity page's enumeration of them is read
+         against the directory rather than against a count somebody typed into a sentence. A
+         wildcard rather than a list, because a list here is the same defect one layer down. -->
+    <None Include="../.github/workflows/*" Link="workflows/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
