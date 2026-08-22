@@ -129,6 +129,11 @@ while read -r board directory; do
     rm -rf "$work/package"
     mkdir -p "$work/package"
     gh release download "$found" --repo "$board" --pattern '*.zip' --dir "$work/package" >/dev/null
+    # The other pipeline of this shape in scripts/, and it is safe where the one in
+    # verify-plugin-loads.sh was not (#263). What writes into head here is find over a directory
+    # this loop empties and refills with one release download, so the whole output is a path or
+    # two and fits in the pipe before head can close it. The unsafe case is a producer still
+    # writing when the reader leaves, which a release full of zip files is not.
     zip=$(find "$work/package" -name '*.zip' | head -1)
     test -n "$zip"
     rm -rf "$work/unpacked"
