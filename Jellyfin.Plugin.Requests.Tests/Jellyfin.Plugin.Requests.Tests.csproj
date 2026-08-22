@@ -65,6 +65,11 @@
          one of those replacements is a type in this project. A document naming an issue number goes
          stale silently; a document naming a type can be read against the type. -->
     <None Include="../docs/testing.md" Link="docs/testing.md" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The two procedures that refusal list names as replacements, so a leg can open what the
+         document points at. They are read for their existence and never run: running one needs a
+         server and a container engine, which is the refusal they are the replacement for. -->
+    <None Include="../scripts/verify-plugin-loads.sh" Link="scripts/verify-plugin-loads.sh" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../scripts/verify-user-isolation.sh" Link="scripts/verify-user-isolation.sh" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
