@@ -145,6 +145,42 @@ public sealed class RepositoryDocumentsTests
     }
 
     /// <summary>
+    /// Every workflow file in the tree is named by the parity document.
+    /// <para>
+    /// That document exists to hold one row per workflow with one line of reasoning, and the
+    /// milestone it serves says a difference nobody wrote a line for is a defect. Nothing read it.
+    /// Three files had arrived with no row and no placement while the paragraph that partitions
+    /// them went on adding up, because the partition was two words and a pasted count rather than
+    /// anything a run compares.
+    /// </para>
+    /// <para>
+    /// What this reaches is membership and nothing else. A file named in a sentence rather than in
+    /// a row passes, a row whose reasoning is wrong passes, and the counts written in the prose
+    /// around the tables are not read at all. The review is where those are caught, and the
+    /// document says so about itself.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void EveryWorkflowInTheTreeHasARowInTheParityDocument()
+    {
+        var page = File.ReadAllText(Beside(Path.Combine("docs", "quality-parity.md")));
+        var workflows = new DirectoryInfo(Beside("workflows")).EnumerateFiles()
+            .Select(file => file.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        // A directory that copied nothing would make the comparison below pass over an empty set,
+        // which is the shape this leg exists to refuse one layer up.
+        Assert.NotEmpty(workflows);
+
+        var unnamed = workflows
+            .Where(name => !page.Contains("`" + name + "`", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.Equal([], unnamed);
+    }
+
+    /// <summary>
     /// The refusal list names the double that replaces a real outbound call, and the double is still
     /// called that.
     /// <para>
