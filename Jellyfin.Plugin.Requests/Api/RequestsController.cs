@@ -417,7 +417,7 @@ public sealed class RequestsController : RequestsControllerBase
     /// <param name="cancellationToken">Cancels the call.</param>
     /// <returns>The page, and how many requests matched.</returns>
     [HttpGet("Requests/Queue")]
-    [Authorize(Policy = Policies.RequiresElevation)]
+    [Authorize]
     [ProducesResponseType<RequestsPage<QueuedRequest>>(StatusCodes.Status200OK)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<RequestFailure>(StatusCodes.Status503ServiceUnavailable)]
