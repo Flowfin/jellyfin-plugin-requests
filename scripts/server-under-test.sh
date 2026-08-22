@@ -26,8 +26,9 @@
 #   api ...     curl with the address, the authorisation header and the failure flags already on it
 #   dk ...      docker with the path rewriting Git Bash does turned off
 #
-# It decides nothing and asserts nothing beyond the server answering and the plugin being active,
-# which is the precondition of every check that sources it rather than a check of its own.
+# It decides nothing and asserts nothing beyond the server answering, the plugin being active, and
+# the version the server reports for it being the one this tree holds. That set is the precondition
+# of every check that sources it rather than a check of its own.
 
 # The assembly and the name the server lists it under. Both are read by every caller.
 ASSEMBLY=Jellyfin.Plugin.Requests
@@ -184,9 +185,22 @@ for plugin in json.load(sys.stdin):
 '
 
     step "verdict"
+    # THE VERSION IS COMPARED HERE AND WAS ONLY PRINTED BEFORE. Everything else this repository knows
+    # about its own version is one file of its own read against another: the suite refuses
+    # Directory.Build.props disagreeing with either packaging file. None of that says what a server
+    # hands back for the plugin it actually loaded, and the number travels through the packaging
+    # tool, an archive and an install before it gets there.
+    #
+    # The number is read out of the one place that holds it rather than written here, so this adds no
+    # copy of it. Exactly one value, or the test below ends the run: two would make which one is
+    # meant a guess, and none would compare against the empty string and pass on any server at all.
+    local expected_version
+    expected_version=$(grep -o '<PluginVersion>[^<]*' "$repo_root/Directory.Build.props" | cut -d'>' -f2)
+    test "$(printf '%s' "$expected_version" | grep -c '^')" = "1"
+
     PLUGIN_ID=$(printf '%s' "$plugins" | python3 -c '
 import json, sys
-name = sys.argv[1]
+name, expected = sys.argv[1], sys.argv[2]
 mine = [p for p in json.load(sys.stdin) if p.get("Name") == name]
 if not mine:
     sys.exit("{0} is not in the plugin list: the server did not load it.".format(name))
@@ -195,9 +209,13 @@ if len(mine) != 1:
 status = mine[0].get("Status")
 if status != "Active":
     sys.exit("{0} is {1} rather than Active.".format(name, status))
+reported = mine[0].get("Version")
+if reported != expected:
+    sys.exit("{0} reports {1!r} and this tree holds {2!r}: the server did not load what was built.".format(
+        name, reported, expected))
 print(mine[0]["Id"])
-' "$PLUGIN_NAME")
-    echo "$PLUGIN_NAME is Active, id $PLUGIN_ID"
+' "$PLUGIN_NAME" "$expected_version")
+    echo "$PLUGIN_NAME is Active at $expected_version, id $PLUGIN_ID"
 }
 
 # One authenticated call. The body is read from the third argument where there is one.
