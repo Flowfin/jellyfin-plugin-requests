@@ -658,10 +658,40 @@ this table names, the default included.
 
 What none of that holds is the server turning a caller away, which is the server's own evaluation of
 the policy and needs a running one. `docs/testing.md` carries that as a refused test with what
-replaces it. **That applies to the repair above as well: no run on a server records these endpoints
-answering anything other than 500.** What is measured is that the name they used exists on neither
-line and that the name they use now exists on both. The first-load procedure in `docs/testing.md` is
-where a run against a server would go, and it has not been made since this changed.
+replaces it, and what replaces it there is a run rather than a plan.
+
+**This paragraph said that no run on a server records these endpoints answering anything other than
+500, and that has stopped being true.** Two checks ask a real Jellyfin of each claimed line, on every
+pull request and nightly. `One person's requests on a real server` asks the queue as a signed-in
+person who is not an administrator. Read at `0a78ab5`, in job `97088428212` on the 10.11 line:
+
+    gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/97088428212/logs \
+      | grep -oa 'the queue answered.*\|the queue refused.*\|the administrator is served.*'
+    the queue answered 403
+    the queue refused with 403 and carried nothing that belongs to anybody.
+    the administrator is served 3 rows and all three titles are among them.
+
+The same command against job `97088428126`, which is the 12.0 line of the same run, returns the same
+three lines. So the elevation policy on that action is evaluated by the server and the caller is
+turned away, on both lines, and the third line is what makes the first two say anything: the same
+call as an administrator is served, so a queue broken for everybody cannot pass as a refusal.
+
+**Six of the ten rows above have been answered by a server, and four have not.** The check quoted
+above makes `POST Requests`, `GET Requests`, `GET Requests/Queue` and `GET Page`. `Activity entries
+on a real server` makes `POST Requests/{id}/Approve` and `POST Requests/{id}/Decline`, and the
+entries the server wrote afterwards are what says both were carried out rather than refused:
+
+    gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/97088428729/logs \
+      | grep -oa 'Type=MediaRequest[A-Za-z]*'
+    Type=MediaRequestDeclined
+    Type=MediaRequestApproved
+
+Job `97088428783` is the 12.0 line of that run and returns the same two lines. `GET Capabilities`,
+`GET Strings`, `POST Requests/Approve` and `POST Requests/Decline` have not been asked of a server at
+all, so what is held of those four is the assembly reading above and nothing more.
+
+What is measured about the constant is unchanged and is the other half of this: the name they used
+exists on neither line and the name they use now exists on both.
 
 The rule underneath the table is narrower than the table. **A user sees their own requests in full
 and learns nothing at all about anybody else's**, which is what `GET Requests` returns and why its
