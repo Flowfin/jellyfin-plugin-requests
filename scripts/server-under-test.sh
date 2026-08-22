@@ -119,6 +119,21 @@ server_start() {
         # and a package shipping those would be shipping what a server has no use for.
         dk cp "$host_dll" "$CONTAINER:$plugin_dir/$ASSEMBLY.dll"
     fi
+    # A SECOND PLUGIN IN THE SAME PROCESS, WHERE A CALLER ASKS FOR ONE. Two plugins share a route
+    # table, a task list and whatever the host does about loading assemblies, and none of that is
+    # visible to a server running one plugin. A caller that wants the second names a directory of
+    # built files and the name the server is to install it under; every other caller passes neither
+    # and gets the server it had before.
+    if [ -n "${EXTRA_PLUGIN_DIRECTORY:-}" ]; then
+        step "install ${EXTRA_PLUGIN_NAME:?a directory name for the second plugin} beside it"
+        local extra_dir extra_host
+        extra_dir="/config/plugins/$EXTRA_PLUGIN_NAME"
+        extra_host=$(cygpath --windows "$EXTRA_PLUGIN_DIRECTORY" 2>/dev/null || printf '%s' "$EXTRA_PLUGIN_DIRECTORY")
+        dk exec "$CONTAINER" mkdir -p "$extra_dir"
+        dk cp "$extra_host/." "$CONTAINER:$extra_dir"
+        dk exec "$CONTAINER" ls -1 "$extra_dir"
+    fi
+
     # Plugins are read at start, so the server has to come up again with the plugin already in place.
     dk restart "$CONTAINER" >/dev/null
     dk exec "$CONTAINER" ls -1 "$plugin_dir"

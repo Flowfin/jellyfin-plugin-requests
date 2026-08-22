@@ -1,0 +1,85 @@
+# What a second plugin in the same server process can see of this one.
+#
+# #117's first condition asks for the server's plugin loading behaviour to be measured on a running
+# server of each claimed line, with the commands that produced the measurement. The failure it is
+# about is invisible at build time and looks exactly like the sibling not being installed, so the
+# only thing that answers it is a server with two plugins in it being asked.
+#
+# `scripts/verify-seam-probe.sh` is what this runs and `tools/seam-probe` is the second plugin. Both
+# say more about the question than a workflow file usefully can.
+#
+# THIS RECORDS AN ANSWER RATHER THAN HOLDING A MERGE, which is why it is not on every pull request.
+# A shared load context and a separate one are both results, and each decides which of the three
+# options #117 lists is available. What reds is a run that produced no answer at all.
+name: What a second plugin can see
+
+on:
+  workflow_dispatch:
+  push:
+    # The files the measurement is made of. A change to any of them makes the recorded answer a
+    # claim about a procedure that has moved, so the answer is taken again.
+    paths:
+      - 'tools/seam-probe/**'
+      - 'scripts/verify-seam-probe.sh'
+      - 'scripts/server-under-test.sh'
+      - 'scripts/server-image-for.sh'
+      - 'scripts/server-lines.tsv'
+      - '.github/workflows/seam-probe.yaml'
+
+# Explicit deny-all at workflow level; the job grants what it needs.
+permissions: {}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: probe ${{ matrix.line }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    strategy:
+      # Both lines whatever the other does. They are different major versions of the host, so an
+      # answer from one is a claim about the other and cancelling it would leave that claim standing.
+      fail-fast: false
+      matrix:
+        include:
+          # The image is not written here. It is one half of a pair several checks need, and copies
+          # of it disagree the first time a line moves, so it lives in `scripts/server-lines.tsv`
+          # and the step below asks for it by the framework it already carries.
+          - line: '10.11'
+            framework: 'net9.0'
+            port: '18098'
+          - line: '12.0'
+            framework: 'net10.0'
+            port: '18099'
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, so do not leave the token in .git/config.
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Ask a second plugin what it can see
+        # The matrix values arrive as environment variables rather than as expressions inside the
+        # script, so nothing a later matrix takes from somewhere else can be read as shell.
+        env:
+          FRAMEWORK: ${{ matrix.framework }}
+          PORT: ${{ matrix.port }}
+        run: |
+          set -euo pipefail
+          IMAGE=$(./scripts/server-image-for.sh "$FRAMEWORK")
+          ./scripts/verify-seam-probe.sh "$IMAGE" "$FRAMEWORK" "$PORT"
