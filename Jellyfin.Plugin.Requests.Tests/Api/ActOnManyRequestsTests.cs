@@ -619,7 +619,7 @@ public sealed class ActOnManyRequestsTests
     /// <param name="caller">Who the server says is calling.</param>
     /// <returns>The controller under test.</returns>
     private RequestsController ControllerFor(IRequestStore store, Guid? caller)
-        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), new FakeInstallSettings(), new RecordingJournal(), new RecordingSink(), new RecordingRequesterNotice(), new FakeLibrary());
+        => new RequestsController(store, new TestClock(Started), _identifiers, new FakeCallerIdentity(caller), new FakeInstallSettings(), new RecordingJournal(), new RecordingSink(), new RecordingRequesterNotice(), new RecordingArrivalNotice(), new FakeLibrary());
 
     /// <summary>
     /// The entries an action came back with, with the status code checked.

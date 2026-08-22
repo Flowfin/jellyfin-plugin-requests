@@ -211,14 +211,15 @@ rather than a habit:
 And nothing reports anything to this project, at any setting, by design and with no opt-in. That is
 recorded in [notifications.md](notifications.md) with the decision behind it.
 
-Three paths would carry something outward once they are built, and each is named here so that an
+Four paths would carry something outward once they are built, and each is named here so that an
 operator can find out what turning one on would mean before it exists:
 
-| Path                | Issue | What leaves, or would                                                           | Off until         | Built |
-| ------------------- | ----- | ------------------------------------------------------------------------------- | ----------------- | ----- |
-| The outbound sink   | #78   | the identifiers of the asker and the answerer, the title, the year, the request | an address is set | yes   |
-| The bridge          | #82   | a title, and an external account for the person who asked                       | a backend is set  | no    |
-| The session message | #77   | nothing off the machine, a message to the asker's own signed-in clients         | never off         | yes   |
+| Path                  | Issue | What leaves, or would                                                           | Off until          | Built |
+| --------------------- | ----- | ------------------------------------------------------------------------------- | ------------------ | ----- |
+| The outbound sink     | #78   | the identifiers of the asker and the answerer, the title, the year, the request | an address is set  | yes   |
+| The bridge            | #82   | a title, and an external account for the person who asked                       | a backend is set   | no    |
+| The session message   | #77   | nothing off the machine, a message to the asker's own signed-in clients         | never off          | yes   |
+| The arrival to admins | #76   | nothing off the machine, one arrival to whoever administers the server          | a switch is set on | yes   |
 
 The bridge names a person to the external service by an account the operator wrote into a table, and
 never by their name. That is the decision in [bridge.md](bridge.md), and the table is empty on a
@@ -226,10 +227,14 @@ fresh install, so a bridge configured and nothing else sends no attribution at a
 in #75 is the fourth path and it is not in the table because it writes into the server's own log,
 which does not leave the machine.
 
-The session message is in the table for what it is rather than for what it sends off the machine,
-which is nothing: it goes to whatever the person who asked is signed in on, over the connection the
-server already holds, and it carries the title they asked for and what happened to it. The
-administrator half of that path is #76 and is not built.
+The two session rows are in the table for what they are rather than for what they send off the
+machine, which is nothing: both go down connections the server already holds to clients already
+signed in. The one to the person who asked carries the title they asked for and what happened to it.
+The one to the administrators carries the same document the outbound sink would post about an
+arrival, which names the person who asked by the server's own identifier and nobody else, and it
+reaches only sessions the server itself counts as administering it. It is off on a fresh install:
+`TellsAdministratorsAboutArrivals` in [configuration.md](configuration.md) is what turns it on, and
+[notifications.md](notifications.md) says why nothing reads it today.
 
 **The bridge row is the one that is not built.** The other two say what happens today.
 

@@ -41,7 +41,8 @@ public class PluginConfigurationTests
             { "AnnouncesFulfilments", "true" },
             { "FinishedRequestRetentionDays", "365" },
             { "OpenRequestsPerUser", "10" },
-            { "OutboundNoticeAddress", string.Empty }
+            { "OutboundNoticeAddress", string.Empty },
+            { "TellsAdministratorsAboutArrivals", "false" }
         };
 
     /// <summary>

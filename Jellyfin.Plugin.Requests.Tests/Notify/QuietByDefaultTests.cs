@@ -332,6 +332,7 @@ public sealed class QuietByDefaultTests
             journal,
             sink,
             new RecordingRequesterNotice(),
+            new RecordingArrivalNotice(),
             new FakeLibrary());
 
     /// <summary>

@@ -10,6 +10,7 @@ using Jellyfin.Plugin.Requests.Seam;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
 using Jellyfin.Plugin.Requests.Time;
+using MediaBrowser.Controller.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -166,16 +167,22 @@ public class PluginServiceRegistrationTests
     }
 
     /// <summary>
-    /// The registration as it ships, with the four things behind it that only a running server has.
+    /// The registration as it ships, with the five things behind it that only a running server has.
     /// <para>
-    /// Each of the four is stood in for because reaching the real one from a test would read
-    /// something other than the registration. The logger factory and the user manager come from the
-    /// server's own container and are not in this collection at all. The store and the settings both
-    /// reach the plugin instance, which is a static the host sets while loading and which any test
-    /// running beside this one replaces, so a test resolving them would fail for a reason nobody
-    /// caused; <c>ServerInstallSettings</c> says so about itself where it takes its second
-    /// constructor. What is left over the four is the seam's own registration, which is what these
-    /// tests are about.
+    /// Each of the five is stood in for because reaching the real one from a test would read
+    /// something other than the registration. The logger factory, the user manager and the session
+    /// manager come from the server's own container and are not in this collection at all. The store
+    /// and the settings both reach the plugin instance, which is a static the host sets while loading
+    /// and which any test running beside this one replaces, so a test resolving them would fail for a
+    /// reason nobody caused; <c>ServerInstallSettings</c> says so about itself where it takes its
+    /// second constructor. What is left over the five is the seam's own registration, which is what
+    /// these tests are about.
+    /// </para>
+    /// <para>
+    /// The session manager arrived with the arrival notice the seam announces through. It is the
+    /// double that raises on every way of reaching somebody this plugin is not allowed to use, so a
+    /// registration that resolved a wider path than the one it declares fails here rather than in
+    /// front of an operator.
     /// </para>
     /// </summary>
     /// <param name="store">The queue the sink writes into.</param>
@@ -190,6 +197,7 @@ public class PluginServiceRegistrationTests
         services.AddSingleton(store);
         services.AddSingleton<IInstallSettings>(new FakeInstallSettings());
         services.AddSingleton<IKnownUsers>(new FakeKnownUsers(Asker));
+        services.AddSingleton<ISessionManager>(new ASessionManagerThatOnlyDelivers());
 
         return services.BuildServiceProvider();
     }

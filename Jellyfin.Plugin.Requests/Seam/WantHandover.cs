@@ -5,6 +5,7 @@ using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Intake;
 using Jellyfin.Plugin.Requests.Model;
+using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Time;
 using Microsoft.Extensions.Logging;
@@ -84,6 +85,7 @@ public sealed class WantHandover : IWantHandover
     private readonly IIdentifierSource _identifiers;
     private readonly IInstallSettings _settings;
     private readonly IKnownUsers _users;
+    private readonly IArrivalNotice _arrivals;
     private readonly ILogger _logger;
     private readonly TimeSpan _answerWithin;
 
@@ -95,6 +97,13 @@ public sealed class WantHandover : IWantHandover
     /// <param name="identifiers">Where a new request's identifier comes from.</param>
     /// <param name="settings">What this install is set to.</param>
     /// <param name="users">The server's answer to whether it has the user a want names.</param>
+    /// <param name="arrivals">
+    /// Where administrators signed in at that moment are told that somebody has asked for something.
+    /// This side announces its own arrivals rather than leaving it to the endpoint, because a want
+    /// handed across here is a request an operator has to work exactly like one typed at the API,
+    /// and a path wired at one of the two surfaces would carry some arrivals while reading as though
+    /// it carried all of them.
+    /// </param>
     /// <param name="logger">Where a refusal is written.</param>
     /// <param name="answerWithin">
     /// How long to wait for the queue before answering without it. A server passes
@@ -109,6 +118,7 @@ public sealed class WantHandover : IWantHandover
         IIdentifierSource identifiers,
         IInstallSettings settings,
         IKnownUsers users,
+        IArrivalNotice arrivals,
         ILogger logger,
         TimeSpan answerWithin)
     {
@@ -117,6 +127,7 @@ public sealed class WantHandover : IWantHandover
         ArgumentNullException.ThrowIfNull(identifiers);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(users);
+        ArgumentNullException.ThrowIfNull(arrivals);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentOutOfRangeException.ThrowIfLessThan(answerWithin, TimeSpan.Zero);
 
@@ -126,6 +137,7 @@ public sealed class WantHandover : IWantHandover
         _identifiers = identifiers;
         _settings = settings;
         _users = users;
+        _arrivals = arrivals;
         _logger = logger;
         _answerWithin = answerWithin;
     }
@@ -314,6 +326,15 @@ public sealed class WantHandover : IWantHandover
         if (!intake.InTime)
         {
             return Refused(want, HandoverRefusal.TheStoreDidNotAnswerInTime);
+        }
+
+        if (intake.Value.Outcome == IntakeOutcome.Created)
+        {
+            // Only a request that came into existence, for the reason the endpoint gives at its own
+            // call: a join is a second person on a row an operator has already been shown. What is
+            // announced is the stored request rather than the want, so an administrator's client is
+            // handed the same document whichever surface the ask arrived on.
+            _arrivals.Tell(OutboundNotice.For(intake.Value.Request.Request, NoticeEvent.Asked));
         }
 
         if (_logger.IsEnabled(LogLevel.Debug))

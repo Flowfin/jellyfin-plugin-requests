@@ -14,15 +14,24 @@ using MediaBrowser.Model.SyncPlay;
 namespace Jellyfin.Plugin.Requests.Tests.Doubles;
 
 /// <summary>
-/// The server's session manager with exactly one method that works.
+/// The server's session manager with exactly two methods that work.
 /// <para>
 /// <b>Every other way of sending anything raises, and that is what this double is for.</b> The
-/// interface offers eleven ways to push something at somebody, and three of them reach people the
-/// plugin was not talking about: an administrator broadcast, a device broadcast, and the two
-/// remote-control commands that take a session identifier rather than a user. A double that
-/// answered all of them politely could not tell a test that only the requester was reached from one
-/// where everybody was. So the only member with a body is the one this plugin is allowed to call,
-/// and a change that reaches for another one fails as a raised exception naming the member.
+/// interface offers eleven ways to push something at somebody, and most of them reach people the
+/// plugin was not talking about: a device broadcast, and the remote-control commands that take a
+/// session identifier rather than a user. A double that answered all of them politely could not
+/// tell a test that only the requester was reached from one where everybody was. So the only
+/// members with a body are the two this plugin is allowed to call, and a change that reaches for
+/// another one fails as a raised exception naming the member.
+/// </para>
+/// <para>
+/// <b>The two are kept in separate lists on purpose.</b> Naming one person and naming an audience
+/// are the two different things this plugin does with sessions, and the guard that matters most
+/// here is that neither path drifts into the other: a message about one person's request must not
+/// go to an audience, and an arrival must not go to a person. A single list would make both claims
+/// unaskable. <see cref="Delivered"/> is what was sent to named people and <see cref="Broadcasts"/>
+/// is what was sent to whoever administers the server, and a test asserts the list it is not about
+/// is empty rather than relying on this double to raise.
 /// </para>
 /// <para>
 /// The recorded call keeps the arguments as they were passed, the user list included, because the
@@ -33,6 +42,7 @@ namespace Jellyfin.Plugin.Requests.Tests.Doubles;
 internal sealed class ASessionManagerThatOnlyDelivers : ISessionManager
 {
     private readonly List<Delivery> _delivered = [];
+    private readonly List<Broadcast> _broadcast = [];
 
     /// <inheritdoc />
     public event EventHandler<PlaybackProgressEventArgs>? PlaybackStart;
@@ -62,9 +72,15 @@ internal sealed class ASessionManagerThatOnlyDelivers : ISessionManager
     public IEnumerable<SessionInfo> Sessions => [];
 
     /// <summary>
-    /// Gets every push this double was asked to make, in order.
+    /// Gets every push at a named person this double was asked to make, in order.
     /// </summary>
     public IReadOnlyList<Delivery> Delivered => _delivered;
+
+    /// <summary>
+    /// Gets every push at whoever administers the server, in order. The server decides which
+    /// sessions those are, so there is no list of people to record and the audience is the fact.
+    /// </summary>
+    public IReadOnlyList<Broadcast> Broadcasts => _broadcast;
 
     /// <summary>
     /// Gets a value indicating whether the one usable call fails instead of delivering.
@@ -96,7 +112,16 @@ internal sealed class ASessionManagerThatOnlyDelivers : ISessionManager
 
     /// <inheritdoc />
     public Task SendMessageToAdminSessions<T>(SessionMessageType name, T data, CancellationToken cancellationToken)
-        => throw Refused(nameof(SendMessageToAdminSessions));
+    {
+        if (Refuses)
+        {
+            throw new InvalidOperationException("This session manager was told to fail the push.");
+        }
+
+        _broadcast.Add(new Broadcast(name, data));
+
+        return Task.CompletedTask;
+    }
 
     /// <inheritdoc />
     public Task SendMessageToUserDeviceSessions<T>(string deviceId, SessionMessageType name, T data, CancellationToken cancellationToken)
@@ -224,7 +249,7 @@ internal sealed class ASessionManagerThatOnlyDelivers : ISessionManager
     /// <returns>The exception to raise, so every call site is one line.</returns>
     private static NotSupportedException Refused(string member)
         => new NotSupportedException(
-            "This plugin reached ISessionManager." + member + ". The only call it is allowed to make is SendMessageToUserSessions, which names the one person a message is about; everything else here reaches somebody the message was not about.");
+            "This plugin reached ISessionManager." + member + ". The only calls it is allowed to make are SendMessageToUserSessions, which names the one person a message is about, and SendMessageToAdminSessions, which names whoever administers the server; everything else here reaches somebody neither message was about.");
 
     /// <summary>
     /// One push, as it was asked for.
@@ -233,5 +258,12 @@ internal sealed class ASessionManagerThatOnlyDelivers : ISessionManager
     /// <param name="Name">The name it went out under.</param>
     /// <param name="Payload">What was sent.</param>
     internal sealed record Delivery(IReadOnlyList<Guid> UserIds, SessionMessageType Name, object? Payload);
+
+    /// <summary>
+    /// One push at whoever administers the server, as it was asked for.
+    /// </summary>
+    /// <param name="Name">The name it went out under.</param>
+    /// <param name="Payload">What was sent.</param>
+    internal sealed record Broadcast(SessionMessageType Name, object? Payload);
 }
 #pragma warning restore CS0067

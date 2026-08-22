@@ -19,6 +19,8 @@
   "config.retention.description": "A finished request names a person, a title and a date. After this many days it is removed. Thirty days is the shortest period allowed, so the history cannot be switched off by setting this to nothing.",
   "config.retention.label": "Keep finished requests for, in days",
   "config.save": "Save",
+  "config.tellsAdministratorsAboutArrivals.description": "Off, and off is the ordinary way to run this. With it on, a small JSON document about each new request is pushed down the connections this server already holds to administrators who are signed in at that moment. Nothing leaves the machine and nothing is retried. No Jellyfin client reads it today, so turn it on only if you run something written to listen for it; the queue is where an operator sees what is waiting.",
+  "config.tellsAdministratorsAboutArrivals.label": "Tell signed-in administrators when something is asked for",
   "config.title": "Requests",
   "declineReason.AlreadyInTheLibrary": "Already in the library",
   "declineReason.AlreadyRequested": "Already asked for",

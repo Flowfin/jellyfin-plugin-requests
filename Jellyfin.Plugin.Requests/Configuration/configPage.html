@@ -50,6 +50,14 @@
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label>
+                                <input is="emby-checkbox" type="checkbox" id="RequestsTellsAdministratorsAboutArrivals" />
+                                <span data-i18n="config.tellsAdministratorsAboutArrivals.label"></span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription" data-i18n="config.tellsAdministratorsAboutArrivals.description"></div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
                                 <input is="emby-checkbox" type="checkbox" id="RequestsAnnouncesApprovals" />
                                 <span data-i18n="config.announcesApprovals.label"></span>
                             </label>
@@ -120,6 +128,7 @@
                         AnnouncesApprovals: "#RequestsAnnouncesApprovals",
                         AnnouncesDeclines: "#RequestsAnnouncesDeclines",
                         AnnouncesFulfilments: "#RequestsAnnouncesFulfilments",
+                        TellsAdministratorsAboutArrivals: "#RequestsTellsAdministratorsAboutArrivals",
                     };
 
                     // Read and written as typed, with no trimming and no default put in its place.

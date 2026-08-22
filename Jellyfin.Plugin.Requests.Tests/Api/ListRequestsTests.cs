@@ -624,5 +624,6 @@ public sealed class ListRequestsTests
             new RecordingJournal(),
             new RecordingSink(),
             new RecordingRequesterNotice(),
+            new RecordingArrivalNotice(),
             new FakeLibrary());
 }

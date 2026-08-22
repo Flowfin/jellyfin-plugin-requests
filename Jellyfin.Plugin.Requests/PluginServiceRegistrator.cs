@@ -101,6 +101,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<IIdentifierSource>(),
             provider.GetRequiredService<IInstallSettings>(),
             provider.GetRequiredService<IKnownUsers>(),
+            provider.GetRequiredService<IArrivalNotice>(),
             provider.GetRequiredService<ILogger<WantHandover>>(),
             WantHandover.DefaultAnswerWithin));
 
@@ -136,6 +137,17 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IRequesterNotice>(provider => new ServerRequesterNotice(
             provider.GetRequiredService<ISessionManager>(),
             provider.GetRequiredService<ILogger<ServerRequesterNotice>>()));
+
+        // The path that tells whoever administers the server that somebody has asked for something,
+        // on whatever they are signed in on right now. It is a fourth registration rather than a
+        // second use of the one above because the audience is different and so is the host call:
+        // that one names one person and this one names none, and the server decides which sessions
+        // administer it. The settings are handed in because an install says nothing here until an
+        // operator turns it on, and the switch is read per notice rather than at startup.
+        serviceCollection.AddSingleton<IArrivalNotice>(provider => new ServerArrivalNotice(
+            provider.GetRequiredService<ISessionManager>(),
+            provider.GetRequiredService<IInstallSettings>(),
+            provider.GetRequiredService<ILogger<ServerArrivalNotice>>()));
 
         // The server's library, as the two questions this plugin asks of it. One per server, because
         // the instance subscribes to the library's own events and a second subscription would look

@@ -25,6 +25,24 @@ public class ConfigurationRulesTests
     private const string SomewhereToPostTo = "https://example.invalid/hook";
 
     /// <summary>
+    /// The settings no value of which can be refused, written out by hand.
+    /// <para>
+    /// A rule refuses a configuration this plugin cannot run on. A switch over a path that does
+    /// nothing but the thing it names has no such value: on is a working install and off is a
+    /// working install, and a rule invented for it would be a refusal with no failure behind it,
+    /// which is worse than an absence because a reader takes it for one that bites.
+    /// </para>
+    /// <para>
+    /// The list is here rather than nowhere so that the leg below still catches the case it exists
+    /// for. A setting added later is a name in the class that is neither refused by a rule nor on
+    /// this list, and whoever adds it has to say which of the two it is. Both directions are closed:
+    /// a name here that no longer exists fails as well, so the exemption cannot outlive the setting.
+    /// </para>
+    /// </summary>
+    private static readonly string[] SettingsNoValueOfWhichCanBeRefused =
+        ["TellsAdministratorsAboutArrivals"];
+
+    /// <summary>
     /// The last value each rule accepts, and the first one it refuses, with the setting the refusal
     /// has to name. One row per rule, and the row for the accepted kinds names both switches because
     /// either of them fixes it.
@@ -144,13 +162,14 @@ public class ConfigurationRulesTests
     }
 
     /// <summary>
-    /// Every setting is reached by a rule. This is the leg that catches a setting added later with
-    /// nothing judging it: the hostile configuration below is written by hand, so a new setting is a
-    /// name in the class that is not in the answer, and whoever adds it has to say what value of it
-    /// cannot work.
+    /// Every setting is reached by a rule, or is named above as one no value of which can be
+    /// refused. This is the leg that catches a setting added later with nothing judging it: the
+    /// hostile configuration below is written by hand, so a new setting is a name in the class that
+    /// is in neither answer, and whoever adds it has to say what value of it cannot work or why
+    /// none can.
     /// </summary>
     [Fact]
-    public void EverySettingIsNamedByARule()
+    public void EverySettingIsNamedByARuleOrDeclaredUnrefusable()
     {
         var hostile = new PluginConfiguration
         {
@@ -172,7 +191,18 @@ public class ConfigurationRulesTests
 
         var named = Settings(ConfigurationRules.Problems(hostile).Select(problem => problem.Setting));
 
-        Assert.Equal(declared, named);
+        // The exemption cannot outlive the setting it exempts, so it is checked against the class
+        // before it is allowed to make up the difference.
+        Assert.Equal(
+            SettingsNoValueOfWhichCanBeRefused.OrderBy(name => name, StringComparer.Ordinal).ToArray(),
+            SettingsNoValueOfWhichCanBeRefused
+                .Where(declared.Contains)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray());
+
+        Assert.Equal(
+            declared,
+            Settings(named.Concat(SettingsNoValueOfWhichCanBeRefused)));
     }
 
     /// <summary>

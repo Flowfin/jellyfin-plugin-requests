@@ -14,16 +14,17 @@ without this page moving with it, and again if the page cannot reach one of them
 
 <!-- settings begins -->
 
-| Setting                      | Default |
-| ---------------------------- | ------- |
-| AcceptsMovies                | true    |
-| AcceptsSeries                | true    |
-| AnnouncesApprovals           | true    |
-| AnnouncesDeclines            | true    |
-| AnnouncesFulfilments         | true    |
-| FinishedRequestRetentionDays | 365     |
-| OpenRequestsPerUser          | 10      |
-| OutboundNoticeAddress        |         |
+| Setting                          | Default |
+| -------------------------------- | ------- |
+| AcceptsMovies                    | true    |
+| AcceptsSeries                    | true    |
+| AnnouncesApprovals               | true    |
+| AnnouncesDeclines                | true    |
+| AnnouncesFulfilments             | true    |
+| FinishedRequestRetentionDays     | 365     |
+| OpenRequestsPerUser              | 10      |
+| OutboundNoticeAddress            |         |
+| TellsAdministratorsAboutArrivals | false   |
 
 <!-- settings ends -->
 
@@ -108,11 +109,27 @@ forwards the yeses and not the noes is an ordinary thing to want, and a fulfilme
 decides, so its volume follows how fast the library is filling rather than how often an operator
 looks at the queue. That is the switch most likely to be turned off first.
 
-**An arrival is not on this list and there is no switch for one.** A request is made over the
-endpoint and also over the seam the sibling plugin hands a want across, and a switch that caught the
-first and not the second would send some arrivals and look like it sent all of them. So nothing is
-announced when a request is made, and what an operator has instead is the queue and, when #76 lands,
-a message to a live administrator session.
+**An arrival is not on that list and is not posted to the address at all.** A request is made over
+the endpoint and also over the seam the sibling plugin hands a want across, and a switch that caught
+the first and not the second would send some arrivals and look like it sent all of them. So the sink
+announces movements and never an arrival, and the setting below is the one that says anything when a
+request is made.
+
+**TellsAdministratorsAboutArrivals** is off, and off is the shipping state rather than a degraded
+one. With it on, a request that has just come into existence is pushed at whoever is signed in as an
+administrator at that moment, on both surfaces an ask arrives over, as the same JSON document the
+sink would post. It leaves nothing on the wire out of this machine: it goes down connections the
+server already holds to clients already signed in.
+
+It is off because no Jellyfin client reads it. The name it goes out under is one a plugin has to
+borrow from the server's own closed list, the dashboard does not subscribe to that name, and
+[notifications.md](notifications.md) carries the measurement and the price of the borrowing. An
+operator running something written against the document turns this on; everybody else leaves it
+alone and reads the queue, which is where what is waiting has always been.
+
+It is a switch of its own rather than a fourth on the list above. Those three narrow what leaves the
+machine, and turning off what a chat service receives should not also turn off what an operator's own
+client is handed.
 
 ## What is refused
 
@@ -152,7 +169,9 @@ other path that could carry anything, since the bridge adapter is #82 and is not
 happen on a fresh install and neither is a path off the machine. Every transition is written to the
 server's own activity log, which is a record rather than a message. And the person who asked is told
 on whatever they are signed in on when their own request is answered, down the connection the server
-already holds to their client. Both are [`notifications.md`](notifications.md).
+already holds to their client. Both are [`notifications.md`](notifications.md). The third session
+path, which tells a live administrator that something arrived, is off on a fresh install and is
+`TellsAdministratorsAboutArrivals` above.
 `NoRequestBackend` is what a server without an external request service runs, and it is what every
 server runs today.
 
@@ -172,8 +191,8 @@ already has somewhere to send to and are not a second way of saying off, which i
 with an address set is refused rather than treated as silence.
 
 **Switches for paths that do not exist.** A setting an operator can change with no effect is worse
-than its absence, so the set above names the three movements the sink announces and grows when a path
-does.
+than its absence, so the set above names the three movements the sink announces plus the one arrival
+path that has a switch, and it grows when a path does rather than ahead of one.
 
 **A switch for the message to the person who asked.** There is none. It reaches only the person the
 request belongs to and only while they are signed in, and whether an operator or that person should

@@ -227,6 +227,7 @@ public sealed class QueueViewTests
             new RecordingJournal(),
             new RecordingSink(),
             new RecordingRequesterNotice(),
+            new RecordingArrivalNotice(),
             new FakeLibrary());
 
         var answered = await controller.QueueAsync(

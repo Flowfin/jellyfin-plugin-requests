@@ -233,5 +233,6 @@ public sealed class WhatAPersonIsToldTests
             new RecordingJournal(),
             new RecordingSink(),
             new RecordingRequesterNotice(),
+            new RecordingArrivalNotice(),
             new FakeLibrary());
 }

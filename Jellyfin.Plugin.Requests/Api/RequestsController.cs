@@ -102,6 +102,7 @@ public sealed class RequestsController : RequestsControllerBase
     private readonly IActivityJournal _journal;
     private readonly IOutboundSink _sink;
     private readonly IRequesterNotice _told;
+    private readonly IArrivalNotice _arrivals;
     private readonly ILibrary _library;
     private readonly RequestIntake _intake;
 
@@ -132,6 +133,12 @@ public sealed class RequestsController : RequestsControllerBase
     /// endpoint has to be able to see is that exactly one person was told and which one, and that
     /// is not visible through a server nothing here runs.
     /// </param>
+    /// <param name="arrivals">
+    /// Where administrators signed in at that moment are told that somebody has asked for something.
+    /// It is a dependency for the reason the one above it is: what a test of this endpoint has to be
+    /// able to see is that an arrival was announced once and that an ask which joined an existing
+    /// request was not, and neither is visible through a server nothing here runs.
+    /// </param>
     /// <param name="library">
     /// The server's library, asked what one person may see of a title. A request row on somebody's
     /// own page says whether what they asked for has arrived, and that sentence is answered for the
@@ -146,6 +153,7 @@ public sealed class RequestsController : RequestsControllerBase
         IActivityJournal journal,
         IOutboundSink sink,
         IRequesterNotice told,
+        IArrivalNotice arrivals,
         ILibrary library)
     {
         _store = store;
@@ -155,6 +163,7 @@ public sealed class RequestsController : RequestsControllerBase
         _journal = journal;
         _sink = sink;
         _told = told;
+        _arrivals = arrivals;
         _library = library;
 
         // Built here rather than injected, because it is this controller's use of the store rather
@@ -1383,6 +1392,16 @@ public sealed class RequestsController : RequestsControllerBase
         CancellationToken cancellationToken)
     {
         var intake = await _intake.AskAsync(incoming, caller, cancellationToken).ConfigureAwait(false);
+
+        if (intake.Outcome == IntakeOutcome.Created)
+        {
+            // Only a request that came into existence. A join is a second person on a row an
+            // operator has already been shown, and announcing it again would put the same title in
+            // front of them once per person waiting for it. The document is built from the stored
+            // request rather than from what was asked for, so what is announced is what a queue read
+            // a moment later would answer.
+            _arrivals.Tell(OutboundNotice.For(intake.Request.Request, NoticeEvent.Asked));
+        }
 
         return new CreatedRequest
         {
