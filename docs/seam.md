@@ -88,6 +88,67 @@ Giving up is safe here for the same reason a repeat is safe. The want carries an
 other side hands it over again, and a request the abandoned call still managed to write is
 recognised as the repeat it is rather than made twice.
 
+## Where the shared type comes from
+
+Implementing somebody's interface means having the type, so the type has to arrive from somewhere,
+and where it arrives from is the whole of whether this seam works at all. The failure is quiet:
+two assemblies of the same simple name in one process can declare two different types with the same
+full name, nothing fails at build time, and what happens instead is that the container returns no
+implementations, which looks exactly like the sibling not being installed and is a supported state.
+
+**The choice is a contract-only package both sides compile against, with exactly one copy shipped.**
+Taken on #117 on 2026-08-21, and taken before the sibling writes its half, because once the other
+side has written against a type declared in this assembly, moving it is a migration across two
+boards rather than a choice on one.
+
+What it costs, stated rather than implied. It is another artefact with its own version and its own
+publishing route, on a board that does not yet publish a manifest for the plugin itself, so the
+package's release path has to be settled as part of building this and not assumed to follow the
+plugin's. It is versioned independently and changed rarely: a contract package that moves often is
+two plugins that have to be upgraded together, which is the thing a shared type was meant to avoid.
+
+### The two that were rejected
+
+**A contract-only package both sides compile against and both ship, with the loader deduplicating
+it.** Rejected. It rests on the loader actually merging two copies, and that is the assumption the
+entire handover would then depend on. Nobody has measured it on either claimed line, so the cost of
+this option is an unmeasured premise underneath every call that crosses. One shipped copy removes
+the question instead of answering it.
+
+**No shared type at all, with the handover taken by name through reflection.** Rejected, and it is
+the honest fallback if the package turns out to be impractical rather than a bad idea. It is immune
+to this whole error class, because there is no second type to be a different type. What it costs is
+the thing #117's fourth condition is about: a mismatch stops being a compile error and becomes a
+runtime one, so "no sibling installed" and "sibling installed, type did not match" collapse back
+into the same silence. A compile-time contract is what keeps those two states different.
+
+### What the tree does today is not yet the choice above
+
+The type the sibling would name is declared in this plugin's own assembly, and this project
+references no contract package:
+
+    git grep -n 'public interface IWantHandover' -- Jellyfin.Plugin.Requests/Seam/IWantHandover.cs
+    Jellyfin.Plugin.Requests/Seam/IWantHandover.cs:30:public interface IWantHandover
+
+    git grep -n 'PackageReference Include\|ProjectReference' -- Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj
+    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:23:    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)">
+    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:26:    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)">
+
+Two references and both are the host's. So the registration landed before the question was decided,
+and the decision above is a thing to build rather than a description of what ships. Reading this
+section as the arrangement being in place is the one misreading it could produce, which is why the
+commands are here.
+
+**Three things #117 asks for are still not done, and none of them is softened by the choice being
+taken.** What the server's loader does with two plugin directories each carrying an assembly of one
+simple name is unmeasured on both claimed lines; a run needs a container engine, an image per line,
+and two throwaway plugins built for the purpose, and none of that has been done from this tree.
+Nothing proves that the sibling's container lookup finds this plugin's implementation, in the shape
+that will actually ship, on either line; what the suite resolves is this assembly's own
+registration, which is a different claim and is written as one above. And nothing separates a
+container that found no implementation from one that found none because the type did not match, so
+an operator meeting either one meets the same silence.
+
 ## Both sides watch the library, and neither tells the other
 
 This plugin decides that a request is fulfilled by watching the server's library for the thing
