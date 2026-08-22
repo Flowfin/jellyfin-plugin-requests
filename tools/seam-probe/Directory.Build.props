@@ -1,0 +1,10 @@
+<Project>
+
+    <!-- INHERITANCE STOPS HERE, DELIBERATELY. MSBuild walks up until it finds one of these files, so
+         this empty one keeps the repository root's properties off the probe: the shipped plugin's
+         version, its analyzer set, its warnings-as-errors and its lock-file policy all belong to the
+         artefact somebody installs. The probe is an instrument. It is built only by the job that runs
+         the measurement, it ships to nobody, and inheriting a version number from the plugin would
+         make a second thing claim to be that version. -->
+
+</Project>
