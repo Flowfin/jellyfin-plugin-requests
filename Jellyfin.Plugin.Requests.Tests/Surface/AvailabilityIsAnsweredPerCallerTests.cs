@@ -253,5 +253,6 @@ public sealed class AvailabilityIsAnsweredPerCallerTests
             new RecordingJournal(),
             new RecordingSink(),
             new RecordingRequesterNotice(),
+            new RecordingArrivalNotice(),
             library);
 }

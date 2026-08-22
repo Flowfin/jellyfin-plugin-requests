@@ -99,7 +99,7 @@ public class WantHandoverTests
             .ToArray();
 
         Assert.Equal(
-            ["IRequestStore", "IClock", "IIdentifierSource", "IInstallSettings", "IKnownUsers", "ILogger", "TimeSpan"],
+            ["IRequestStore", "IClock", "IIdentifierSource", "IInstallSettings", "IKnownUsers", "IArrivalNotice", "ILogger", "TimeSpan"],
             taken);
     }
 
@@ -792,6 +792,10 @@ public class WantHandoverTests
     /// <param name="settings">What the install is set to, or a fresh install where not given.</param>
     /// <param name="log">Where refusals are written, or a discarded one where not given.</param>
     /// <param name="users">Who the server has, or both people these tests use where not given.</param>
+    /// <param name="arrivals">
+    /// Where an arrival is announced to the administrators, or one that keeps what it was given
+    /// where not given.
+    /// </param>
     /// <param name="answerWithin">
     /// How long to wait for the queue, or the shipping bound where not given. A test that is not
     /// about waiting takes the shipping one, so nothing here passes for the wrong reason.
@@ -802,6 +806,7 @@ public class WantHandoverTests
         IInstallSettings? settings = null,
         RecordingLogger? log = null,
         IKnownUsers? users = null,
+        RecordingArrivalNotice? arrivals = null,
         TimeSpan? answerWithin = null)
         => new WantHandover(
             store,
@@ -809,6 +814,7 @@ public class WantHandoverTests
             new SequentialIdentifierSource(),
             settings ?? new FakeInstallSettings(),
             users ?? new FakeKnownUsers(Asker, SecondAsker),
+            arrivals ?? new RecordingArrivalNotice(),
             log ?? new RecordingLogger(),
             answerWithin ?? WantHandover.DefaultAnswerWithin);
 
@@ -832,6 +838,7 @@ public class WantHandoverTests
                 new SequentialIdentifierSource(),
                 new FakeInstallSettings(),
                 new FakeKnownUsers(Asker, SecondAsker),
+                new RecordingArrivalNotice(),
                 log,
                 WantHandover.DefaultAnswerWithin),
             "the clock" => new WantHandover(
@@ -840,6 +847,7 @@ public class WantHandoverTests
                 new SequentialIdentifierSource(),
                 new FakeInstallSettings(),
                 new FakeKnownUsers(Asker, SecondAsker),
+                new RecordingArrivalNotice(),
                 log,
                 WantHandover.DefaultAnswerWithin),
             "the identifier source" => new WantHandover(
@@ -848,6 +856,7 @@ public class WantHandoverTests
                 failing,
                 new FakeInstallSettings(),
                 new FakeKnownUsers(Asker, SecondAsker),
+                new RecordingArrivalNotice(),
                 log,
                 WantHandover.DefaultAnswerWithin),
             "the settings" => new WantHandover(
@@ -856,6 +865,7 @@ public class WantHandoverTests
                 new SequentialIdentifierSource(),
                 failing,
                 new FakeKnownUsers(Asker, SecondAsker),
+                new RecordingArrivalNotice(),
                 log,
                 WantHandover.DefaultAnswerWithin),
             "the server's users" => new WantHandover(
@@ -864,6 +874,7 @@ public class WantHandoverTests
                 new SequentialIdentifierSource(),
                 new FakeInstallSettings(),
                 failing,
+                new RecordingArrivalNotice(),
                 log,
                 WantHandover.DefaultAnswerWithin),
 

@@ -246,10 +246,13 @@ public sealed class TellingTheRequesterTests
     /// The one call this plugin makes to the server names that one person, goes out under the name a
     /// client acts on, and carries a timeout.
     /// <para>
-    /// The double raises on every other way of sending anything, so this leg also asserts the
-    /// absence: an administrator broadcast, a device broadcast or a remote-control command would end
-    /// the test rather than pass it. The timeout is not decoration - the web client draws a message
-    /// carrying one as a notice that fades and one without as a dialog somebody has to dismiss.
+    /// The double raises on every way of sending anything except the two this plugin is allowed to
+    /// make, so this leg asserts the absence twice over: a device broadcast or a remote-control
+    /// command would end the test rather than pass it, and the one remaining way of reaching
+    /// somebody the message was not about, which is the broadcast to whoever administers the server,
+    /// is asserted here to be empty rather than left to raise. The timeout is not decoration - the
+    /// web client draws a message carrying one as a notice that fades and one without as a dialog
+    /// somebody has to dismiss.
     /// </para>
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
@@ -265,6 +268,7 @@ public sealed class TellingTheRequesterTests
 
         var pushed = Assert.Single(sessions.Delivered);
 
+        Assert.Empty(sessions.Broadcasts);
         Assert.Equal(new[] { Asker }, pushed.UserIds);
         Assert.Equal(SessionMessageType.GeneralCommand, pushed.Name);
 
@@ -320,6 +324,7 @@ public sealed class TellingTheRequesterTests
             new RecordingJournal(),
             new RecordingSink(),
             told,
+            new RecordingArrivalNotice(),
             new FakeLibrary());
 
     /// <summary>

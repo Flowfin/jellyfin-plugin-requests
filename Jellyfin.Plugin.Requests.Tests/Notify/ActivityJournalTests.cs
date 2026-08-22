@@ -272,6 +272,7 @@ public sealed class ActivityJournalTests
             journal,
             new RecordingSink(),
             new RecordingRequesterNotice(),
+            new RecordingArrivalNotice(),
             new FakeLibrary());
 
     /// <summary>

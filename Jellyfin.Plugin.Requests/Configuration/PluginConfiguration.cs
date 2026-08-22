@@ -22,9 +22,10 @@ namespace Jellyfin.Plugin.Requests.Configuration;
 /// boolean added now would be the wrong shape rather than an early version of the right one.
 /// </para>
 /// <para>
-/// The notification switches below name the three movements this plugin announces outward and
-/// nothing else. A switch for a path that does not exist is a setting an operator can change with no
-/// effect, so the set grows when a path does rather than ahead of one.
+/// The notification switches below name the three movements this plugin announces outward, and one
+/// more names the arrival this plugin tells a live administrator about. A switch for a path that
+/// does not exist is a setting an operator can change with no effect, so the set grows when a path
+/// does rather than ahead of one, and this is that rule applied rather than an exception to it.
 /// </para>
 /// <para>
 /// There is no bridge address and no credential. The only implementation of the bridge in this tree
@@ -97,6 +98,26 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </para>
     /// </summary>
     public int FinishedRequestRetentionDays { get; set; } = 365;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether administrators signed in at that moment are told that
+    /// somebody has asked for something.
+    /// <para>
+    /// False, and off is the shipping state rather than a degraded one. Nothing on either claimed
+    /// server line listens for this document, which <c>docs/notifications.md</c> measures rather than
+    /// asserts, so an install that sent it by default would push a message at every administrator's
+    /// client on every arrival and no client would do anything with it. An operator running
+    /// something written against the contract turns it on.
+    /// </para>
+    /// <para>
+    /// It is a switch of its own rather than one of the three below it. Those three narrow what
+    /// leaves the machine on the outbound sink, and this leaves nothing: it goes down connections
+    /// the server already holds to clients already signed in. Sharing a switch with the sink would
+    /// make turning off what a chat service receives also turn off what an operator's own dashboard
+    /// is handed, which are different decisions.
+    /// </para>
+    /// </summary>
+    public bool TellsAdministratorsAboutArrivals { get; set; }
 
     /// <summary>
     /// Gets or sets where a notice about a request is posted, or nothing to send none.

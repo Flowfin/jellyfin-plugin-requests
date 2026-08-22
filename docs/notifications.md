@@ -69,7 +69,8 @@ stands now rather than where it stood when the measurement above was taken:
     origin/master:MediaBrowser.Controller/Session/ISessionManager.cs:207:        Task SendMessageToUserSessions<T>(List<Guid> userIds, SessionMessageType name, T data, CancellationToken cancellationToken);
 
 Telling the person who asked that their own request moved is built, and the section below is what
-they are told. Telling a live administrator that something arrived is #76 and is not built.
+they are told. Telling a live administrator that something arrived is built too, on the other of the
+two calls above, and the section for it says why an operator sees nothing today.
 
 **One outbound sink.** An operator who wants a request to reach something outside the server points
 this at whatever they already run. It is one sink with a defined payload rather than a service this
@@ -162,7 +163,7 @@ needs to know what happened reads that log.
 One entry per transition and none for anything else. Asking for something is not a transition:
 nothing has been decided, the model appends no history entry for it, and an entry there would be this
 plugin announcing its own arrival in a list an operator reads for what the server did. Telling an
-administrator that something arrived is a live message and is #76. An observation that changed a
+administrator that something arrived is a live message and is the section further down. An observation that changed a
 title's availability without moving the request writes nothing here either, because a line per
 re-observation is the wall of entries this page's own rule refuses.
 
@@ -345,6 +346,109 @@ reaches this, and the activity log has no switch either. Whether an operator or 
 should be the one to turn this off is a question nobody has taken, and it is written here rather than
 answered by adding a field.
 
+## What a live administrator is told when something arrives
+
+The other message this plugin pushes is about a request that has just come into existence, and it
+goes to whoever administers the server rather than to a person this plugin names.
+
+**Nothing on either claimed line reads it, and that is the first thing to know about it.** An
+operator who installs this plugin, switches it on and then watches the dashboard sees nothing,
+because the dashboard is `jellyfin-web` and it does not subscribe to the name this goes out under.
+That is measured in the section below rather than assumed. What this path is for is a client written
+against the document, the same way the outbound sink is for a service an operator already runs. What
+reaches an operator today is the activity entries above, which are in a page the dashboard already
+draws, and the queue, which holds every open request whenever they next open it.
+
+It is off on a fresh install. `TellsAdministratorsAboutArrivals` in the settings is what turns it on,
+and off is a supported way to run rather than a degraded one: a path nothing reads is traffic on
+every administrator's connection for nobody.
+
+### When it is sent, and when it is not
+
+One document per request that came into existence, on both surfaces an ask arrives over: the endpoint
+a person asks through and the seam a sibling plugin hands a want across. A path wired at one of the
+two would carry some arrivals while reading as though it carried all of them, which is the same
+failure the sink's own switches are written against.
+
+A second person joining a request that is already open sends nothing, and neither does somebody
+asking again for their own. A join is another person on a row an operator has already been shown, so
+announcing it would put one title in front of them once per person waiting for it.
+
+### What it sends
+
+The same document the outbound sink posts, with `event` set to `Asked`, which is the word the sink's
+vocabulary has always carried and nothing has ever sent. So there is one shape leaving this plugin
+whichever carrier took it, one version number, and one place a field is added. What it carries and
+what it deliberately does not is the sink's own section above, without exception: neither note, no
+provider identifiers, nobody else waiting, no history, and no user name of any kind.
+
+`state` on an arrival is `Open` and `movedByUserId` is absent, because nobody has moved it. `at` is
+when the request was asked for.
+
+### How it reaches a client, and why nothing acts on it
+
+The server carries one call that addresses administrators rather than named people, and it takes a
+name out of an enumeration a plugin cannot add to. The enumeration is closed and the two claimed
+lines carry the same members, compared rather than assumed:
+
+    for r in release-10.11.z master; do gh api \
+      "repos/jellyfin/jellyfin/contents/MediaBrowser.Model/Session/SessionMessageType.cs?ref=$r" \
+      -H "Accept: application/vnd.github.raw" | grep -oE '^\s{8}[A-Za-z]+,' | tr -d ' ,' ; done \
+      | sort | uniq -c | awk '$1 != 2'
+    (nothing)
+
+Not one of those members means "a plugin has something to say", so a name has to be borrowed, and the
+members are not equally safe to borrow. Some are commands a client is expected to obey and the rest
+are notices it may read. A document sent under a command name is acted on as a command, which is a
+worse outcome than not being read at all. `ActivityLogEntry` is the notice closest in meaning to what
+this sends, which is that something happened a view of the server may want to react to:
+
+    gh api "repos/jellyfin/jellyfin/contents/MediaBrowser.Model/Session/SessionMessageType.cs?ref=release-10.11.z" \
+      -H "Accept: application/vnd.github.raw" | grep -nE '^\s{8}(ActivityLogEntry|GeneralCommand),'
+    12:        GeneralCommand,
+    36:        ActivityLogEntry,
+
+The web client subscribes to five names and that is not one of them. Read at `5389bba` in
+`jellyfin/jellyfin-web`, which is the same commit the section above reads:
+
+    ref=5389bbad37d178ef5ebeaac8860403527c0e4121
+    gh api "repos/jellyfin/jellyfin-web/contents/src/scripts/serverNotifications.js?ref=$ref" \
+      -H "Accept: application/vnd.github.raw" | grep -oE 'OutboundWebSocketMessageType\.[A-Za-z]+' | sort -u
+    OutboundWebSocketMessageType.GeneralCommand
+    OutboundWebSocketMessageType.Play
+    OutboundWebSocketMessageType.Playstate
+    OutboundWebSocketMessageType.SyncPlayCommand
+    OutboundWebSocketMessageType.SyncPlayGroupUpdate
+
+    gh api "repos/jellyfin/jellyfin-web/contents/src/scripts/serverNotifications.js?ref=$ref" \
+      -H "Accept: application/vnd.github.raw" | grep -c 'ActivityLogEntry'
+    0
+
+Three of the five are commands a client obeys and two belong to sync play, so a document sent under
+any of them would be obeyed or discarded rather than read. The name this plugin uses is ignored
+there, which is the outcome to prefer of the two available.
+
+**The price of the borrowing, written down rather than discovered.** A client that subscribes to
+`ActivityLogEntry` expecting the server's own entry shape is handed this plugin's document instead
+and does not recognise it. That is the cost of an enumeration a plugin cannot add to, and it is why
+`version` is on the document: a reader can tell what it is holding without guessing from which fields
+it found.
+
+### What this is not proof of
+
+One file of one client was read, at one commit, and no client was run. It is not a claim about what
+any other Jellyfin client does with the same name, and it is not a claim that anybody saw anything.
+Nothing here was run against a server either: the suite asserts what this plugin asked the server to
+send, that it addressed the administrators, that nobody was named, and that no other way of reaching
+anybody was used, and the headless rule in [testing.md](testing.md) is why it stops there.
+
+### When the push fails
+
+**Nothing that reaches a request.** The request is in the store before anybody is told, telling hands
+nothing back for a caller to check, and every way a push can fail costs the same: a line in the
+server's log and nothing else. Nothing is retried and nothing is queued. An operator who was not
+reached finds the request in the queue, which is where they would look anyway.
+
 ## Why there is no fourth
 
 Because the fourth is the first of six. Growing an integration per messaging service is how a plugin
@@ -361,9 +465,10 @@ design, it is a standing decision recorded on #113, and it has no opt-in.
 
 Nothing leaves the machine until an operator turns it on. The outbound sink is off on a fresh
 install by having nowhere to send to, and what an operator narrows it with once it has somewhere is
-the section below. The other two paths have no switch and neither leaves the machine: the activity
-log is a record in the server's own database, and the message to the person who asked goes down a
-connection that server already holds to their client.
+the section below. The other paths put nothing on a wire out of this machine: the activity log is a
+record in the server's own database, and both session messages go down connections that server
+already holds to clients. The activity log has no switch and the message to the person who asked has
+none either; the message to a live administrator has one, and it is off until somebody sets it.
 
 ## Which movements are announced, and which are not
 
@@ -384,16 +489,12 @@ The vocabulary carries `Asked` because the document's shape is a contract with s
 machine and removing a word from it is a change to that contract; nothing here sends one, and the
 sink refuses any movement it has no switch for rather than sending it under a default.
 
-Telling an administrator that something arrived is #76, on the path that is a message rather than a
-post off the machine. What the person who asked is told when their own request moves is the section
-above, and it is not narrowed by these three either.
+Telling an administrator that something arrived is a message rather than a post off the machine, it
+is `TellsAdministratorsAboutArrivals` rather than one of these three, and the section below it is
+where what it sends and what reads it are written down. What the person who asked is told when their
+own request moves is the section above, and it is not narrowed by these three either.
 
 ## What this page does not do
-
-It does not say what a message to a live administrator would send. That half of the session path is
-#76's and is unbuilt, and its own question, what such a message is for on a dashboard that does not
-listen for one, is open there. The half that is built is the message to the person who asked, and it
-is above.
 
 It does not say what a fourth path would be switched with. The three settings above name the three
 movements the sink announces, and a setting for a path nothing sends on is a field an operator can

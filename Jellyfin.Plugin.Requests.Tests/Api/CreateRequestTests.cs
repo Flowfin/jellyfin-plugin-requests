@@ -369,6 +369,7 @@ public sealed class CreateRequestTests
             new RecordingJournal(),
             new RecordingSink(),
             new RecordingRequesterNotice(),
+            new RecordingArrivalNotice(),
             new FakeLibrary());
 
     /// <summary>
