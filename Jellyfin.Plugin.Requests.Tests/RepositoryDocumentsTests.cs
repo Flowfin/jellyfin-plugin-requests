@@ -191,6 +191,65 @@ public sealed class RepositoryDocumentsTests
     }
 
     /// <summary>
+    /// The procedures the refusal list names as replacements, each beside the sentence that points
+    /// at it.
+    /// </summary>
+    /// <returns>One path in the tree per case.</returns>
+    public static TheoryData<string> ProceduresTheRefusalListNames()
+        => new TheoryData<string> { "scripts/verify-plugin-loads.sh", "scripts/verify-user-isolation.sh" };
+
+    /// <summary>
+    /// The refusal list names a procedure for each refusal a running server answers instead of the
+    /// suite.
+    /// <para>
+    /// The same guard as the two doubles above and for the same reason, one register wider. A
+    /// refused test is only refused honestly while what replaces it can be found, and both of these
+    /// replacements are shell scripts rather than types, so no rename follows them. A document that
+    /// has stopped naming one leaves a reader looking for the replacement and finding prose.
+    /// </para>
+    /// <para>
+    /// The other direction, a script moved while the document goes on naming it, is refused before
+    /// this runs: the test project copies both paths beside the suite, so a missing one is a build
+    /// that does not produce a test assembly rather than a leg that reds. That is why nothing here
+    /// asserts the file exists. An assertion that cannot fail proves nothing, and the copy is what
+    /// bites.
+    /// </para>
+    /// <para>
+    /// It matches the whole path rather than a substring of one. A plain containment leg passes on
+    /// a document naming <c>scripts/verify-user-isolation.sh.moved</c>, which is a reader sent to a
+    /// path that is not there while the leg stays green, and that near-miss was watched passing
+    /// before this was written.
+    /// </para>
+    /// <para>
+    /// It asks whether the document names the path anywhere in it, not whether the paragraph about
+    /// that refusal does. The evidence block closing the list names both paths as well, so a
+    /// paragraph rewritten to stop naming its own replacement stays green here. That is the same
+    /// bound as the two legs above, which read a name and not the sentence around it, and it is
+    /// stated rather than hidden.
+    /// </para>
+    /// <para>
+    /// It reads the path and never runs the script. Running one needs a server and a container
+    /// engine, which is the refusal these are the replacement for, so a leg that ran them would be
+    /// the test this document refuses.
+    /// </para>
+    /// </summary>
+    /// <param name="procedure">The path the document names, relative to the repository root.</param>
+    [Theory]
+    [MemberData(nameof(ProceduresTheRefusalListNames))]
+    public void TheRefusalListNamesAProcedureThatIsThere(string procedure)
+    {
+        const string Testing = "docs/testing.md";
+
+        var document = File.ReadAllText(Beside(Testing.Replace('/', Path.DirectorySeparatorChar)));
+        var whole = new Regex(
+            @"(?<![\w./-])" + Regex.Escape(procedure) + @"(?![\w.-])",
+            RegexOptions.None,
+            TimeSpan.FromSeconds(2));
+
+        Assert.Matches(whole, document);
+    }
+
+    /// <summary>
     /// One file as it sits next to the suite.
     /// </summary>
     /// <param name="name">Its path, relative to the repository root.</param>

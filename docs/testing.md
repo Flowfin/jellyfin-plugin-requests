@@ -125,18 +125,54 @@ taken from the constant the server registers it under. That is the half about wh
 endpoint is under. The other half is that the endpoint a caller without elevation can reach has
 nothing wider than that caller's own requests to return, which `ListRequestsTests` asks under every
 combination of filter, order and page. Neither is the server turning somebody away, and neither
-claims to be: what they leave open is that the server evaluates `RequiresElevation` the way its own
-endpoints are evaluated under it. That is #51.
+claims to be.
+
+The server turning somebody away is watched outside the suite, which is the same shape as the
+first-load procedure above rather than a second kind of thing. `scripts/verify-user-isolation.sh`
+signs two ordinary accounts in to a running Jellyfin and asks the queue endpoint as one of them,
+and `.github/workflows/user-isolation.yaml` runs it on every pull request and nightly, once per
+claimed line. Read at `e51942b`, the head of the change that landed it, on the 10.11 line in job
+`97002549666` and on the 12.0 line in job `97002549757`:
+
+    gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/97002549666/logs | grep -a "the queue \|the administrator is served"
+    == the queue is refused to somebody who is not an administrator
+    the queue answered 403
+    the queue refused with 403 and carried nothing that belongs to anybody.
+    the administrator is served 3 rows and all three titles are among them.
+
+The same command against `97002549757` returns the same four lines. The queue is asked a second
+time as an administrator because a queue broken for everybody would satisfy the refusal on its own.
+
+That it can fail is watched rather than assumed. `proof/67-the-queue-is-not-closed-to-everybody`
+takes the elevation off the queue action and leaves the authorisation attribute, which is one word,
+and both lines go red at that step and green at every step before it:
+
+    gh run view 32560880189 --repo Flowfin/jellyfin-plugin-requests --json headBranch,conclusion,jobs --jq '.headBranch, .conclusion, (.jobs[] | "\(.name)  \(.conclusion)")'
+    proof/67-the-queue-is-not-closed-to-everybody
+    failure
+    isolation 12.0  failure
+    isolation 10.11  failure
+
+    the queue answered 200
+    the queue was served to somebody who is not an administrator.
+
+That branch is not for merging and has no pull request.
+
+What this does not do is lift the refusal above. A test inside the ordinary suite still needs a
+running Jellyfin holding a session for a person, and still may not have one, so the suite asserts
+what an endpoint carries and never what a server does with it. The procedure runs on a pull request
+and on a schedule, so a mainline commit that no pull request carried has no reading of its own
+until the next nightly run.
 
 Every replacement named above exists, either as something already in the tree or as an issue on
 this board. The states move, and a paste taken once reads afterwards as a claim about today, so
-this one carries the commit it was read at, `1f5ad56`:
+this one carries the commit it was read at, `ffa28c1`:
 
-    for n in 20 35 50 51 52 54 56 61 64 115; do gh issue view $n --json number,state,title --jq '"\(.number)  \(.state)  \(.title)"'; done
+    for n in 20 35 50 51 52 54 56 61 64 115; do gh issue view $n --repo Flowfin/jellyfin-plugin-requests --json number,state,title --jq '"\(.number)  \(.state)  \(.title)"'; done
     20  CLOSED  Prove the built plugin loads on a server of each claimed line
     35  OPEN  Provide an in-process HTTP double for the outbound calls
     50  CLOSED  Lay out the controller, the route prefix and the version rule
-    51  OPEN  Decide the authorisation policy for every endpoint
+    51  CLOSED  Decide the authorisation policy for every endpoint
     52  CLOSED  Create a request over the API
     54  CLOSED  Act on a request over the API
     56  CLOSED  Fix the error shape and the status codes
@@ -144,8 +180,14 @@ this one carries the commit it was read at, `1f5ad56`:
     64  CLOSED  Hold the page to the same rules as the rest of the tree
     115  CLOSED  Make the headless rule refusable rather than written down
 
-    git ls-files scripts/
+    git ls-tree --name-only origin/master scripts/verify-plugin-loads.sh scripts/verify-user-isolation.sh
     scripts/verify-plugin-loads.sh
+    scripts/verify-user-isolation.sh
+
+The two lines above replace a `git ls-files scripts/` whose pasted output was one file. That did
+not reproduce at the commit it was stamped with either, where the directory already held two, and
+it drifts every time anything unrelated is added beside them. Naming the two files this list points
+at is what a reader wants from it and is what stays true.
 
 `Check formatting` is the name the check reports rather than the name of its file, read off a run
 rather than off the workflow:
