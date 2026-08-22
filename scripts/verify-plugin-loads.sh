@@ -47,7 +47,7 @@ step "the configuration page the dashboard would fetch"
 # The embedded resource path is built at run time from the plugin's namespace. A half rename leaves
 # a build that is green and a page that is empty, and this is where that shows.
 page_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 30 \
-    "$BASE/web/ConfigurationPage?name=$PLUGIN_NAME")
+    "$BASE/web/ConfigurationPage?name=${PLUGIN_NAME}s")
 echo "GET /web/ConfigurationPage?name=$PLUGIN_NAME -> $page_status"
 test "$page_status" = "200"
 # THE HEAD IS PRINTED OUT OF A FILE AND NEVER OUT OF A PIPE, and it is the same reason the stored
