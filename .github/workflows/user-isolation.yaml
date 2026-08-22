@@ -1,0 +1,90 @@
+# Does one person's request reach another person, on a real server of each claimed line.
+#
+# #67 asks for this and says why a suite cannot answer it. The suite runs the controller over a
+# double: there is no session, no authorisation pipeline and no cache, so what it holds is that the
+# action reading a person's own list reads the store for that person, and that the queue action
+# carries the elevation attribute. Whether the server enforces that attribute, and whether a second
+# caller arriving after the first is handed the first one's answer, are properties of the server.
+#
+# So this job starts a Jellyfin of each line, installs the plugin, creates two ordinary accounts,
+# has each of them ask for something, and reads back what each of them is given. One of the three
+# requests is a title both of them asked for, which the plugin joins into a single row: that row is
+# the one two people are both entitled to see, and the notes written on it are not.
+#
+# What it does not do is render a page. Nothing here opens a browser, which is the headless rule in
+# `docs/testing.md`, so what this proves is what the server hands back, not what a client draws.
+#
+# It runs on pull requests as well as on a schedule, for the reason the activity check gives: a
+# check of this shape that only runs nightly reports a defect after it has landed. The cost is one
+# container per line.
+name: One person's requests on a real server
+
+on:
+  pull_request:
+    branches: ["**"]
+  schedule:
+    - cron: "47 4 * * *"
+  workflow_dispatch:
+
+# Explicit deny-all at workflow level; the job grants what it needs.
+permissions: {}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolation:
+    name: isolation ${{ matrix.line }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    strategy:
+      # Both lines run whatever the other one does. A failure on one is a fact about that line, and
+      # cancelling the other would leave nobody knowing whether it is a fact about both.
+      fail-fast: false
+      matrix:
+        include:
+          # The image is not written here. It is one half of a pair several checks need, and two
+          # copies of that pair disagree the first time a line moves, so it lives in
+          # `scripts/server-lines.tsv` and the steps below ask for it by framework.
+          - line: "10.11"
+            framework: "net9.0"
+            port: "18100"
+          - line: "12.0"
+            framework: "net10.0"
+            port: "18101"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, so do not leave the token in .git/config.
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Restore in locked mode
+        run: dotnet restore Jellyfin.Plugin.Requests.sln --locked-mode
+
+      - name: Is one person's list that person's alone
+        # The matrix values arrive as environment variables rather than as expressions inside the
+        # script. They are written in this file and are not somebody's input, so nothing here is
+        # injectable today; what the shape buys is that it stays that way when a later matrix takes
+        # a value from somewhere else.
+        env:
+          FRAMEWORK: ${{ matrix.framework }}
+          PORT: ${{ matrix.port }}
+        run: |
+          set -euo pipefail
+          IMAGE=$(./scripts/server-image-for.sh "$FRAMEWORK")
+          ./scripts/verify-user-isolation.sh "$IMAGE" "$FRAMEWORK" "$PORT"
