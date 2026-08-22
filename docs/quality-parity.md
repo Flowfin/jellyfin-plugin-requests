@@ -579,12 +579,124 @@ nothing, and #25's second condition is answered for the fifth workflow by there
 being nothing to answer: it is not a guard, and the four that are have their red
 runs.
 
+## What the guards this milestone adopted have been watched doing
+
+The section above is the five that arrived with this repository. These are the ones this milestone
+added, and #2 asks the same of them: a run in which the guard went red for the reason it names, and
+a run in which the tree passes it. Nothing in this tree recorded either, so what follows is that
+record rather than a claim that it already existed.
+
+Six of the twelve have both. Six do not, and the table says which rather than leaving a reader to
+take a full-looking column for a full one.
+
+Every green run below is the same head, `110abde`, which is the last change to land, and every
+workflow that ran on it succeeded:
+
+    $ gh run list --repo Flowfin/jellyfin-plugin-requests \
+        --branch checks/2-every-workflow-carries-a-row --limit 40 \
+        --json databaseId,conclusion,headSha,workflowName \
+        --jq '.[] | "\(.databaseId)  \(.conclusion)  \(.headSha[0:7])  \(.workflowName)"' | sort -k4
+    32603611274  success  110abde  ABI floor
+    32603611247  success  110abde  Activity entries on a real server
+    32603611276  success  110abde  DCO
+    32603611301  success  110abde  Dependency review
+    32603611273  success  110abde  One person's requests on a real server
+    32603611237  success  110abde  Package
+    32603611279  success  110abde  Prettier
+    32603611261  success  110abde  Repo Invariant Lint
+    32603550618  success  110abde  unicode-guard
+    32603611236  success  110abde  unicode-guard
+    32603611255  success  110abde  Workflow Security Analysis
+    32603611260  success  110abde  Works alone, works with the sibling set
+    32603611416  success  110abde  🏗️ Build and test
+    32603550662  success  110abde  🔬 Run CodeQL
+    32603611246  success  110abde  🔬 Run CodeQL
+    32603611353  success  110abde  🧾 PR hygiene
+
+Two names appear twice because two triggers fired on one head, and two of the sixteen belong to the
+inherited section above rather than to this one. Two workflows do not appear at all: `mutation.yaml`
+runs on a schedule and `seam-probe.yaml` on a push that touches the probe, so their green runs are
+their own and carry their own head.
+
+| Workflow                      | Red run                                                                                                                                               | Green run                 |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `abi-floor.yaml`              | 31095776433, `proof/23-floor-bites`, job `floor 10.11.0.0` red at `Build the plugin against the floor`                                                | 32603611274               |
+| `activity-entries.yaml`       | none of this kind, below                                                                                                                              | 32603611247               |
+| `build.yaml` with `gate.yaml` | none of this kind, below                                                                                                                              | 32603611416               |
+| `invariant-lint.yaml`         | 31265005320, `proof/28-invariants-refuse`, red at `Refuse an invariant broken anywhere in the tree`                                                   | 32603611261               |
+| `mutation.yaml`               | none at all, below                                                                                                                                    | 31996260260, at `0482b29` |
+| `package.yaml`                | 32554832287, `proof/1-a-version-the-tree-does-not-hold-is-refused`, both lines red at `Install this package on a server of the line it was built for` | 32603611237               |
+| `pr-hygiene.yaml`             | 31258955738, `proof/26-hygiene-refuses`, red at `Run the hygiene checks`                                                                              | 32603611353               |
+| `prettier.yml`                | 31258897067, `proof/26-hygiene-annotates`, red at `Check formatting of the embedded web assets and the markdown`                                      | 32603611279               |
+| `scan-codeql.yaml`            | none of this kind, below                                                                                                                              | 32603611246               |
+| `seam-probe.yaml`             | 32555537635, cause unproven, below                                                                                                                    | 32555794613, at `5b96f57` |
+| `sibling-set.yaml`            | none at all, below                                                                                                                                    | 32603611260               |
+| `user-isolation.yaml`         | 32560880189, `proof/67-the-queue-is-not-closed-to-everybody`, both lines red at the queue step                                                        | 32603611273               |
+
+The job and step of each red run are read off the run rather than off a log:
+
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/actions/runs/31265005320/jobs \
+        --jq '.jobs[] | select(.conclusion=="failure")
+              | "\(.name)  |  \([.steps[]|select(.conclusion=="failure")|.name]|join("; "))"'
+    Enforce greppable invariants  |  Refuse an invariant broken anywhere in the tree
+
+`user-isolation.yaml` is the one whose log has been read, and `docs/testing.md` carries the two lines
+of it rather than this page holding a second copy.
+
+### The six empty cells, one reason each
+
+**`activity-entries.yaml`.** One red run exists, 32547852608 on `throwaway/263-page-not-served`, and
+both its jobs are red at `Does the plugin load at all`. That is the first-load procedure this
+workflow runs ahead of the check it exists for, so the run records the load procedure refusing and
+says nothing about whether the activity check refuses what it names.
+
+**`build.yaml` with `gate.yaml`.** Every red run in that workflow's history is a change that did not
+compile or a test that failed, which is the guard doing its job on real work rather than a near-miss
+written to be red. `gate.yaml` produces no run of its own: it is called by `build.yaml` and is where
+the two names the ruleset matches literally come from.
+
+**`mutation.yaml` and `sibling-set.yaml`.** No red run at all, in either.
+
+    $ for w in mutation.yaml sibling-set.yaml; do \
+        gh run list --repo Flowfin/jellyfin-plugin-requests --workflow $w \
+          --status failure --limit 1 --json databaseId --jq 'length'; done
+    0
+    0
+
+**`scan-codeql.yaml`.** Its one red run, 31265837166 on `proof/34-clock-and-identifier-refuse`, is
+red at `Build for the analysis`. A build that did not compile is not the analysis finding anything,
+so that run says nothing about this guard.
+
+**`seam-probe.yaml`.** 32555537635 is red on both lines at `Ask a second plugin what it can see`, on
+a branch that was building the probe rather than proving it. The workflow's own file says what reds
+it is a run that produced no answer at all, which is consistent with that step, but the branch was
+not written to be red and the log has not been read, so the cause is recorded as unproven rather
+than as the reason the guard names.
+
+### What this table is not
+
+It is a ledger of runs, not a demonstration that each guard is correct. A red run at a step proves
+the step refused something; which of the things that step can refuse it refused is in the log, and
+six of these cells are read at the step rather than in the log. The `Kind` distinction the inherited
+table makes does not appear here because all twelve refuse; none of them is a report.
+
 ## What this document does not do
 
-Nothing here is enforced. No check reads this file, no check compares it against
-the workflow directory, and a workflow added or deleted without a row moves
-nothing red. The table drifts against the thing it describes the moment either
-board changes, and the commands above are the only part that cannot.
+**This section said nothing here is enforced, and one sentence of that has stopped
+being true.** `EveryWorkflowInTheTreeHasARowInTheParityDocument` compares this
+page against the workflow directory, so a workflow added or deleted without its
+name appearing here reds the suite. That check arrived in the same change as the
+rows for `package.yaml`, `seam-probe.yaml` and `user-isolation.yaml`, and this
+paragraph was left behind by it, which is the drift this page is about happening
+to the page itself.
+
+Everything else here is unenforced. Nothing reads the other board, so the first
+table drifts against it the moment that board changes and no run notices.
+Nothing reads a `Disposition` cell, nothing judges whether a reasoning cell says
+anything, and nothing compares the check list at the top against what actually
+reports. The counts written into the prose are read by no run either. The
+commands pasted beside them are the only part that cannot drift, and they are
+there to be re-run rather than trusted.
 
 The adopted rows that name an issue are decisions, not deliveries. What is
 running is the check list at the top, printed from a run, and an adopted row
