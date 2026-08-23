@@ -105,8 +105,29 @@ the caller, and the server removes everything under that parent which the curren
 did not contain. Whether two callers arriving in turn can see each other's rows is a property of a
 running server, it is #67, and nothing in this repository answers it.
 
+**The channel is built before this plugin is, and that is measured rather than supposed.** It is
+worth writing down because it is a trap for anything else this plugin registers. The host resolves a
+channel while it is still starting, from `ApplicationHost.SetStaticProperties`, and at that moment
+the plugin instance the store's data directory comes from does not exist. A channel that took the
+store therefore took the server down with it, on both claimed lines, at the startup wizard. Read out
+of the server's own log on a run made to print it:
+
+    System.InvalidOperationException: The request store was asked for before this plugin was loaded, so there is no data directory to keep requests in.
+       at Jellyfin.Plugin.Requests.PluginServiceRegistrator.<>c.<RegisterServices>b__0_0(IServiceProvider provider)
+       ...
+       at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitIEnumerable(IEnumerableCallSite enumerableCallSite, RuntimeResolverContext context)
+       ...
+       at Emby.Server.Implementations.ApplicationHost.SetStaticProperties()
+       at Emby.Server.Implementations.ApplicationHost.InitializeServices(IConfiguration startupConfig)
+
+The elisions are the container's own frames and are marked. So the channel asks for the store when
+somebody browses rather than holding one, and the token the server caches on answers the same as a
+store nothing has been written to where there is no store to build yet.
+
 **Nothing here has been browsed from a client and nothing has been run against a server.** What is
-held is the answer this plugin hands the server, which is what the suite asserts.
+held is the answer this plugin hands the server, which is what the suite asserts. That the plugin
+still loads at all, with this channel registered, is watched on a real server of each line by the
+checks that install it.
 
 ## The page, as it is built
 
