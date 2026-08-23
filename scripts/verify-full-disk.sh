@@ -29,7 +29,7 @@
 set -euo pipefail
 
 framework=${1:?target framework, for example net9.0}
-size=${2:-256k}
+size=${2:-64m}
 
 case "$framework" in
     net9.0) runtime=mcr.microsoft.com/dotnet/runtime:9.0 ;;
