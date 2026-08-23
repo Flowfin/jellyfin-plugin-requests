@@ -161,10 +161,17 @@ server_start() {
     test "$settled" -ge 3
     printf '%s\n' "$info"
 
+    # THROWAWAY. Print what the server says when a wizard call is refused, and the server's own log
+    # with it. The ordinary script fails with a status code and nothing to act on, which is exactly
+    # what happened when the channel landed: eight checks red at this step on both lines and no way
+    # to tell from the run why.
+    trap 'echo "== the server log"; dk logs "$CONTAINER" 2>&1 | tail -80' ERR
+    set -E
+
     step "complete the startup wizard"
     # These are open on a server whose wizard has not been completed. Completing it is what makes an
     # authenticated call possible, and everything below is an authenticated call.
-    curl --silent --fail --max-time 30 -X POST "$BASE/Startup/Configuration" \
+    curl --silent --fail-with-body --max-time 30 -X POST "$BASE/Startup/Configuration" \
         -H 'Content-Type: application/json' \
         -d '{"UICulture":"en-US","MetadataCountryCode":"US","PreferredMetadataLanguage":"en"}'
     curl --silent --fail --max-time 30 "$BASE/Startup/User" >/dev/null
