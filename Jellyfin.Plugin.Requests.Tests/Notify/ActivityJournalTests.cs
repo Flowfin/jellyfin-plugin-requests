@@ -273,7 +273,8 @@ public sealed class ActivityJournalTests
             new RecordingSink(),
             new RecordingRequesterNotice(),
             new RecordingArrivalNotice(),
-            new FakeLibrary());
+            new FakeLibrary(),
+            ABridgeSubmission.WithNothingBehindIt(store));
 
     /// <summary>
     /// One open request in the store, with a provider identifier so the library can match it.

@@ -8,9 +8,9 @@ reconciled: what the service's words mean here.
 It is not the whole of the bridge. The interface is
 [`IRequestBackend`](../Jellyfin.Plugin.Requests/Bridge/IRequestBackend.cs), the implementation every
 server without a service runs is
-[`NoRequestBackend`](../Jellyfin.Plugin.Requests/Bridge/NoRequestBackend.cs), and how a submission is
-made and what happens when the service misbehaves are separate questions this page does not answer.
-Where a credential lives is answered at the end of it.
+[`NoRequestBackend`](../Jellyfin.Plugin.Requests/Bridge/NoRequestBackend.cs), what an approval hands
+over is below, and what happens when the service misbehaves is a separate question this page does not
+answer. Where a credential lives is answered at the end of it.
 
 ## The mapping
 
@@ -76,6 +76,34 @@ history, and the person it belongs to is told something untrue about their own r
 Case is ignored when a word is looked up, because two adapters written against one service will spell
 one word two ways and both mean what the service meant. Nothing else is normalised.
 
+## What an approval hands over
+
+Approving is the moment something else is asked to fetch the title, and
+[`BridgeSubmission`](../Jellyfin.Plugin.Requests/Bridge/BridgeSubmission.cs) is the whole of what this
+side does about it. It runs after the decision has been written and never instead of it.
+
+**A submission that failed never takes an approval back.** The operator decided, the queue already
+holds the decision, and undoing it because a service on another machine was down would be the plugin
+overruling a person. What a failure leaves is an approved request carrying no reference and a line in
+the server log, which is a state that can be handed over again once the service answers. Making that
+failure visible to an operator without reading a log is #283, and until that lands the log is the only
+place it appears.
+
+**Submitting the same request twice is refused, and the request itself is what refuses it.** The
+reference is written only after a service answered, so a request carrying one has already been handed
+over and is not handed over again. Harmless was the other available answer and it is the wrong one: a
+second submission of an accepted request is a second copy of the same download on the service's side,
+and nothing here could tell the two apart afterwards.
+
+The one case that needs somebody to look is the service accepting a request and the reference then
+failing to be written back. The service holds it and this queue does not know so. Nothing retries,
+because retrying is the duplicate the rule above exists against, and the log line carries the
+identifier the service issued so the two can be reconciled by hand.
+
+On a server with no external service none of this happens and none of it is reported. The shipping
+bridge hands back no reference, which is an answer rather than a failure, so an approval there leaves
+no log line and no field.
+
 ## Whose name a request carries over there
 
 The external service has its own users, and something has to decide whose name a submitted request
@@ -136,6 +164,7 @@ cannot arrive quietly: it either gets a line in this table saying so, or the cha
 
 | What                     | Without a bridge                                                          |
 | ------------------------ | ------------------------------------------------------------------------- |
+| `BridgeSubmission`       | Hands nothing over, keeps nothing, and writes no line about it.           |
 | `CapabilitiesController` | Answers, and says that no bridge is configured.                           |
 | `HealthController`       | Answers, and says the bridge is not configured rather than not answering. |
 

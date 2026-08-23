@@ -333,7 +333,8 @@ public sealed class QuietByDefaultTests
             sink,
             new RecordingRequesterNotice(),
             new RecordingArrivalNotice(),
-            new FakeLibrary());
+            new FakeLibrary(),
+            ABridgeSubmission.WithNothingBehindIt(store));
 
     /// <summary>
     /// One open request, with a provider identifier the library can match.

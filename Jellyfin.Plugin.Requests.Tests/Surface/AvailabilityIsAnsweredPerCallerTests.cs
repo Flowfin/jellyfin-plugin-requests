@@ -254,5 +254,6 @@ public sealed class AvailabilityIsAnsweredPerCallerTests
             new RecordingSink(),
             new RecordingRequesterNotice(),
             new RecordingArrivalNotice(),
-            library);
+            library,
+            ABridgeSubmission.WithNothingBehindIt(store));
 }

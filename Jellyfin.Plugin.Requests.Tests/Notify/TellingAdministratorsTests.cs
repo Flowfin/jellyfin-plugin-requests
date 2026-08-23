@@ -299,7 +299,8 @@ public sealed class TellingAdministratorsTests
             new RecordingSink(),
             new RecordingRequesterNotice(),
             arrivals,
-            new FakeLibrary());
+            new FakeLibrary(),
+            ABridgeSubmission.WithNothingBehindIt(store));
 
     /// <summary>
     /// The seam announcing arrivals to the path handed in.
