@@ -200,7 +200,7 @@ public sealed class RequestsChannel : IChannel, IHasCacheKey
 
         try
         {
-            theirs = await _store().FindForUserAsync(query.UserId, cancellationToken).ConfigureAwait(false);
+            theirs = await _store().GetAllAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (RequestStoreLoadException reason)
         {
