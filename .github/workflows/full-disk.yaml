@@ -1,0 +1,83 @@
+# What a caller sees when the volume the store writes to runs out of room.
+#
+# #46 asks for three things and the suite holds two of them. A write stopped in the middle, and
+# persisted bytes cut short at every offset, are both cheap to produce on any machine and both run
+# under `dotnet test`. The third is a full disk, and it is listed separately because it is the one
+# failure of the three where the wrong outcome looks exactly like the right one: a request that was
+# never written, on a call that returned normally.
+#
+# It cannot run in the suite. Filling a filesystem means having one to fill, and the headless rule
+# in `docs/testing.md` refuses a test that needs a container engine. So it runs here, on a mount
+# with a hard size, and nothing outside that mount is written to.
+#
+# The probe refuses to report a measurement it did not make. If every addition succeeds it exits 2
+# saying nothing was measured, which is what a mount that was never size limited produces, so a
+# green run on this job is a run in which the filesystem actually filled.
+#
+# Both claimed lines, because a store that reports a full disk on one runtime and swallows it on the
+# other is a difference between the two server lines, and running one of them would find it on
+# whichever line nobody ran.
+#
+# It runs on pull requests as well as on a schedule, for the reason the activity check gives: a
+# check of this shape that only runs nightly reports a defect after it has landed.
+name: A full disk reaches the caller
+
+on:
+  pull_request:
+    branches: ["**"]
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+# Explicit deny-all at workflow level; the job grants what it needs.
+permissions: {}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-disk:
+    name: full disk ${{ matrix.line }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    strategy:
+      # Both lines run whatever the other one does. A failure on one is a fact about that line, and
+      # cancelling the other would leave nobody knowing whether it is a fact about both.
+      fail-fast: false
+      matrix:
+        include:
+          - line: "10.11"
+            framework: "net9.0"
+          - line: "12.0"
+            framework: "net10.0"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, so do not leave the token in .git/config.
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Does a full disk reach the caller
+        # The matrix value arrives as an environment variable rather than as an expression inside
+        # the script, for the reason the isolation check gives: it is written in this file and is
+        # not somebody's input, and the shape is what keeps that true when a later matrix takes a
+        # value from somewhere else.
+        env:
+          FRAMEWORK: ${{ matrix.framework }}
+        run: |
+          set -euo pipefail
+          ./scripts/verify-full-disk.sh "$FRAMEWORK"

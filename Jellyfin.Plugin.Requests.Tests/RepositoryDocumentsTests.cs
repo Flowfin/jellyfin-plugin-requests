@@ -232,7 +232,7 @@ public sealed class RepositoryDocumentsTests
     /// </summary>
     /// <returns>One path in the tree per case.</returns>
     public static TheoryData<string> ProceduresTheRefusalListNames()
-        => new TheoryData<string> { "scripts/verify-plugin-loads.sh", "scripts/verify-user-isolation.sh" };
+        => new TheoryData<string> { "scripts/verify-plugin-loads.sh", "scripts/verify-user-isolation.sh", "scripts/verify-full-disk.sh" };
 
     /// <summary>
     /// The refusal list names a procedure for each refusal a running server answers instead of the

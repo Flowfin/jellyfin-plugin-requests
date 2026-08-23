@@ -1,0 +1,9 @@
+<Project>
+
+    <!-- INHERITANCE STOPS HERE, DELIBERATELY, for the reason the seam probe's copy of this file
+         gives: MSBuild walks up until it finds one of these, and the repository root's properties
+         belong to the artefact somebody installs. The probe is an instrument. It is built only by
+         the job that runs the measurement, it ships to nobody, and inheriting the plugin's version
+         number would make a second thing claim to be that version. -->
+
+</Project>

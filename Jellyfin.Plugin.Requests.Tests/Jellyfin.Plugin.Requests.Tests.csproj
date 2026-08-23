@@ -70,6 +70,7 @@
          server and a container engine, which is the refusal they are the replacement for. -->
     <None Include="../scripts/verify-plugin-loads.sh" Link="scripts/verify-plugin-loads.sh" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../scripts/verify-user-isolation.sh" Link="scripts/verify-user-isolation.sh" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../scripts/verify-full-disk.sh" Link="scripts/verify-full-disk.sh" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

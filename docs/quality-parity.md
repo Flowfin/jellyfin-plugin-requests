@@ -291,12 +291,12 @@ produce several.
 Twelve files here map onto a file there and are placed by the table above:
 `dco.yml`, `dependency-review.yml`, `invariant-lint.yaml`, `mutation.yaml`,
 `package.yaml`, `prettier.yml`, `pr-hygiene.yaml`, `publish.yaml`,
-`scan-codeql.yaml`, `scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Seven
-of the rows below name a file that is present, and twelve plus seven is what the
+`scan-codeql.yaml`, `scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Eight
+of the rows below name a file that is present, and twelve plus eight is what the
 directory holds:
 
     $ ls .github/workflows/ | wc -l
-    19
+    20
 
 This paragraph said eleven and three and pasted 14, and the three numbers were
 wrong in one way: `package.yaml`, `seam-probe.yaml` and `user-isolation.yaml` had
@@ -317,19 +317,20 @@ vanishes without one is a question somebody asks again. `Disposition` says which
 of the two a row is, so no reader has to infer presence from a table that no
 longer tracks it.
 
-| File here               | Disposition       | Reasoning                                                                                                                                                                                                                                                                  |
-| ----------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `abi-floor.yaml`        | adopted, landed   | The floor leg, split out because the lines and their floors are read out of the packaging files rather than listed in a job, so adding a line is adding a file.                                                                                                            |
-| `activity-entries.yaml` | adopted, landed   | A request walked through its life on a real server of each line, with the activity entries read back out of the endpoint the dashboard draws. It reports and holds no merge; #107 is where required contexts are decided.                                                  |
-| `sibling-set.yaml`      | adopted, landed   | This plugin alone and beside the supported sibling set, on a real server of each line, with a collision scan over routes, scheduled task names and plugin configuration. #119.                                                                                             |
-| `build.yaml`            | adopted, landed   | The trigger surface and the two check names the ruleset matches literally; the legs themselves moved into `gate.yaml`.                                                                                                                                                     |
-| `gate.yaml`             | adopted, landed   | The build and test legs, in this repository rather than called from another organisation, because a called workflow knows nothing about this tree's lockfiles.                                                                                                             |
-| `seam-probe.yaml`       | adopted, landed   | What a second plugin in the same server process can see of this one, measured on a real server of each line with `tools/seam-probe` as the second plugin. It records an answer rather than holding a merge, so what reds it is a run that produced no answer at all. #117. |
-| `user-isolation.yaml`   | adopted, landed   | Two ordinary accounts on a real server of each line, each asking for something and reading back what they are given, with the queue asked as somebody who is not an administrator. The server's own evaluation of a policy is the half no double here reaches. #67.        |
-| `changelog.yaml`        | declined, deleted | It drafts a release changelog against a version scheme this repository has not fixed, and nothing covers that risk here because there is nothing to release yet; #107.                                                                                                     |
-| `command-dispatch.yaml` | declined, deleted | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                                                                                                                |
-| `command-rebase.yaml`   | declined, deleted | Same comment-driven surface, the half that rewrites pull request branches on command, and the same absence.                                                                                                                                                                |
-| `sync-labels.yaml`      | declined, deleted | It overwrites the label vocabulary from a file in another organisation, and the vocabulary here is this board's own, so adopting it would delete what it is meant to keep.                                                                                                 |
+| File here               | Disposition       | Reasoning                                                                                                                                                                                                                                                                    |
+| ----------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `abi-floor.yaml`        | adopted, landed   | The floor leg, split out because the lines and their floors are read out of the packaging files rather than listed in a job, so adding a line is adding a file.                                                                                                              |
+| `activity-entries.yaml` | adopted, landed   | A request walked through its life on a real server of each line, with the activity entries read back out of the endpoint the dashboard draws. It reports and holds no merge; #107 is where required contexts are decided.                                                    |
+| `sibling-set.yaml`      | adopted, landed   | This plugin alone and beside the supported sibling set, on a real server of each line, with a collision scan over routes, scheduled task names and plugin configuration. #119.                                                                                               |
+| `build.yaml`            | adopted, landed   | The trigger surface and the two check names the ruleset matches literally; the legs themselves moved into `gate.yaml`.                                                                                                                                                       |
+| `gate.yaml`             | adopted, landed   | The build and test legs, in this repository rather than called from another organisation, because a called workflow knows nothing about this tree's lockfiles.                                                                                                               |
+| `seam-probe.yaml`       | adopted, landed   | What a second plugin in the same server process can see of this one, measured on a real server of each line with `tools/seam-probe` as the second plugin. It records an answer rather than holding a merge, so what reds it is a run that produced no answer at all. #117.   |
+| `user-isolation.yaml`   | adopted, landed   | Two ordinary accounts on a real server of each line, each asking for something and reading back what they are given, with the queue asked as somebody who is not an administrator. The server's own evaluation of a policy is the half no double here reaches. #67.          |
+| `full-disk.yaml`        | adopted, landed   | What a caller sees when the volume the store writes to runs out of room, on a mount with a hard size, on the runtime of each line. The suite cannot ask it: filling a filesystem needs one to fill, and the headless rule refuses a test that needs a container engine. #46. |
+| `changelog.yaml`        | declined, deleted | It drafts a release changelog against a version scheme this repository has not fixed, and nothing covers that risk here because there is nothing to release yet; #107.                                                                                                       |
+| `command-dispatch.yaml` | declined, deleted | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                                                                                                                  |
+| `command-rebase.yaml`   | declined, deleted | Same comment-driven surface, the half that rewrites pull request branches on command, and the same absence.                                                                                                                                                                  |
+| `sync-labels.yaml`      | declined, deleted | It overwrites the label vocabulary from a file in another organisation, and the vocabulary here is this board's own, so adopting it would delete what it is meant to keep.                                                                                                   |
 
 ## Mutation testing is adopted, fuzzing is declined
 
@@ -586,8 +587,8 @@ added, and #2 asks the same of them: a run in which the guard went red for the r
 a run in which the tree passes it. Nothing in this tree recorded either, so what follows is that
 record rather than a claim that it already existed.
 
-Eight of the twelve have both. Four do not, and the table says which rather than leaving a reader to
-take a full-looking column for a full one.
+Nine of the thirteen have both. Four do not, and the table says which rather than leaving a reader
+to take a full-looking column for a full one.
 
 **Two of those cells said the guard had no red run of this kind and both were wrong.** They were
 filled from the three most recent failures of each workflow rather than from its whole history, which
@@ -620,9 +621,9 @@ workflow that ran on it succeeded:
     32603611353  success  110abde  🧾 PR hygiene
 
 Two names appear twice because two triggers fired on one head, and two of the sixteen belong to the
-inherited section above rather than to this one. Two workflows do not appear at all: `mutation.yaml`
-runs on a schedule and `seam-probe.yaml` on a push that touches the probe, so their green runs are
-their own and carry their own head.
+inherited section above rather than to this one. Three workflows do not appear at all: `mutation.yaml`
+runs on a schedule, `seam-probe.yaml` on a push that touches the probe, and `full-disk.yaml`
+arrived after that head, so their green runs are their own and carry their own head.
 
 | Workflow                      | Red run                                                                                                                                               | Green run                 |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
@@ -638,6 +639,7 @@ their own and carry their own head.
 | `seam-probe.yaml`             | 32555537635, cause unproven, below                                                                                                                    | 32555794613, at `5b96f57` |
 | `sibling-set.yaml`            | none at all, below                                                                                                                                    | 32603611260               |
 | `user-isolation.yaml`         | 32560880189, `proof/67-the-queue-is-not-closed-to-everybody`, both lines red at the queue step                                                        | 32603611273               |
+| `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                       | 32623457801, at `d154ab3` |
 
 The job and step of each red run are read off the run rather than off a log:
 
