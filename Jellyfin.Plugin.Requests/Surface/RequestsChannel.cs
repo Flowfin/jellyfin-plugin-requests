@@ -137,7 +137,7 @@ public sealed class RequestsChannel : IChannel
                     new ChannelItemInfo
                     {
                         Id = WhereToLookFolderId,
-                        Name = _words.Get(ChannelWords.WhereToLook, null),
+                        Name = _words.Get(ChannelWords.WhereToLook, null) + " " + query.UserId,
                         Type = ChannelItemType.Folder,
                         FolderType = ChannelFolderType.Container
                     }
