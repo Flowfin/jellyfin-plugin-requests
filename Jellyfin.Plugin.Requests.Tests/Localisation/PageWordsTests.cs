@@ -160,6 +160,11 @@ public sealed class PageWordsTests
     /// covered the first time the suite runs.
     /// </para>
     /// <para>
+    /// <see cref="ChannelWords"/> is the third, and it is here because the channel draws nothing
+    /// itself: it hands the server a folder tree and the server renders it, so a key it names is
+    /// invisible to the reading of the assets above.
+    /// </para>
+    /// <para>
     /// <see cref="LiveSentences"/> is the second such class and is here for a stronger version of
     /// the same reason. No page draws any of those at all: they are pushed to a person's client
     /// when their request moves, so there is no asset for the first leg to find them in, and
@@ -169,7 +174,7 @@ public sealed class PageWordsTests
     /// <returns>The keys.</returns>
     private static string[] Declared()
     {
-        var declared = new[] { typeof(Sentences), typeof(LiveSentences) }
+        var declared = new[] { typeof(Sentences), typeof(LiveSentences), typeof(ChannelWords) }
             .SelectMany(declaring => declaring.GetFields(BindingFlags.Public | BindingFlags.Static))
             .Where(field => field.IsLiteral && field.FieldType == typeof(string))
             .Select(field => (string?)field.GetRawConstantValue())

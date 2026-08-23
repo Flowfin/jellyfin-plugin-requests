@@ -67,10 +67,50 @@ and it is the price of reaching a client nobody here can change. It is not the s
 placeholders into a real library, because a channel's folder is the plugin's own and disappears with
 it.
 
+## The channel, as it is built
+
+`Jellyfin.Plugin.Requests/Surface/RequestsChannel.cs`. The server resolves its channels out of the
+container this plugin registers into, so the registration is what puts a folder tree beside a
+person's libraries on a client nobody here can change.
+
+The root is one folder per state that person actually has something in, in the order somebody reads
+rather than the order the states are stored in: what is waiting, then what was approved, then what
+arrived, then what was refused, then what could not be obtained. A state they hold nothing in is not
+a folder, because an empty folder in a tree is a thing somebody opens for no reason. Inside a folder
+are the titles, newest movement first.
+
+Every word comes out of the same catalogue the page reads, by the same key, so the two surfaces
+cannot drift into two answers. A row that is waiting carries the sentence that says nobody has
+answered it yet and that asking again does not move it, which is the message this plugin exists to
+remove. A row that was refused carries the reason and whatever the operator wrote beside it.
+
+Somebody who has never asked for anything gets one folder carrying the sentence that says so, and
+opening it is answered with nothing rather than with an error. An empty tree is indistinguishable
+from a plugin that has stopped working, and a folder that raises when it is opened is worse than
+either.
+
+**No row names anybody, including the person reading it**, and no row carries a provider
+identifier. The first is the same rule the endpoint underneath keeps, one layer further out: these
+rows are written into the server's own library database, where this plugin no longer decides who
+reads them. The second is what keeps a record that somebody asked for something from being matched
+against real media by the server, which is the awkwardness this page accepts rather than the
+placeholder rows it rejected outright.
+
+**What the channel implements for the cache and what that does not buy.** It carries
+`IHasCacheKey`, and the key is the person plus the moment the store last moved. A channel without
+one derives a single cache path for every user on the server, which for a view of one person's
+requests is the failure this milestone cares about most. That repairs the cache path and nothing
+else: the items a channel returns are written under a parent belonging to the channel rather than to
+the caller, and the server removes everything under that parent which the current caller's answer
+did not contain. Whether two callers arriving in turn can see each other's rows is a property of a
+running server, it is #67, and nothing in this repository answers it.
+
+**Nothing here has been browsed from a client and nothing has been run against a server.** What is
+held is the answer this plugin hands the server, which is what the suite asserts.
+
 ## The page, as it is built
 
-The page is on the mainline and the channel is not, so this section is about the one of the three
-surfaces that exists beyond the API.
+Both are on the mainline now, and this section is about the browser one.
 
 It is served by this plugin rather than registered with the dashboard:
 
@@ -227,8 +267,8 @@ nothing to ask with. The gesture that creates a request arrives from the sibling
 
 ## The reach matrix
 
-No cell of the reach matrix in docs/surface.md has been checked against a real client, and the page
-now on the mainline is not a measurement of one; the channel it describes is still not built.
+No cell of the reach matrix in docs/surface.md has been checked against a real client, and the
+channel now on the mainline has not been browsed from one.
 
 That sentence is the first thing in this section because the table under it looks like a
 capability list and is not one. It is what the decision above would reach if it were built, written
@@ -239,7 +279,7 @@ before it looks. Each file becomes one line, so the count is 1 where the sentenc
 where a word of it has moved:
 
     for f in README.md docs/surface.md; do printf '%s: ' "$f"; tr -s '[:space:]' ' ' < "$f" \
-      | grep -c 'No cell of the reach matrix in docs/surface.md has been checked against a real client, and the page now on the mainline is not a measurement of one; the channel it describes is still not built.'; done
+      | grep -c 'No cell of the reach matrix in docs/surface.md has been checked against a real client, and the channel now on the mainline has not been browsed from one.'; done
     README.md: 1
     docs/surface.md: 1
 
@@ -341,7 +381,8 @@ inside the pages, not the entry in the dashboard's own menu.
 Every issue after #65 in milestone 8 is read against the decision above.
 
 - #66, the user's view of their own requests on a client this project has never touched, is the
-  channel rendering.
+  channel rendering, and it is built. The section above says what it answers and what it does not
+  settle.
 - #67, proving one user cannot see another's requests through the surface, is the channel's
   per-user rendering, with the fallback stated above.
 - #68, what gesture creates a request from this side, is unchanged: the gesture arrives through the
