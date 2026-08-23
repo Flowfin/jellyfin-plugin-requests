@@ -19,7 +19,7 @@
 #
 # The runtime image is derived from the target framework rather than read out of
 # scripts/server-lines.tsv. That file pairs a framework with the Jellyfin server image that runs
-# the plugin, and no server is started here: what this needs is the bare .NET runtime the line
+# the plugin, and no server is started here: what this needs is the .NET runtime the line
 # provides, which is a different fact about the same framework.
 #
 # usage: scripts/verify-full-disk.sh <target-framework> [size]
@@ -31,9 +31,14 @@ set -euo pipefail
 framework=${1:?target framework, for example net9.0}
 size=${2:-256k}
 
+# The ASP.NET Core image rather than the bare runtime one. The plugin compiles against
+# Jellyfin.Controller, which carries a framework reference to Microsoft.AspNetCore.App, and that
+# reference is recorded in the probe's runtime configuration whether or not the store touches a
+# type from it. The bare runtime image refuses to start such an application, which is how this was
+# found: `No frameworks were found.` on both lines.
 case "$framework" in
-    net9.0) runtime=mcr.microsoft.com/dotnet/runtime:9.0 ;;
-    net10.0) runtime=mcr.microsoft.com/dotnet/runtime:10.0 ;;
+    net9.0) runtime=mcr.microsoft.com/dotnet/aspnet:9.0 ;;
+    net10.0) runtime=mcr.microsoft.com/dotnet/aspnet:10.0 ;;
     *)
         echo "no .NET runtime image for $framework. The claimed lines are:" >&2
         grep -v '^#' "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/server-lines.tsv" >&2
