@@ -77,7 +77,7 @@ jobs:
         # low score, only on a run that did not happen.
         run: |
           ./.stryker-tool/dotnet-stryker \
-            --project Jellyfin.Plugin.Requests.csproj \
+            --project Jellyfin.Plugin.Media.Requests.csproj \
             --test-project Jellyfin.Plugin.Requests.Tests/Jellyfin.Plugin.Requests.Tests.csproj \
             --target-framework net10.0 \
             --break-at 0 \
