@@ -77,17 +77,23 @@ public sealed class RequestsChannel : IChannel, IHasCacheKey
         RequestState.Failed
     ];
 
-    private readonly IRequestStore _store;
+    private readonly Func<IRequestStore> _store;
     private readonly StringCatalogue _words;
     private readonly ILogger _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RequestsChannel"/> class.
     /// </summary>
-    /// <param name="store">Where the requests are kept.</param>
+    /// <param name="store">
+    /// Where the requests are kept, asked for rather than held. The server resolves its channels
+    /// out of the container while it is still starting, and the store this plugin registers is
+    /// built out of the plugin's own data directory, which exists only once the host has
+    /// constructed the plugin. A channel holding the store would therefore be a channel that has to
+    /// be built before there is one, so it asks for it when somebody browses instead.
+    /// </param>
     /// <param name="words">The catalogue every sentence is looked up in.</param>
     /// <param name="logger">Where a store that cannot be read is reported.</param>
-    public RequestsChannel(IRequestStore store, StringCatalogue words, ILogger logger)
+    public RequestsChannel(Func<IRequestStore> store, StringCatalogue words, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(words);
@@ -119,11 +125,34 @@ public sealed class RequestsChannel : IChannel, IHasCacheKey
     /// restarted server starts from the same value again and asks once.
     /// </para>
     /// </summary>
-    public string DataVersion =>
-        _store.LastWrittenAt?.UtcTicks.ToString(CultureInfo.InvariantCulture) ?? "0";
+    public string DataVersion => WhenTheStoreLastMoved();
 
     /// <inheritdoc />
     public bool IsEnabledFor(string userId) => true;
+
+    /// <summary>
+    /// When the store last accepted a write, as the token the two properties above are built from.
+    /// <para>
+    /// <b>A store that cannot be built yet answers the same as one nothing has been written to.</b>
+    /// The store is the plugin's own data directory and there is none until the host has
+    /// constructed the plugin, while the server reads a channel's properties as it starts. There is
+    /// nothing cached at that moment either, so the honest answer and the safe one are the same,
+    /// and the alternative is a plugin that takes the server's startup down with it. The refusal
+    /// caught here is the one the registration raises by name and nothing wider.
+    /// </para>
+    /// </summary>
+    /// <returns>The token.</returns>
+    private string WhenTheStoreLastMoved()
+    {
+        try
+        {
+            return _store().LastWrittenAt?.UtcTicks.ToString(CultureInfo.InvariantCulture) ?? "0";
+        }
+        catch (InvalidOperationException)
+        {
+            return "0";
+        }
+    }
 
     /// <summary>
     /// Gets what the server keys its copy of this channel's answer on, per person.
@@ -171,7 +200,7 @@ public sealed class RequestsChannel : IChannel, IHasCacheKey
 
         try
         {
-            theirs = await _store.FindForUserAsync(query.UserId, cancellationToken).ConfigureAwait(false);
+            theirs = await _store().FindForUserAsync(query.UserId, cancellationToken).ConfigureAwait(false);
         }
         catch (RequestStoreLoadException reason)
         {

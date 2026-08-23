@@ -331,7 +331,7 @@ public sealed class TheChannelAPersonBrowsesTests
     {
         var log = new RecordingLogger();
 
-        var answer = await new RequestsChannel(new StoreThatCannotBeRead(), StringCatalogue.Shipped, log)
+        var answer = await new RequestsChannel(() => new StoreThatCannotBeRead(), StringCatalogue.Shipped, log)
             .GetChannelItems(Browsing(Asker, null), CancellationToken.None)
             .ConfigureAwait(true);
 
@@ -390,8 +390,41 @@ public sealed class TheChannelAPersonBrowsesTests
         Assert.Empty(Assert.Single(answer.Items).ProviderIds);
     }
 
+    /// <summary>
+    /// The channel is built without the store being reached for, and it says nothing about the
+    /// store until somebody browses.
+    /// <para>
+    /// <b>This is the leg for a defect that had already reached a real server.</b> The channel took
+    /// the store, so building the channel built the store, and the store this plugin registers is
+    /// built out of the plugin's own data directory, which exists only once the host has
+    /// constructed the plugin. The server resolves its channels out of the container while it is
+    /// still starting, so on a real server of each claimed line the plugin took the startup wizard
+    /// down with it and every check that needs a running server went red at the same step.
+    /// </para>
+    /// <para>
+    /// So the store is asked for rather than held, and this holds that: a factory that raises
+    /// stands in for the one that raises on a starting server, and constructing the channel and
+    /// reading what a client shows under its name both have to survive it.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void BuildingTheChannelDoesNotBuildTheStore()
+    {
+        var channel = new RequestsChannel(
+            () => throw new InvalidOperationException("The request store was asked for before this plugin was loaded."),
+            StringCatalogue.Shipped,
+            new RecordingLogger());
+
+        Assert.Equal(StringCatalogue.Shipped.Get("mine.title", null), channel.Name);
+        Assert.Equal(StringCatalogue.Shipped.Get(ChannelWords.Description, null), channel.Description);
+        Assert.NotNull(channel.GetChannelFeatures());
+        Assert.True(channel.IsEnabledFor(Asker.ToString("D", CultureInfo.InvariantCulture)));
+        Assert.Equal("0", channel.DataVersion);
+        Assert.NotEmpty(channel.GetCacheKey(Asker.ToString("D", CultureInfo.InvariantCulture)));
+    }
+
     private static RequestsChannel Channel(IRequestStore store)
-        => new RequestsChannel(store, StringCatalogue.Shipped, new RecordingLogger());
+        => new RequestsChannel(() => store, StringCatalogue.Shipped, new RecordingLogger());
 
     private static InternalChannelItemQuery Browsing(Guid who, string? folderId)
         => new InternalChannelItemQuery { UserId = who, FolderId = folderId };

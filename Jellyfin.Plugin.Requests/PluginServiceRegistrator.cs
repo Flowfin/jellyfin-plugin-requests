@@ -200,7 +200,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // clients this project will never change. It is a singleton for the same reason the store
         // is: it holds nothing per call and a second one would be a second reader of one file.
         serviceCollection.AddSingleton<IChannel>(provider => new RequestsChannel(
-            provider.GetRequiredService<IRequestStore>(),
+            provider.GetRequiredService<IRequestStore>,
             provider.GetRequiredService<StringCatalogue>(),
             provider.GetRequiredService<ILogger<RequestsChannel>>()));
     }
