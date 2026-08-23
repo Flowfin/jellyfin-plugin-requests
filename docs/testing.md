@@ -178,10 +178,43 @@ write failed at all, that the caller was told and what it was told, that the sto
 through still reports the set it held before, and that a store opened fresh over the same directory
 loads and holds that same set.
 
+Read at `d154ab3`, the head that landed it, on the 10.11 line in job `97155092294` and on the 12.0
+line in job `97155092318`:
+
+    gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/97155092294/logs | grep -a "== \|No space left" | sed 's/^[0-9T:.Z-]*Z //'
+    == publishing the probe for net9.0
+    == running the probe on a 256k filesystem under mcr.microsoft.com/dotnet/aspnet:9.0
+    == the store writes into /data
+    == running on 9.0.19
+    == 15 of at most 200 additions were accepted
+    == what the caller was told
+    No space left on device : '/data/requests.json.writing'
+    == the store that saw the failure now reports 15
+    == a store opened fresh over the same directory reports 15
+    == what is left on the mount
+    == the caller was told, and nothing that was accepted was lost
+
+The `sed` drops the timestamp the runner puts in front of every line. The same command against `97155092318` returns the same lines with `net10.0`, `aspnet:10.0` and
+`10.0.11` in the three that name the line. The
+fifteenth addition is the one the mount had no room for; the fourteen before it are still there,
+still readable, and still there after the store is opened again.
+
 **A run in which nothing filled is a refusal rather than a pass.** That is the mistake this shape
 exists against: a mount that is not size limited produces a job where every step succeeds and
-nothing was measured. The probe bounds the additions it will attempt and exits saying so, and the
-refusal is watched rather than assumed, below.
+nothing was measured. The probe bounds the additions it will attempt and exits saying so, and that
+refusal is watched rather than assumed. `throwaway/46-a-mount-nobody-limited` raises the mount from
+`256k` to `64m`, which is one token, and both lines go red at the step the measurement is made in:
+
+    gh run view 32623464033 --repo Flowfin/jellyfin-plugin-requests --json headBranch,conclusion,jobs --jq '.headBranch, .conclusion, (.jobs[] | "\(.name)  \(.conclusion)")'
+    throwaway/46-a-mount-nobody-limited
+    failure
+    full disk 10.11  failure
+    full disk 12.0  failure
+
+    == 200 of at most 200 additions were accepted
+    NOTHING WAS MEASURED. 200 additions all succeeded, so the filesystem under /data never ran out of room. This run says nothing about what a caller sees on a full disk. Check that the mount is size limited.
+
+That branch is not for merging.
 
 What it does not do is prove anything about a disk that is full for a different reason. A tmpfs at
 its size limit is one way a write runs out of room; a quota, a full physical device and a

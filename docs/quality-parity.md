@@ -587,8 +587,8 @@ added, and #2 asks the same of them: a run in which the guard went red for the r
 a run in which the tree passes it. Nothing in this tree recorded either, so what follows is that
 record rather than a claim that it already existed.
 
-Eight of the twelve have both. Four do not, and the table says which rather than leaving a reader to
-take a full-looking column for a full one.
+Nine of the thirteen have both. Four do not, and the table says which rather than leaving a reader
+to take a full-looking column for a full one.
 
 **Two of those cells said the guard had no red run of this kind and both were wrong.** They were
 filled from the three most recent failures of each workflow rather than from its whole history, which
@@ -621,9 +621,9 @@ workflow that ran on it succeeded:
     32603611353  success  110abde  🧾 PR hygiene
 
 Two names appear twice because two triggers fired on one head, and two of the sixteen belong to the
-inherited section above rather than to this one. Two workflows do not appear at all: `mutation.yaml`
-runs on a schedule and `seam-probe.yaml` on a push that touches the probe, so their green runs are
-their own and carry their own head.
+inherited section above rather than to this one. Three workflows do not appear at all: `mutation.yaml`
+runs on a schedule, `seam-probe.yaml` on a push that touches the probe, and `full-disk.yaml`
+arrived after that head, so their green runs are their own and carry their own head.
 
 | Workflow                      | Red run                                                                                                                                               | Green run                 |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
@@ -639,6 +639,7 @@ their own and carry their own head.
 | `seam-probe.yaml`             | 32555537635, cause unproven, below                                                                                                                    | 32555794613, at `5b96f57` |
 | `sibling-set.yaml`            | none at all, below                                                                                                                                    | 32603611260               |
 | `user-isolation.yaml`         | 32560880189, `proof/67-the-queue-is-not-closed-to-everybody`, both lines red at the queue step                                                        | 32603611273               |
+| `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                       | 32623457801, at `d154ab3` |
 
 The job and step of each red run are read off the run rather than off a log:
 
