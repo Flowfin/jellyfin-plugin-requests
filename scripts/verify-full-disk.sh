@@ -55,16 +55,24 @@ dotnet publish "$root/tools/full-disk-probe/FullDiskProbe.csproj" \
     --framework "$framework" \
     --output "$out"
 
+# `mktemp -d` makes a directory only its owner may enter, and the runtime image runs as a user
+# that is not that owner, so without this the container cannot see the published probe at all.
+# It failed that way the first time this ran, with `realpath(/probe/...) failed: Permission
+# denied`, which reads as a missing file rather than as a permission.
+chmod -R a+rX "$out"
+
 echo "== running the probe on a $size filesystem under $runtime"
 
 # --network none because nothing here talks to anything, --cap-drop ALL and no-new-privileges
 # because a probe needs none of it, and the published output goes in read-only: the only thing this
 # container may write to is the mount it is here to fill.
+# mode=1777 on that mount for the same reason as the chmod above: the container is not root, and
+# the mount is the one place it has to be able to write.
 docker run --rm \
     --network none \
     --cap-drop ALL \
     --security-opt no-new-privileges \
     --volume "$out:/probe:ro" \
-    --tmpfs "/data:size=$size" \
+    --tmpfs "/data:rw,size=$size,mode=1777" \
     "$runtime" \
     dotnet /probe/Jellyfin.Plugin.Requests.FullDiskProbe.dll /data
