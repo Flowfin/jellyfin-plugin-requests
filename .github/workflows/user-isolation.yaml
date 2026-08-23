@@ -14,8 +14,13 @@
 # It reads all three surfaces this plugin serves: the endpoint, the page, and the channel, which is
 # the one #67 is actually written about. A channel is answered into the server's own library
 # database under a parent belonging to the channel rather than to the caller, so the channel is
-# walked as a client walks it and then the same rows are asked for through the library, which is a
+# walked as a client walks it and then the same parent is asked for through the library, which is a
 # route that never touches this plugin.
+#
+# What the channel is asked to hold is an absence rather than a filter. It answered one person's own
+# requests until that walk caught the first person being handed a title only the second had asked
+# for, on both lines, so it now answers one folder saying where to look and the same one to
+# everybody. `docs/surface.md` carries that transcript and what follows from it.
 #
 # What it does not do is render a page. Nothing here opens a browser, which is the headless rule in
 # `docs/testing.md`, so what this proves is what the server hands back, not what a client draws.

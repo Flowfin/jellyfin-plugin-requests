@@ -59,9 +59,13 @@ Not checked.
 
 ### Android phone and tablet
 
-Nothing from this plugin yet. The surface meant for a client that draws its own interface is a
-folder that appears beside your libraries, and it is not built, so today there is nothing to open on
-this family and nothing to look for.
+Nothing from this plugin here. The surface meant for a client that draws its own interface is a
+folder that appears beside your libraries. That folder exists and it holds one line telling you to
+open the page in a browser, because it cannot show your requests: what it showed reached the wrong
+person on a real server of each supported line, which is #67, so it was taken out.
+
+So there is nothing on this family to read your requests from and nothing to look for beyond that
+one line.
 
 Reading your own requests works from a browser on the same device, with the address above.
 

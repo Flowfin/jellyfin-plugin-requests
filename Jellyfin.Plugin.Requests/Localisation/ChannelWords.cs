@@ -27,4 +27,12 @@ public static class ChannelWords
     /// in it are records that somebody asked for something.
     /// </summary>
     public const string Description = "mine.channel.description";
+
+    /// <summary>
+    /// The one folder every caller is answered with, which says where a person reads their own
+    /// requests. The channel stopped answering them itself when #67 measured that an answer does
+    /// not stay one person's on a running server, and <see cref="Surface.RequestsChannel"/> carries
+    /// that reading and what follows from it.
+    /// </summary>
+    public const string WhereToLook = "mine.channel.whereToLook";
 }

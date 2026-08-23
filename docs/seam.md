@@ -250,8 +250,9 @@ copy of itself. Each rule catches what the other cannot:
     git grep -n 'Task<StoredRequest?> FindByWantAsync' -- Jellyfin.Plugin.Requests/Storage/IRequestStore.cs
 
 The user's answer to what happened to their request comes from this plugin's own surface, decided in
-[`docs/surface.md`](surface.md) and reaching the same clients: the channel for a client that renders
-one, the page for a browser. Not from the seam, and not from anything the sibling draws.
+[`docs/surface.md`](surface.md), and today that is the page and a browser. The channel carried it
+for a client that renders one until #67 measured on a running server that the answer did not stay
+one person's. Not from the seam either way, and not from anything the sibling draws.
 
 ### Refusing a read over the seam is not the same as nothing being able to read
 

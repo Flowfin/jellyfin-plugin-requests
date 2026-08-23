@@ -301,15 +301,24 @@ print("the page served to the {0} person carries no title and no note.".format(w
 done
 rm -f "$page_body"
 
-# The channel is the surface #67 is written about, and it has a route to a leak the API does not.
-# The server writes what a channel returns into its own library database, under a parent belonging
-# to the channel rather than to the caller, and an item in that database is ordinarily visible to
-# whoever can see the folder holding it. So the channel is read here as a client reads it, and then
-# the same rows are asked for through the library, which is the other end of that route.
+# The channel is the surface #67 is written about, and it is the one where a leak has a route the
+# API does not. The server writes what a channel returns into its own library database, under a
+# parent belonging to the channel rather than to the caller, and an item in that database is
+# ordinarily visible to whoever can see the folder holding it.
 #
-# The channel name and the row format are read out of the catalogue rather than written here. A
+# THAT ROUTE WAS MEASURED OPEN AND THE CHANNEL WAS CHANGED BECAUSE OF IT. Read against a channel
+# that answered one person's own requests, this walk had the first person browse, then the second,
+# then the first again, and on both claimed lines the first person came back holding a title only
+# the second had asked for. #67's third condition says what happens then, and what the channel
+# answers now is one folder saying where to read your own requests, the same for everybody.
+#
+# So what is checked below is an absence rather than a filter. A leg asserting that somebody is
+# shown their own rows and not another person's is what the suite over the double already held, and
+# it was green while the server was handing one person the other's answer.
+#
+# The channel name and the folder sentence are read out of the catalogue rather than written here. A
 # second copy of either would disagree with the plugin the first time a sentence is reworded, and
-# this check would then pass by finding no channel and no rows at all.
+# this check would then pass by finding no channel and no folder at all.
 catalogue="$repo_root/Jellyfin.Plugin.Requests/Localisation/Strings/en.json"
 
 word_for() {
@@ -319,20 +328,13 @@ print(json.load(open(sys.argv[1], encoding="utf-8"))[sys.argv[2]])
 ' "$catalogue" "${1:?catalogue key}"
 }
 
-# One row, as the channel names it: the title and the year, joined by the format the plugin uses.
-row_for() {
-    python3 -c '
-import sys
-print(sys.argv[1].format(sys.argv[2], sys.argv[3]))
-' "$(word_for title.withYear)" "${1:?title}" "${2:?year}"
-}
-
 # What the channel hands one person, written one answer per line: the root first, then every row of
 # the root asked for as a folder.
 #
 # EVERY ROW OF THE ROOT IS ASKED FOR, rather than the ones the server marked as folders. Reading
-# that mark would make the walk depend on a field whose absence leaves the titles unread and the
-# verdict green, and a row that is not a folder is answered with nothing, which costs one call.
+# that mark would make the walk depend on a field whose absence leaves the inside of a folder unread
+# and the verdict green, and a row that is not a folder is answered with nothing, which costs one
+# call.
 browse_channel() {
     local token=${1:?token} who=${2:?user id} out=${3:?answer file} root row
 
@@ -349,17 +351,17 @@ for row in json.load(sys.stdin)["Items"]:
     done
 }
 
-# Refuses unless the rows a person is shown inside the folders are exactly the titles belonging to
-# them, and unless anything belonging to somebody else appears anywhere in the bytes of any answer.
+# Refuses unless the whole of what a person was handed is the one folder the catalogue names, with
+# nothing inside it, and unless anything belonging to anybody appears anywhere in the bytes.
 #
-# The folders are told from the titles by where they came from rather than by a field: the first
-# answer is the root, which is one folder per state that person has something in, and every answer
-# after it is the inside of one of those folders.
+# THE FORBIDDEN SET IS BOTH PEOPLE ON EVERY CALL, not the other person. There is nothing per-user
+# for this surface to get right or wrong now, so the first person reading their own title here would
+# be the same defect as reading the second person's.
 CHANNEL_VERDICT='
 import json, sys
 
 label = sys.argv[1]
-expected = sorted(line for line in sys.argv[2].splitlines() if line)
+folder = sys.argv[2]
 forbidden = [line for line in sys.argv[3].splitlines() if line]
 
 raw = open(sys.argv[4], encoding="utf-8", errors="replace").read()
@@ -368,20 +370,34 @@ answers = [json.loads(line) for line in raw.splitlines() if line.strip()]
 if not answers:
     sys.exit("{0} was handed nothing at all by the channel.".format(label))
 
-names = sorted(row["Name"] for answer in answers[1:] for row in answer["Items"])
+root = [row.get("Name") for row in answers[0]["Items"]]
+if root != [folder]:
+    sys.exit("{0} was handed {1} and the whole of this channel is {2}.".format(label, root, [folder]))
 
-if names != expected:
-    sys.exit("{0} was shown {1} and what belongs to that caller is {2}.".format(label, names, expected))
+inside = [row.get("Name") for answer in answers[1:] for row in answer["Items"]]
+if inside:
+    sys.exit("{0} found {1} inside it, and nothing is meant to be there.".format(label, inside))
 
 for secret in forbidden:
     if secret in raw:
-        sys.exit("{0} was shown {1!r}, which belongs to somebody else.".format(label, secret))
+        sys.exit("{0} was shown {1!r}, which belongs to somebody.".format(label, secret))
 
-print("{0} was shown {1}".format(label, names))
+print("{0} was handed the one folder and nothing else.".format(label))
 '
+
+# Everything a request on this server carries that a person could be identified by or told apart
+# from another by. None of it may reach this surface at all any more.
+nobodys="$first_title
+$second_title
+$shared_title
+$first_note
+$second_note
+$FIRST_ID
+$SECOND_ID"
 
 step "find the channel this plugin registers"
 CHANNEL_NAME=$(word_for mine.title)
+CHANNEL_FOLDER=$(word_for mine.channel.whereToLook)
 CHANNEL_ID=$(as "$FIRST_TOKEN" GET "/Channels?userId=$FIRST_ID" | python3 -c '
 import json, sys
 wanted = sys.argv[1]
@@ -394,98 +410,81 @@ print(listed[0]["Id"])
 ' "$CHANNEL_NAME")
 echo "the channel is $CHANNEL_NAME, $CHANNEL_ID"
 
-first_row=$(row_for "$first_title" 1999)
-second_row=$(row_for "$second_title" 2001)
-shared_row=$(row_for "$shared_title" 1975)
-first_rows="$first_row
-$shared_row"
-second_rows="$second_row
-$shared_row"
-
 channel_body=$(mktemp)
 
 step "what the first person is shown in the channel"
 browse_channel "$FIRST_TOKEN" "$FIRST_ID" "$channel_body"
-python3 -c "$CHANNEL_VERDICT" \
-    "the first person, browsing" \
-    "$first_rows" \
-    "$second_title
-$second_note
-$SECOND_ID" \
-    "$channel_body"
+python3 -c "$CHANNEL_VERDICT" "the first person, browsing" "$CHANNEL_FOLDER" "$nobodys" "$channel_body"
 
 step "what the second person is shown, immediately after"
 # Immediately after, for the reason the three list calls above are ordered in the same way. An
 # answer the server kept against the channel rather than against the caller only reaches the wrong
-# person when a second caller arrives after the first. The channel carries a cache key naming the
-# person for exactly that, and whether the server keys on it is the thing no double can be asked.
+# person when a second caller arrives after the first, and this is the order that caught it when
+# this surface still had something per person to get wrong.
 browse_channel "$SECOND_TOKEN" "$SECOND_ID" "$channel_body"
-python3 -c "$CHANNEL_VERDICT" \
-    "the second person, browsing" \
-    "$second_rows" \
-    "$first_title
-$first_note
-$FIRST_ID" \
-    "$channel_body"
+python3 -c "$CHANNEL_VERDICT" "the second person, browsing" "$CHANNEL_FOLDER" "$nobodys" "$channel_body"
 
 step "what the first person is shown once the server has answered both"
 browse_channel "$FIRST_TOKEN" "$FIRST_ID" "$channel_body"
-python3 -c "$CHANNEL_VERDICT" \
-    "the first person, browsing again" \
-    "$first_rows" \
-    "$second_title
-$second_note
-$SECOND_ID" \
-    "$channel_body"
+python3 -c "$CHANNEL_VERDICT" "the first person, browsing again" "$CHANNEL_FOLDER" "$nobodys" "$channel_body"
 
 rm -f "$channel_body"
 
-# What the three readings above cannot say. They ask the channel, and the leak this issue is written
-# about is in what the server did with the answers afterwards: the rows are written into the library
-# database under the channel as their parent, and asking the library for that parent is a route that
-# does not go through the channel at all.
+# What the three walks above cannot say. They ask the channel, and the route this issue is written
+# about is what the server did with the answers afterwards: the rows are written into the library
+# database under the channel as their parent, and asking the library for that parent reaches
+# whatever is beneath it without going through this plugin at all.
 library_body=$(mktemp)
 
-step "the second person asks the library for everything under the channel"
-library_status=$(status_as "$SECOND_TOKEN" GET \
-    "/Items?userId=$SECOND_ID&parentId=$CHANNEL_ID&recursive=true&limit=500" "$library_body")
-echo "the library answered the second person with $library_status, $(wc -c <"$library_body") bytes"
-python3 -c '
-import sys
+step "what the library holds under the channel, asked by everybody in turn"
+# The first person browsed the channel, so the folder is in the library under it and their answer
+# has to carry it. Without that the whole reading passes on a server where this query answers with
+# an empty set whatever is asked of it, which is a different thing from a library holding nothing of
+# anybody. It is the same near-miss the queue is asked about twice for.
+for who in first second administrator; do
+    case $who in
+        first) token=$FIRST_TOKEN; identifier=$FIRST_ID; expected=$CHANNEL_FOLDER ;;
+        second) token=$SECOND_TOKEN; identifier=$SECOND_ID; expected= ;;
+        administrator) token=$TOKEN; identifier=$ADMIN_ID; expected= ;;
+    esac
 
-status = sys.argv[1]
-body = open(sys.argv[2], encoding="utf-8", errors="replace").read()
-forbidden = sys.argv[3:]
+    library_status=$(status_as "$token" GET \
+        "/Items?userId=$identifier&parentId=$CHANNEL_ID&recursive=true&limit=500" "$library_body")
+    echo "the library answered the $who with $library_status, $(wc -c <"$library_body") bytes"
+    python3 -c '
+import json, sys
+
+who, status, folder, required = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+body = open(sys.argv[5], encoding="utf-8", errors="replace").read()
+forbidden = [line for line in sys.argv[6].splitlines() if line]
+
+if status != "200":
+    sys.exit("the library answered the {0} with {1} rather than serving it.".format(who, status))
 
 for secret in forbidden:
     if secret in body:
-        sys.exit("the library served the second person {0!r}, which belongs to the first.".format(secret))
-print("the library answered the second person with {0} and carried nothing of the first person.".format(status))
-' "$library_status" "$library_body" "$first_title" "$first_note" "$FIRST_ID"
+        sys.exit("the library served the {0} {1!r}, which belongs to somebody.".format(who, secret))
 
-step "the first person is served their own rows by the same query"
-# Without this the step above passes on a server where that query returns nothing to anybody, which
-# is a different thing from a library holding one person's rows and not handing them to another. It
-# is the same near-miss the queue is asked about twice for.
-as "$FIRST_TOKEN" GET "/Items?userId=$FIRST_ID&parentId=$CHANNEL_ID&recursive=true&limit=500" \
-    >"$library_body"
-python3 -c '
-import json, sys
+names = sorted({row.get("Name") for row in json.loads(body)["Items"]})
 
-wanted = sys.argv[2:]
-names = [row.get("Name") for row in json.load(open(sys.argv[1], encoding="utf-8"))["Items"]]
-missing = [row for row in wanted if row not in names]
-if missing:
-    sys.exit("the library holds no {0} for the first person, so the step above says nothing.".format(missing))
-print("the library holds {0} rows for the first person and their own titles are among them.".format(len(names)))
-' "$library_body" "$first_row" "$shared_row"
+if required and names != [required]:
+    sys.exit("the library holds {0} under the channel for the {1} and it has to hold {2}.".format(
+        names, who, [required]))
+
+if names not in ([], [folder]):
+    sys.exit("the library holds {0} under the channel and the only thing there may be is {1}.".format(
+        names, [folder]))
+
+print("the library served the {0} {1} and carried nothing of anybody.".format(who, names))
+' "$who" "$library_status" "$CHANNEL_FOLDER" "$expected" "$library_body" "$nobodys"
+done
 
 rm -f "$library_body"
 
 step "the second person asking for the first person's channel is refused"
-# This one is the server's guard rather than this plugin's, and it is asked rather than assumed. The
-# channel is handed the identifier the server resolved, so what stops one person naming another is
-# the server refusing the call before this plugin is reached at all.
+# The server's guard rather than this plugin's, and asked rather than assumed. Nothing per person
+# reaches this surface any more, so what this holds is the shape of the refusal rather than a leak
+# it prevents, and it is the leg that stays true if per-user rows are ever proposed again.
 impersonation_body=$(mktemp)
 impersonation_status=$(status_as "$SECOND_TOKEN" GET \
     "/Channels/$CHANNEL_ID/Items?userId=$FIRST_ID" "$impersonation_body")
@@ -495,15 +494,15 @@ import sys
 
 status = sys.argv[1]
 body = open(sys.argv[2], encoding="utf-8", errors="replace").read()
-forbidden = sys.argv[3:]
+forbidden = [line for line in sys.argv[3].splitlines() if line]
 
 if status == "200":
     sys.exit("the channel was read for the first person by the second person.")
 for secret in forbidden:
     if secret in body:
-        sys.exit("the refusal carried {0!r}, which belongs to somebody else.".format(secret))
-print("naming somebody else was refused with {0} and carried nothing of theirs.".format(status))
-' "$impersonation_status" "$impersonation_body" "$first_title" "$first_note"
+        sys.exit("the refusal carried {0!r}, which belongs to somebody.".format(secret))
+print("naming somebody else was refused with {0} and carried nothing of anybody.".format(status))
+' "$impersonation_status" "$impersonation_body" "$nobodys"
 rm -f "$impersonation_body"
 
 step "done"
