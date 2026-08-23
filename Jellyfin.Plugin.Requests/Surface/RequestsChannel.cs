@@ -330,7 +330,9 @@ public sealed class RequestsChannel : IChannel, IHasCacheKey
         Type = ChannelItemType.Media,
         ContentType = ChannelMediaContentType.Clip,
         MediaType = ChannelMediaType.Video,
-        Overview = WhatHappenedTo(request),
+        Overview = request.RequesterNote is null
+            ? WhatHappenedTo(request)
+            : WhatHappenedTo(request) + " " + request.RequesterNote,
         DateModified = request.StateChangedAt.UtcDateTime,
         DateCreated = request.RequestedAt.UtcDateTime,
         ProductionYear = request.DisplayYear
