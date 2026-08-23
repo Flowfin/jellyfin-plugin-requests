@@ -34,7 +34,8 @@ it means the same thing:
   those two words, so a checked section and an unchecked one can never be read as the same thing.
 
 Nothing in this document says a client does something on the strength of a plan. Where the thing
-itself is not built yet, the section says that instead, and no observation can change it until it is.
+itself is not there, the section says that instead, and no observation can change it while it is
+absent.
 
 ### Browser
 
@@ -71,7 +72,7 @@ Reading your own requests works from a browser on the same device, with the addr
 
 ### Android TV and Fire TV
 
-Nothing from this plugin yet, for the same reason as the row above.
+Nothing from this plugin here, for the same reason as the row above.
 
 This is the family the absence costs most, because a television is where somebody is least able to
 go and open a browser instead. Reading your own requests means finding a browser somewhere else,
@@ -79,33 +80,33 @@ which is a real answer and not a good one.
 
 ### iPhone and iPad
 
-Nothing from this plugin yet, for the same reason.
+Nothing from this plugin here, for the same reason.
 
 Reading your own requests works from a browser on the same device.
 
 ### Apple TV
 
-Nothing from this plugin yet, for the same reason, and the same cost as the other television
+Nothing from this plugin here, for the same reason, and the same cost as the other television
 families.
 
 ### Roku
 
-Nothing from this plugin yet, for the same reason, and the same cost as the other television
+Nothing from this plugin here, for the same reason, and the same cost as the other television
 families.
 
 ### LG webOS television
 
-Nothing from this plugin yet, for the same reason, and the same cost as the other television
+Nothing from this plugin here, for the same reason, and the same cost as the other television
 families.
 
 ### Samsung Tizen television
 
-Nothing from this plugin yet, for the same reason, and the same cost as the other television
+Nothing from this plugin here, for the same reason, and the same cost as the other television
 families.
 
 ### Kodi
 
-Nothing from this plugin yet, for the same reason.
+Nothing from this plugin here, for the same reason.
 
 ### A script, or another program
 
