@@ -196,12 +196,14 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IScheduledTask, RetentionTask>();
 
         // The surface every client can reach. The server resolves its channels out of this
-        // container, so this registration is what puts a folder tree beside a person's libraries on
-        // clients this project will never change. It is a singleton for the same reason the store
-        // is: it holds nothing per call and a second one would be a second reader of one file.
+        // container, so this registration is what puts a place beside a person's libraries on
+        // clients this project will never change.
+        //
+        // IT NO LONGER TAKES THE STORE, AND THAT IS THE POINT RATHER THAN A TIDYING. #67 measured
+        // that an answer built from one person's requests does not stay that person's on a running
+        // server, so the channel answers the same folder to everybody and reads nothing. A
+        // dependency it cannot use is a dependency somebody adds a use for.
         serviceCollection.AddSingleton<IChannel>(provider => new RequestsChannel(
-            provider.GetRequiredService<IRequestStore>,
-            provider.GetRequiredService<StringCatalogue>(),
-            provider.GetRequiredService<ILogger<RequestsChannel>>()));
+            provider.GetRequiredService<StringCatalogue>()));
     }
 }

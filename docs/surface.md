@@ -52,58 +52,58 @@ It is the expensive choice and it is chosen with its costs open.
 The plugin takes a place in the server's library database, because that is how the server holds what
 a channel returns. That is a second thing an uninstall has to clean up, which is #98.
 
-The rendering is per user, and a request is personal data. A user's requests must not be visible to
-another user through anything this plugin puts in that database. That is #67, it is the failure that
-matters most on this milestone, and it is not treated here as a detail of the implementation:
+The rendering was per user, and a request is personal data. A user's requests must not be visible to
+another user through anything this plugin puts in that database. That was #67, it is the failure
+that matters most on this milestone, and this page said in advance what would happen if it could not
+be shown:
 
 **If per-user isolation cannot be shown on a running server of each claimed line, the channel falls
-back to a shape that carries no per-user data at all.** That is #67's own third condition and it is
-repeated here because this page is where the decision lives. A channel that leaks one user's requests
-to another is worse than no channel, and the fallback is the answer rather than a softer test.
+back to a shape that carries no per-user data at all.**
 
-What a channel renders is items, and a request is not an item of media. The rows will be titles a
-person asked for, with their state, and pressing play on one does nothing. That is a real awkwardness
-and it is the price of reaching a client nobody here can change. It is not the same defect as writing
-placeholders into a real library, because a channel's folder is the plugin's own and disappears with
-it.
+**IT COULD NOT BE SHOWN, ON EITHER LINE, AND THE FALLBACK IS WHAT THIS CHANNEL NOW IS.** The reading
+is under "Whether one person's requests reach another" below, with the jobs it came from. Two people
+browsed in turn and the first browsed again, and the first was handed a title only the second had
+asked for, word for word the same on 10.11 and on 12.0. So this is a condition that was met rather
+than a plan that failed, and the sentence above is kept in the tense it was written in, because
+having decided this before the measurement is the whole value of it.
+
+What it costs is in the matrix at the bottom of this page rather than softened here. A person on a
+television client can no longer see what they asked for from that client at all. That is worse than
+what stood yesterday for everybody who is not at a browser, and it is better than a surface that
+hands one person another person's requests.
 
 ## The channel, as it is built
 
 `Jellyfin.Plugin.Requests/Surface/RequestsChannel.cs`. The server resolves its channels out of the
-container this plugin registers into, so the registration is what puts a folder tree beside a
-person's libraries on a client nobody here can change.
+container this plugin registers into, so the registration is what puts a place beside a person's
+libraries on a client nobody here can change.
 
-The root is one folder per state that person actually has something in, in the order somebody reads
-rather than the order the states are stored in: what is waiting, then what was approved, then what
-arrived, then what was refused, then what could not be obtained. A state they hold nothing in is not
-a folder, because an empty folder in a tree is a thing somebody opens for no reason. Inside a folder
-are the titles, newest movement first.
+It answers one folder, that folder says where a person reads their own requests, and it is the same
+folder for everybody. Opening it is answered with nothing rather than with an error, and so is any
+other identifier, including the state folders the shape this replaced handed out, because the server
+keeps identifiers it was given earlier and a client that saved one will ask for it again.
 
-Every word comes out of the same catalogue the page reads, by the same key, so the two surfaces
-cannot drift into two answers. A row that is waiting carries the sentence that says nobody has
-answered it yet and that asking again does not move it, which is the message this plugin exists to
-remove. A row that was refused carries the reason and whatever the operator wrote beside it.
+**It never asks who is browsing and it never reads the store.** That is the property rather than a
+consequence of one. `InternalChannelItemQuery.UserId` is not read anywhere in the type, and the
+constructor takes the catalogue and nothing else, so there is nothing in the object an answer could
+be made one person's from. `TheChannelIsBuiltFromTheCatalogueAndNothingElse` holds the second half,
+which makes putting the store back a change to a test rather than a line inside a method that
+nothing reads.
 
-Somebody who has never asked for anything gets one folder carrying the sentence that says so, and
-opening it is answered with nothing rather than with an error. An empty tree is indistinguishable
-from a plugin that has stopped working, and a folder that raises when it is opened is worse than
-either.
+Every word still comes out of the same catalogue the page reads, by the same key, so the two
+surfaces cannot drift into two answers.
 
-**No row names anybody, including the person reading it**, and no row carries a provider
-identifier. The first is the same rule the endpoint underneath keeps, one layer further out: these
-rows are written into the server's own library database, where this plugin no longer decides who
-reads them. The second is what keeps a record that somebody asked for something from being matched
-against real media by the server, which is the awkwardness this page accepts rather than the
-placeholder rows it rejected outright.
-
-**What the channel implements for the cache and what that does not buy.** It carries
-`IHasCacheKey`, and the key is the person plus the moment the store last moved. A channel without
-one derives a single cache path for every user on the server, which for a view of one person's
-requests is the failure this milestone cares about most. That repairs the cache path and nothing
-else: the items a channel returns are written under a parent belonging to the channel rather than to
-the caller, and the server removes everything under that parent which the current caller's answer
-did not contain. Whether two callers arriving in turn can see each other's rows is a property of a
-running server, it is #67, and nothing in this repository answers it.
+**What this replaced, and why a filter was not enough.** It answered one folder per state that
+person had something in, with the titles inside them, the decline reason where one was given, and a
+sentence for somebody who had asked for nothing. That answer was correct, and the suite asserting
+that one person's rows never carried another person's was green throughout. What a client is served
+is a different thing from what this plugin answers. A channel's rows are written into the server's
+own library database under a parent belonging to the channel rather than to the caller, and the
+server removes everything under that parent which the current caller's answer did not contain.
+`IHasCacheKey` named the person and repaired the cache path; it did not repair the parent. Naming
+the person in each folder identifier does not either, because the folders hang under the channel and
+a library query for that parent reaches whatever is beneath it without passing through this plugin
+at all.
 
 **The channel is built before this plugin is, and that is measured rather than supposed.** It is
 worth writing down because it is a trap for anything else this plugin registers. The host resolves a
@@ -224,6 +224,61 @@ The queue is asked for twice on purpose. A queue that is broken for everybody wo
 refusal on its own, so it is asked again as the administrator and has to answer with all three
 titles; the refusal above means the endpoint is closed to that person rather than closed.
 
+### The channel, and what the same reading found there
+
+The channel is the surface #67 is written about, and it was the last of the three to be asked. The
+walk is the same shape as the three list calls: the channel is found by the name the catalogue
+holds, each person reads the root and then every row of the root asked for as a folder, the second
+person reads immediately after the first, and the first reads again once the server has answered
+both.
+
+**It found the leak on its first run and that is why this channel changed.** Read against the
+channel that answered a person's own requests, run `32645853066`, both lines red, the 10.11 job
+`97209886193`:
+
+    the first person, browsing was shown ['A film both of them asked for (1975)', 'A film only the first person asked for (1999)']
+    the second person, browsing was shown ['A film both of them asked for (1975)', 'A film only the second person asked for (2001)']
+    the first person, browsing again was shown ['A film both of them asked for (1975)', 'A film only the second person asked for (2001)'] and what belongs to that caller is ['A film both of them asked for (1975)', 'A film only the first person asked for (1999)'].
+
+The 12.0 job is `97209886061` and the three lines come back word for word. Read the third against
+the first. The first person asked for a 1999 film and never for a 2001 one, and on their second
+visit the 1999 film is gone and the film only the second person asked for is in its place.
+
+The third call is the whole reason the order is what it is. One person reading and then another
+reading says nothing; what shows this is the first person coming back after somebody else has been
+served.
+
+**What the channel answers now, and it is the fallback rather than a repair.** Under "What the
+channel costs" above. Taken at `4eb91c4` on the 10.11 line, job `97213335974`:
+
+    the first person, browsing was handed the one folder and nothing else.
+    the second person, browsing was handed the one folder and nothing else.
+    the first person, browsing again was handed the one folder and nothing else.
+    the library answered the first with 200, 608 bytes
+    the library served the first ['Open the requests page on this server to see what you asked for.'] and carried nothing of anybody.
+    the library answered the second with 200, 608 bytes
+    the library served the second ['Open the requests page on this server to see what you asked for.'] and carried nothing of anybody.
+    the library answered the administrator with 200, 608 bytes
+    the library served the administrator ['Open the requests page on this server to see what you asked for.'] and carried nothing of anybody.
+    naming somebody else answered 403
+    naming somebody else was refused with 403 and carried nothing of anybody.
+
+The 12.0 line is job `97213335855` and returns the same eleven lines.
+
+**The three library calls are the half the channel calls cannot reach.** A channel's answer is
+written into the server's own library database under a parent belonging to the channel, and
+`GET /Items?parentId=<channel>&recursive=true` reaches whatever is beneath that parent without
+passing through this plugin at all. So the same parent is asked for as each person and as the
+administrator, and the only thing any of them may be served is the one folder.
+
+The first person's call has to return that folder rather than merely not returning anybody's title.
+Without it the whole reading passes on a server where that query answers with an empty set whatever
+is asked of it, which is a different thing from a library holding nothing of anybody. It is the
+same near-miss the queue is asked about twice for.
+
+The last call asks whether the server refuses one person naming another in `userId`. That is the
+server's guard rather than this plugin's, and it is read rather than assumed.
+
 ### That the check bites
 
 Two branches carry the mistakes it exists to catch. Neither is for merging and neither has a pull
@@ -242,16 +297,27 @@ green at everything before it:
     the queue answered 200
     the queue was served to somebody who is not an administrator.
 
-### What this does not reach
+`proof/67-the-channel-knows-who-is-asking` makes the one folder's name depend on the caller, which
+is the smallest way per-user data comes back to that surface. Run `32647542023`, both lines red at
+the first walk:
 
-It is the API and the page. The channel is not in the tree, and the leak #67 is written about is a
-property of that surface specifically: the server materialising what a channel returns into its
-library database, where an item is ordinarily visible to whoever can see the folder holding it.
-Nothing above says anything about that, and the fallback stated under what the channel costs is
-unchanged.
+    the first person, browsing was handed ['Open the requests page on this server to see what you asked for. 1b789934-1111-4859-8973-dc24ade9c6d9'] and the whole of this channel is ['Open the requests page on this server to see what you asked for.'].
+
+That branch reds the suite as well, and the strongest thing said for the channel walk is not it. The
+walk refused the mainline, on both lines, for a defect nobody had injected, and the shape of this
+surface changed because of it. That is the run quoted two sections above rather than a branch made
+to fail.
+
+### What this does not reach
 
 Nothing here opens a browser. What is measured is what the server hands back, including the bytes of
 the page itself, and not what a client draws from them.
+
+Nothing here says what a television client draws of the one folder the channel answers, or whether
+it draws it at all. That is the matrix below, and every cell of it still says nobody has looked.
+
+The library reading is a reading of one parent. Anything written into that database under a parent
+this reading does not name is outside it.
 
 ## What is not reached
 
@@ -268,7 +334,8 @@ HTTP to a signed-in session. A client that draws its own interface and offers no
 gets nothing from it.
 
 **A client that does not render channels gets nothing from the channel**, and there is no fallback
-for it inside this plugin beyond the API.
+for it inside this plugin beyond the API. Since #67 that costs less than it did, because what the
+channel carries is one sentence saying where to look rather than anything a person came for.
 
 **A person is never told a title is here when they would not be allowed to open it.** Both surfaces
 draw the same rows from the same endpoint, so what each class of user may learn about a title is one
@@ -282,9 +349,9 @@ both.
 television client at all.** This is the sharpest one and it is certain rather than a claim about
 clients. This plugin ships no way to find a title the server does not have, decided on #113, because
 the sibling discover plugin owns the catalogue and this plugin calls no metadata source, decided in
-#92. So on such a server the channel can show a user what they have already asked for and can offer
-nothing to ask with. The gesture that creates a request arrives from the sibling, which is #68 and
-#89.
+#92. So on such a server there is nothing to ask with from a television client, and since #67 there
+is nothing to read there either. The gesture that creates a request arrives from the sibling, which
+is #68 and #89.
 
 ## The reach matrix
 
@@ -308,19 +375,19 @@ The rows are client families grouped by what draws the interface, not by vendor,
 things that decide reach here are whether the client renders a channel and whether it can open a
 URL. Two clients that share both answers share a row.
 
-| Client family                               | See their own requests     | Ask for something new  | Cancel one they asked for |
-| ------------------------------------------- | -------------------------- | ---------------------- | ------------------------- |
-| Browser                                     | page and channel, untested | sibling only, untested | page, untested            |
-| Desktop client wrapping the web interface   | page and channel, untested | sibling only, untested | page, untested            |
-| Android phone and tablet                    | channel, untested          | sibling only, untested | nothing                   |
-| Android TV and Fire TV                      | channel, untested          | sibling only, untested | nothing                   |
-| iPhone and iPad                             | channel, untested          | sibling only, untested | nothing                   |
-| Apple TV                                    | channel, untested          | sibling only, untested | nothing                   |
-| Roku                                        | channel, untested          | sibling only, untested | nothing                   |
-| LG webOS television                         | channel, untested          | sibling only, untested | nothing                   |
-| Samsung Tizen television                    | channel, untested          | sibling only, untested | nothing                   |
-| Kodi                                        | channel, untested          | sibling only, untested | nothing                   |
-| A script or another program against the API | the API                    | the API                | no route today            |
+| Client family                               | See their own requests | Ask for something new  | Cancel one they asked for |
+| ------------------------------------------- | ---------------------- | ---------------------- | ------------------------- |
+| Browser                                     | page, untested         | sibling only, untested | page, untested            |
+| Desktop client wrapping the web interface   | page, untested         | sibling only, untested | page, untested            |
+| Android phone and tablet                    | nothing                | sibling only, untested | nothing                   |
+| Android TV and Fire TV                      | nothing                | sibling only, untested | nothing                   |
+| iPhone and iPad                             | nothing                | sibling only, untested | nothing                   |
+| Apple TV                                    | nothing                | sibling only, untested | nothing                   |
+| Roku                                        | nothing                | sibling only, untested | nothing                   |
+| LG webOS television                         | nothing                | sibling only, untested | nothing                   |
+| Samsung Tizen television                    | nothing                | sibling only, untested | nothing                   |
+| Kodi                                        | nothing                | sibling only, untested | nothing                   |
+| A script or another program against the API | the API                | the API                | no route today            |
 
 What the cells mean.
 
@@ -335,8 +402,11 @@ what does not exist, which no client can contradict, and writing them the same w
 a client would hide the difference between something nobody has tried and something nobody has
 built.
 
-`page and channel` is the browser rows, which reach both surfaces. `channel` is every client that
-renders a channel, and whether a given client does is exactly what has not been tried.
+`page` is the browser rows, and it is the only cell in that column that says a person can see their
+own requests at all. Every other row says `nothing`, and it says it because of #67 rather than
+because nobody has tried: the channel answered a person's own requests until a reading on a running
+server of each line handed one person another person's title, and it now answers one folder saying
+where to look. The cell above the matrix that used to read `channel` was the reach that bought.
 
 `sibling only` is the sharpest cell and the one that is certain rather than untested. This plugin
 ships no way to find a title the server does not have, so there is no gesture here to make. On a
@@ -345,10 +415,10 @@ it, the answer in that column is nothing, on every row above the last. What is u
 whether the sibling draws anything on that client, which is that board's measurement and not this
 one's.
 
-`nothing` in the cancel column is the cost of the folder tree. Cancelling is a per-state operation
-with a reason a person reads, and a channel renders items, so the gesture has nowhere to live there.
-A user on a television can see that they asked for something and cannot take it back from that
-client.
+`nothing` in the cancel column is the cost of the folder tree and predates #67. Cancelling is a
+per-state operation with a reason a person reads, and a channel renders items, so the gesture has
+nowhere to live there. Since #67 the row above it says `nothing` too, so a user on a television
+neither sees what they asked for nor takes it back from that client.
 
 The last row is not a client family and is in the table because leaving it out would make the API
 look like it is not reachable. It is the floor under every other row, it reaches whoever writes
@@ -401,11 +471,12 @@ inside the pages, not the entry in the dashboard's own menu.
 
 Every issue after #65 in milestone 8 is read against the decision above.
 
-- #66, the user's view of their own requests on a client this project has never touched, is the
-  channel rendering, and it is built. The section above says what it answers and what it does not
-  settle.
-- #67, proving one user cannot see another's requests through the surface, is the channel's
-  per-user rendering, with the fallback stated above.
+- #66, the user's view of their own requests on a client this project has never touched, was the
+  channel rendering. It was built and then taken out by #67, so what that issue asks for is not
+  reachable through this surface and the issue wants re-planning rather than finishing.
+- #67, proving one user cannot see another's requests through the surface, was measured on a
+  running server of each claimed line and could not be shown. Its third condition is what this
+  channel now is.
 - #68, what gesture creates a request from this side, is unchanged: the gesture arrives through the
   seam and this plugin draws nothing anybody clicks.
 - #69, serving a page for browsers, is the page.
