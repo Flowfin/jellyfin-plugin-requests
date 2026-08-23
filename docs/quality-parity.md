@@ -587,7 +587,7 @@ added, and #2 asks the same of them: a run in which the guard went red for the r
 a run in which the tree passes it. Nothing in this tree recorded either, so what follows is that
 record rather than a claim that it already existed.
 
-Eleven of the thirteen have both. Two do not, and the table says which rather than leaving a
+Twelve of the thirteen have both. One does not, and the table says which rather than leaving a
 reader to take a full-looking column for a full one.
 
 **Two of those cells said the guard had no red run of this kind and both were wrong.** They were
@@ -631,7 +631,7 @@ arrived after that head, so their green runs are their own and carry their own h
 | `activity-entries.yaml`       | 32490301669, `notify/75-activity-entries-on-a-real-server`, job `entries 10.11` red at `Does an operator see the moves`                               | 32603611247               |
 | `build.yaml` with `gate.yaml` | 31083336296, `proof/22-gate-bites`, jobs `call / build` and `call / test` red at `Build every claimed target framework`                               | 32603611416               |
 | `invariant-lint.yaml`         | 31265005320, `proof/28-invariants-refuse`, red at `Refuse an invariant broken anywhere in the tree`                                                   | 32603611261               |
-| `mutation.yaml`               | none at all, below                                                                                                                                    | 31996260260, at `0482b29` |
+| `mutation.yaml`               | 32659524696, `proof/2-a-mutation-run-that-breaks`, red at `Mutate the plugin project` with no report produced, below                                  | 31996260260, at `0482b29` |
 | `package.yaml`                | 32554832287, `proof/1-a-version-the-tree-does-not-hold-is-refused`, both lines red at `Install this package on a server of the line it was built for` | 32603611237               |
 | `pr-hygiene.yaml`             | 31258955738, `proof/26-hygiene-refuses`, red at `Run the hygiene checks`                                                                              | 32603611353               |
 | `prettier.yml`                | 31258897067, `proof/26-hygiene-annotates`, red at `Check formatting of the embedded web assets and the markdown`                                      | 32603611279               |
@@ -729,16 +729,41 @@ no answer at all, and that is what happened, so its cell is the reason the guard
 than an approximation of it. The cause was read rather than assumed, out of the server's own log
 on `throwaway/66-what-the-server-said`, and `docs/surface.md` carries it.
 
-### The two empty cells, one reason each
+### The cell that filled, and what the first attempt at it found instead
 
-**`mutation.yaml`.** No red run at all, and `sibling-set.yaml` is beside it in this command
-because the count it returns is the one that moved.
+**A red suite does not stop the weekly mutation run, and that was measured rather than assumed.**
+The near-miss written first for this cell was one failing test, on the reasoning that the runner
+begins by running the suite unmutated and that a run which cannot start is what `mutation.yaml` says
+reds it. The run went green. What the runner does with a red suite is warn and carry on:
 
-    $ for w in mutation.yaml sibling-set.yaml; do printf '%s: ' "$w"; \
-        gh run list --repo Flowfin/jellyfin-plugin-requests --workflow $w \
-          --status failure --limit 1 --json databaseId --jq 'length'; done
-    mutation.yaml: 0
-    sibling-set.yaml: 1
+    $ gh run view 32658416123 --repo Flowfin/jellyfin-plugin-requests --json conclusion,headSha --jq '.conclusion + "  " + .headSha[0:7]'
+    success  22ebc87
+
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/97240739544/logs | grep -a 'tests are failing'
+    2026-08-23T18:34:39.0695831Z [18:34:39 WRN] 1 tests are failing. Stryker will continue but outcome will be impacted.
+
+So the weekly report is published from a red suite, with a score that is impacted and a run that
+looks like every other one. Nothing else watches that, because this workflow is off the merge path
+on purpose and what it produces is a report somebody reads.
+
+**What does red it is the run not happening**, which is the sentence the file makes about itself.
+The second head of the same branch names a project the tree does not hold, which is the mistake that
+produces one and the one no other gate here can see: the project is renamed and this file still says
+the old name.
+
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/97243454378/logs \
+        | grep -a -E 'No project found|Stryker cannot continue|##\[error\]' | sed 's/\x1b\[[0-9;]*m//g'
+    2026-08-23T18:54:50.5204519Z [18:54:50 WRN] No project found, check settings and ensure project file is not corrupted.
+    2026-08-23T18:54:50.5246963Z Failed to analyze project builds. Stryker cannot continue.
+    2026-08-23T18:54:50.5402698Z ##[error]Process completed with exit code 1.
+
+**The bound on that cell is that the near-miss is in the workflow's own argument and not in the
+tree.** Every breakage of the tree that would stop this run, source that does not compile or a target
+framework the test project no longer builds, reds the ordinary gate first, so a reader who takes this
+cell for "a change was refused here" is reading it wrong. What it records is that the step reds when
+the run does not happen rather than reporting a score nobody produced.
+
+### The one cell that is still empty
 
 **`scan-codeql.yaml`.** Five red runs, and none of them is the analysis refusing code. Four are red
 at `Build for the analysis`, which is a change that did not compile rather than anything the scan
