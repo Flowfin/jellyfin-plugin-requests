@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Api;
+using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Identity;
@@ -116,7 +117,8 @@ public sealed class CatalogueSplitTests
                 nameof(IOutboundSink),
                 nameof(IRequesterNotice),
                 nameof(IArrivalNotice),
-                nameof(ILibrary)),
+                nameof(ILibrary),
+                nameof(BridgeSubmission)),
             string.Join(" | ", taken),
             StringComparer.Ordinal);
     }
@@ -155,5 +157,6 @@ public sealed class CatalogueSplitTests
             new RecordingSink(),
             new RecordingRequesterNotice(),
             new RecordingArrivalNotice(),
-            new FakeLibrary());
+            new FakeLibrary(),
+            ABridgeSubmission.WithNothingBehindIt(store));
 }

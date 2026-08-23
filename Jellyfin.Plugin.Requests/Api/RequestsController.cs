@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Identity;
@@ -104,6 +105,7 @@ public sealed class RequestsController : RequestsControllerBase
     private readonly IRequesterNotice _told;
     private readonly IArrivalNotice _arrivals;
     private readonly ILibrary _library;
+    private readonly BridgeSubmission _bridge;
     private readonly RequestIntake _intake;
 
     /// <summary>
@@ -144,6 +146,12 @@ public sealed class RequestsController : RequestsControllerBase
     /// own page says whether what they asked for has arrived, and that sentence is answered for the
     /// reader rather than for the server, which is #71.
     /// </param>
+    /// <param name="bridge">
+    /// What an approval hands to an external request service, and what it keeps of the answer. It
+    /// is a dependency rather than something this controller builds, because it takes the bridge and
+    /// the server's log, and because what a test of an approval has to be able to see is whether
+    /// anything was handed over at all, which is not visible through a server nothing here runs.
+    /// </param>
     public RequestsController(
         IRequestStore store,
         IClock clock,
@@ -154,7 +162,8 @@ public sealed class RequestsController : RequestsControllerBase
         IOutboundSink sink,
         IRequesterNotice told,
         IArrivalNotice arrivals,
-        ILibrary library)
+        ILibrary library,
+        BridgeSubmission bridge)
     {
         _store = store;
         _clock = clock;
@@ -165,6 +174,7 @@ public sealed class RequestsController : RequestsControllerBase
         _told = told;
         _arrivals = arrivals;
         _library = library;
+        _bridge = bridge;
 
         // Built here rather than injected, because it is this controller's use of the store rather
         // than one more thing the server has to supply. CatalogueSplitTests reads the list this
@@ -863,6 +873,17 @@ public sealed class RequestsController : RequestsControllerBase
                     _told.Tell(message);
                 }
             }
+
+            // An approval is also the moment something else is asked to fetch the title, and what
+            // comes back is written onto the request. Last of everything here and never in place of
+            // the write above: the decision is the operator's and it stands whatever a service on
+            // another machine does, so this can only add a reference and never take a decision back.
+            //
+            // The row that is answered with is the one this leaves behind, because it is the newer
+            // revision. Answering the earlier one would hand the page a number the store has already
+            // moved past, and the operator's next action on that row would be refused for a conflict
+            // this call created itself.
+            written = await _bridge.SubmitAsync(written, cancellationToken).ConfigureAwait(false);
 
             return new DecidedRequest { Id = id, Request = Queued(written) };
         }

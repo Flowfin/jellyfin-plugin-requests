@@ -87,6 +87,15 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // registration and nothing else.
         serviceCollection.AddSingleton<IRequestBackend, NoRequestBackend>();
 
+        // What an approval hands over and what it keeps of the answer. Registered rather than built
+        // inside the controller, because it takes the bridge and the server's log, and because it
+        // writes to the store: a second construction of it somewhere else would be a second place
+        // that decides whether a request has already been handed over.
+        serviceCollection.AddSingleton<BridgeSubmission>(provider => new BridgeSubmission(
+            provider.GetRequiredService<IRequestBackend>(),
+            provider.GetRequiredService<IRequestStore>(),
+            provider.GetRequiredService<ILogger<BridgeSubmission>>()));
+
         // When the bridge was last seen answering. One per server, because it is a fact about the
         // install and the controller that reads it is built per call: state kept on that controller
         // would be forgotten between two reads of the same page.

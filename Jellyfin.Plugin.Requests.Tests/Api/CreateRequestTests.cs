@@ -370,7 +370,8 @@ public sealed class CreateRequestTests
             new RecordingSink(),
             new RecordingRequesterNotice(),
             new RecordingArrivalNotice(),
-            new FakeLibrary());
+            new FakeLibrary(),
+            ABridgeSubmission.WithNothingBehindIt(store));
 
     /// <summary>
     /// The answer, with the status code checked, so a leg cannot pass on a body that came back under

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Jellyfin.Plugin.Requests.Bridge;
 
 namespace Jellyfin.Plugin.Requests.Model;
 
@@ -276,6 +277,28 @@ public sealed record MediaRequest
     /// operator asking why a request still says absent needs to know whether anything checked.
     /// </summary>
     public DateTimeOffset? AvailabilityCheckedAt { get; init; }
+
+    /// <summary>
+    /// Gets what an external request service called this after it was handed over, or
+    /// <see langword="null"/> where nothing was. Null is the ordinary value: most servers run no
+    /// such service, and on those nothing is ever handed anywhere.
+    /// <para>
+    /// It is kept on the request because losing it means the two systems can never be reconciled
+    /// again. A reference held anywhere else would be a second store to keep in step with this one,
+    /// and the first restore from a backup would separate them.
+    /// </para>
+    /// <para>
+    /// Both halves of it are strings the service chose, unread. Nothing here parses one, which is
+    /// what keeps the record a value with nothing to resolve, and it is why a reference on a plain
+    /// record is not the same kind of field as a client or a manager would be.
+    /// </para>
+    /// <para>
+    /// It is written once. <see cref="Bridge.BridgeSubmission"/> hands a request over only where
+    /// this is null, so a request that already carries one is never submitted a second time, and
+    /// this field is the fact that decides it.
+    /// </para>
+    /// </summary>
+    public BackendReference? Backend { get; init; }
 
     /// <summary>
     /// Whether this person is one of the people waiting for this request, whether they asked first

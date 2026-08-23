@@ -438,5 +438,6 @@ public sealed class QueueContextTests
             new RecordingSink(),
             new RecordingRequesterNotice(),
             new RecordingArrivalNotice(),
-            new FakeLibrary());
+            new FakeLibrary(),
+            ABridgeSubmission.WithNothingBehindIt(store));
 }

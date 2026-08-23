@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Model;
 using Xunit;
 
@@ -24,6 +25,7 @@ public class MediaRequestTests
     [
         "Availability",
         "AvailabilityCheckedAt",
+        "Backend",
         "DeclineNote",
         "DeclineReason",
         "DisplayTitle",
@@ -226,7 +228,30 @@ public class MediaRequestTests
         return underlying == typeof(IReadOnlyDictionary<string, string>)
             || underlying == typeof(IReadOnlyList<int>)
             || underlying == typeof(IReadOnlyList<Guid>)
-            || underlying == typeof(IReadOnlyList<RequestHistoryEntry>);
+            || underlying == typeof(IReadOnlyList<RequestHistoryEntry>)
+            || underlying == typeof(BackendReference);
+    }
+
+    /// <summary>
+    /// The reference an external service issued is held to the same rule as the record that carries
+    /// it, for the reason the history entry is: widening the line above to admit a record admits
+    /// whatever that record's own fields happen to be, and the reader of the widened line does not
+    /// see that. Two strings the service chose, which the record does not read.
+    /// </summary>
+    [Fact]
+    public void TheBackendReferenceIsAPlainValueToo()
+    {
+        var offending = typeof(BackendReference)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => !IsAPlainValue(property.PropertyType))
+            .Select(property => string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} is {1}",
+                property.Name,
+                property.PropertyType.Name))
+            .ToArray();
+
+        Assert.Empty(offending);
     }
 
     /// <summary>

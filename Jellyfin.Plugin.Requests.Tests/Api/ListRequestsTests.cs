@@ -625,5 +625,6 @@ public sealed class ListRequestsTests
             new RecordingSink(),
             new RecordingRequesterNotice(),
             new RecordingArrivalNotice(),
-            new FakeLibrary());
+            new FakeLibrary(),
+            ABridgeSubmission.WithNothingBehindIt(store));
 }

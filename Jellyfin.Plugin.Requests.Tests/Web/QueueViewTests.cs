@@ -228,7 +228,8 @@ public sealed class QueueViewTests
             new RecordingSink(),
             new RecordingRequesterNotice(),
             new RecordingArrivalNotice(),
-            new FakeLibrary());
+            new FakeLibrary(),
+            ABridgeSubmission.WithNothingBehindIt(store));
 
         var answered = await controller.QueueAsync(
             [Enum.Parse<RequestState>(SelectedValueOf(body, "RequestsQueueState"), false)],

@@ -325,7 +325,8 @@ public sealed class TellingTheRequesterTests
             new RecordingSink(),
             told,
             new RecordingArrivalNotice(),
-            new FakeLibrary());
+            new FakeLibrary(),
+            ABridgeSubmission.WithNothingBehindIt(store));
 
     /// <summary>
     /// A sweep telling the path handed in.
