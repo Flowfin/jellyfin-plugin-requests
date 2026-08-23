@@ -35,6 +35,7 @@
   "live.declined": "Your request for {0} was declined: {1}",
   "live.fulfilled": "{0} is in the library now.",
   "live.header": "Requests",
+  "mine.channel.description": "What you asked for and what happened to it. Nothing here plays.",
   "mine.column.availability": "In the library",
   "mine.column.kind": "Kind",
   "mine.column.requestedAt": "Asked for",

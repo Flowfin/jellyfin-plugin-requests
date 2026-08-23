@@ -103,8 +103,7 @@ the requests a server already holds are in
 ## Which clients this reaches
 
 No cell of the reach matrix in docs/surface.md has been checked against a real
-client, and the page now on the mainline is not a measurement of one; the
-channel it describes is still not built.
+client, and the channel now on the mainline has not been browsed from one.
 
 That sentence is the whole claim this file makes about client reach, and it is
 the sentence the matrix opens with. The matrix itself, a row per client family

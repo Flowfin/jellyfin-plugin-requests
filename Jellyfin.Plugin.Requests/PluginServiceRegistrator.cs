@@ -9,8 +9,10 @@ using Jellyfin.Plugin.Requests.Localisation;
 using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Seam;
 using Jellyfin.Plugin.Requests.Storage;
+using Jellyfin.Plugin.Requests.Surface;
 using Jellyfin.Plugin.Requests.Time;
 using MediaBrowser.Controller;
+using MediaBrowser.Controller.Channels;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Activity;
@@ -192,5 +194,14 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<ILogger<RetentionSweep>>()));
 
         serviceCollection.AddSingleton<IScheduledTask, RetentionTask>();
+
+        // The surface every client can reach. The server resolves its channels out of this
+        // container, so this registration is what puts a folder tree beside a person's libraries on
+        // clients this project will never change. It is a singleton for the same reason the store
+        // is: it holds nothing per call and a second one would be a second reader of one file.
+        serviceCollection.AddSingleton<IChannel>(provider => new RequestsChannel(
+            provider.GetRequiredService<IRequestStore>,
+            provider.GetRequiredService<StringCatalogue>(),
+            provider.GetRequiredService<ILogger<RequestsChannel>>()));
     }
 }
