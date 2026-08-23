@@ -587,8 +587,8 @@ added, and #2 asks the same of them: a run in which the guard went red for the r
 a run in which the tree passes it. Nothing in this tree recorded either, so what follows is that
 record rather than a claim that it already existed.
 
-Nine of the thirteen have both. Four do not, and the table says which rather than leaving a reader
-to take a full-looking column for a full one.
+Eleven of the thirteen have both. Two do not, and the table says which rather than leaving a
+reader to take a full-looking column for a full one.
 
 **Two of those cells said the guard had no red run of this kind and both were wrong.** They were
 filled from the three most recent failures of each workflow rather than from its whole history, which
@@ -636,8 +636,8 @@ arrived after that head, so their green runs are their own and carry their own h
 | `pr-hygiene.yaml`             | 31258955738, `proof/26-hygiene-refuses`, red at `Run the hygiene checks`                                                                              | 32603611353               |
 | `prettier.yml`                | 31258897067, `proof/26-hygiene-annotates`, red at `Check formatting of the embedded web assets and the markdown`                                      | 32603611279               |
 | `scan-codeql.yaml`            | none of this kind, below                                                                                                                              | 32603611246               |
-| `seam-probe.yaml`             | 32555537635, cause unproven, below                                                                                                                    | 32555794613, at `5b96f57` |
-| `sibling-set.yaml`            | none at all, below                                                                                                                                    | 32603611260               |
+| `seam-probe.yaml`             | 32625777966, `throwaway/66-what-the-server-said`, both lines red at `Ask a second plugin what it can see` with no answer produced at all              | 32555794613, at `5b96f57` |
+| `sibling-set.yaml`            | 32624752477, `surface/66-a-view-of-your-own-requests`, both lines red at `Alone, then with the set`, on the alone half rather than the collision half | 32603611260               |
 | `user-isolation.yaml`         | 32560880189, `proof/67-the-queue-is-not-closed-to-everybody`, both lines red at the queue step                                                        | 32603611273               |
 | `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                       | 32623457801, at `d154ab3` |
 
@@ -690,15 +690,55 @@ near-miss written to be red, on two heads of one branch exercising two different
 `gate.yaml` produces no run of its own: it is called by `build.yaml` and is where the two names the
 ruleset matches literally come from, which is why both rows above are `call /` jobs.
 
-### The four empty cells, one reason each
+### The two cells that filled, and what the older reading of one of them was
 
-**`mutation.yaml` and `sibling-set.yaml`.** No red run at all, in either.
+**`seam-probe.yaml`'s red run was not the guard at all, and this page recorded it as unproven
+rather than as wrong.** 32555537635 was named here as red at `Ask a second plugin what it can
+see` on a branch that was not written to be red, with the cause unread. The log has been read
+now and it is not a refusal of anything:
 
-    $ for w in mutation.yaml sibling-set.yaml; do \
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/96988969843/logs | grep -a -A 1 'Permission denied' | sed 's/^[0-9T:.Z-]*Z //'
+    /home/runner/work/_temp/219b159a-8c06-486b-943a-672dad505e99.sh: line 3: ./scripts/verify-seam-probe.sh: Permission denied
+    ##[error]Process completed with exit code 126.
+
+The script was not executable at that commit, so the job stopped before it started a server and
+the run measured nothing. That is the same shape as the two cells corrected above, one step
+earlier: a run read at its step and taken for that step's own verdict. Every script in that
+directory is executable today, which is the other half of the reading and is why nothing here is
+owed a repair:
+
+    $ git ls-tree origin/master scripts/ | grep '[.]sh$' | awk '{print $1}' | sort -u
+    100755
+
+**Both cells filled from one defect, and it was this repository's own.** A channel that held the
+store made the plugin fatal to load, so on `7deb240` and on the branch made to print why, every
+check that starts a server went red. Two of those are these two cells:
+
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/actions/runs/32624752477/jobs \
+        --jq '.jobs[] | select(.conclusion=="failure")
+              | "\(.name)  |  \([.steps[]|select(.conclusion=="failure")|.name]|join("; "))"'
+    set 12.0  |  Alone, then with the set
+    set 10.11  |  Alone, then with the set
+
+**What each of the two proves is narrower than its step.** `sibling-set.yaml` asserts that this
+plugin works alone and works beside the sibling set; what it refused is a plugin that would not
+load alone, which is the first half. Nothing has yet been watched refusing a collision with a
+sibling, and `the scan refuses what it says it refuses` is a separate job that fires on fixtures
+rather than on a server. `seam-probe.yaml`'s own file says what reds it is a run that produced
+no answer at all, and that is what happened, so its cell is the reason the guard names rather
+than an approximation of it. The cause was read rather than assumed, out of the server's own log
+on `throwaway/66-what-the-server-said`, and `docs/surface.md` carries it.
+
+### The two empty cells, one reason each
+
+**`mutation.yaml`.** No red run at all, and `sibling-set.yaml` is beside it in this command
+because the count it returns is the one that moved.
+
+    $ for w in mutation.yaml sibling-set.yaml; do printf '%s: ' "$w"; \
         gh run list --repo Flowfin/jellyfin-plugin-requests --workflow $w \
           --status failure --limit 1 --json databaseId --jq 'length'; done
-    0
-    0
+    mutation.yaml: 0
+    sibling-set.yaml: 1
 
 **`scan-codeql.yaml`.** Five red runs, and none of them is the analysis refusing code. Four are red
 at `Build for the analysis`, which is a change that did not compile rather than anything the scan
@@ -707,17 +747,13 @@ than a finding either. What a finding does here is upload to the code-scanning t
 that reports it is `CodeQL`, which the set at the top of this page declines to require for a
 different reason. Nothing has been watched refusing on a finding.
 
-**`seam-probe.yaml`.** 32555537635 is red on both lines at `Ask a second plugin what it can see`, on
-a branch that was building the probe rather than proving it. The workflow's own file says what reds
-it is a run that produced no answer at all, which is consistent with that step, but the branch was
-not written to be red and the log has not been read, so the cause is recorded as unproven rather
-than as the reason the guard names.
-
 ### What this table is not
 
 It is a ledger of runs, not a demonstration that each guard is correct. A red run at a step proves
 the step refused something; which of the things that step can refuse it refused is in the log, and
-six of these cells are read at the step rather than in the log. The `Kind` distinction the inherited
+most of these cells are read at the step rather than in the log. Two of the readings above are
+what that bound costs when it is paid: one cell held a run that never reached the check at all,
+and one holds a run whose step can refuse two different things. The `Kind` distinction the inherited
 table makes does not appear here because all twelve refuse; none of them is a report.
 
 ## What this document does not do
