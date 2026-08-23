@@ -164,6 +164,29 @@ what an endpoint carries and never what a server does with it. The procedure run
 and on a schedule, so a mainline commit that no pull request carried has no reading of its own
 until the next nightly run.
 
+**Filling the volume the store writes to, as part of the ordinary suite.** Refused: there has to
+be a volume that may be filled, and making one means a container engine, which is the fourth
+condition. Filling the volume the checkout is on is worse than refused: it is a machine somebody
+else is using.
+
+What replaces it is `scripts/verify-full-disk.sh` and `tools/full-disk-probe`, run by
+`.github/workflows/full-disk.yaml` on every pull request and nightly, once per claimed line. The
+mount is `--tmpfs /data:size=256k`, so what fills is a filesystem of a fixed size that lives in
+memory and is discarded with the container, and nothing outside it is written to. The probe drives
+the store this repository ships, adds requests until one is refused, and asks four things: that a
+write failed at all, that the caller was told and what it was told, that the store it was told
+through still reports the set it held before, and that a store opened fresh over the same directory
+loads and holds that same set.
+
+**A run in which nothing filled is a refusal rather than a pass.** That is the mistake this shape
+exists against: a mount that is not size limited produces a job where every step succeeds and
+nothing was measured. The probe bounds the additions it will attempt and exits saying so, and the
+refusal is watched rather than assumed, below.
+
+What it does not do is prove anything about a disk that is full for a different reason. A tmpfs at
+its size limit is one way a write runs out of room; a quota, a full physical device and a
+filesystem out of inodes are others, and none of them was produced here.
+
 Every replacement named above exists, either as something already in the tree or as an issue on
 this board. The states move, and a paste taken once reads afterwards as a claim about today, so
 this one carries the commit it was read at, `ffa28c1`:

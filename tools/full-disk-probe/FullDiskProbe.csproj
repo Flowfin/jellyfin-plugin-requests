@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The same two targets the plugin claims. A store that reports a full disk on one runtime and
+         swallows it on the other is a difference between the two server lines, which is exactly the
+         kind of thing a probe run on one line only would miss. -->
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>Jellyfin.Plugin.Requests.FullDiskProbe</RootNamespace>
+    <AssemblyName>Jellyfin.Plugin.Requests.FullDiskProbe</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <JellyfinVersion Condition="'$(JellyfinVersion)' == '' and '$(TargetFramework)' == 'net9.0'">10.11.11</JellyfinVersion>
+    <JellyfinVersion Condition="'$(JellyfinVersion)' == '' and '$(TargetFramework)' == 'net10.0'">12.0.0-rc4</JellyfinVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Without ExcludeAssets, unlike the plugin. The plugin leaves these out because a running
+         server supplies them and a package carrying a second copy is how a plugin breaks on the
+         server it was built for. Nothing supplies them to a probe running on its own, so the
+         runtime assets have to be here or the store cannot be constructed at all. This is the same
+         reason the test project references them this way. -->
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)" />
+    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The project rather than a built assembly, so the store under measurement is the one in this
+         checkout and never a stale copy in a bin directory. -->
+    <ProjectReference Include="..\..\Jellyfin.Plugin.Requests\Jellyfin.Plugin.Requests.csproj" />
+  </ItemGroup>
+
+</Project>
