@@ -224,6 +224,61 @@ The queue is asked for twice on purpose. A queue that is broken for everybody wo
 refusal on its own, so it is asked again as the administrator and has to answer with all three
 titles; the refusal above means the endpoint is closed to that person rather than closed.
 
+### The channel, and what the same reading found there
+
+The channel is the surface #67 is written about, and it was the last of the three to be asked. The
+walk is the same shape as the three list calls: the channel is found by the name the catalogue
+holds, each person reads the root and then every row of the root asked for as a folder, the second
+person reads immediately after the first, and the first reads again once the server has answered
+both.
+
+**It found the leak on its first run and that is why this channel changed.** Read against the
+channel that answered a person's own requests, run `32645853066`, both lines red, the 10.11 job
+`97209886193`:
+
+    the first person, browsing was shown ['A film both of them asked for (1975)', 'A film only the first person asked for (1999)']
+    the second person, browsing was shown ['A film both of them asked for (1975)', 'A film only the second person asked for (2001)']
+    the first person, browsing again was shown ['A film both of them asked for (1975)', 'A film only the second person asked for (2001)'] and what belongs to that caller is ['A film both of them asked for (1975)', 'A film only the first person asked for (1999)'].
+
+The 12.0 job is `97209886061` and the three lines come back word for word. Read the third against
+the first. The first person asked for a 1999 film and never for a 2001 one, and on their second
+visit the 1999 film is gone and the film only the second person asked for is in its place.
+
+The third call is the whole reason the order is what it is. One person reading and then another
+reading says nothing; what shows this is the first person coming back after somebody else has been
+served.
+
+**What the channel answers now, and it is the fallback rather than a repair.** Under "What the
+channel costs" above. Taken at `4eb91c4` on the 10.11 line, job `97213335974`:
+
+    the first person, browsing was handed the one folder and nothing else.
+    the second person, browsing was handed the one folder and nothing else.
+    the first person, browsing again was handed the one folder and nothing else.
+    the library answered the first with 200, 608 bytes
+    the library served the first ['Open the requests page on this server to see what you asked for.'] and carried nothing of anybody.
+    the library answered the second with 200, 608 bytes
+    the library served the second ['Open the requests page on this server to see what you asked for.'] and carried nothing of anybody.
+    the library answered the administrator with 200, 608 bytes
+    the library served the administrator ['Open the requests page on this server to see what you asked for.'] and carried nothing of anybody.
+    naming somebody else answered 403
+    naming somebody else was refused with 403 and carried nothing of anybody.
+
+The 12.0 line is job `97213335855` and returns the same eleven lines.
+
+**The three library calls are the half the channel calls cannot reach.** A channel's answer is
+written into the server's own library database under a parent belonging to the channel, and
+`GET /Items?parentId=<channel>&recursive=true` reaches whatever is beneath that parent without
+passing through this plugin at all. So the same parent is asked for as each person and as the
+administrator, and the only thing any of them may be served is the one folder.
+
+The first person's call has to return that folder rather than merely not returning anybody's title.
+Without it the whole reading passes on a server where that query answers with an empty set whatever
+is asked of it, which is a different thing from a library holding nothing of anybody. It is the
+same near-miss the queue is asked about twice for.
+
+The last call asks whether the server refuses one person naming another in `userId`. That is the
+server's guard rather than this plugin's, and it is read rather than assumed.
+
 ### That the check bites
 
 Two branches carry the mistakes it exists to catch. Neither is for merging and neither has a pull
@@ -241,6 +296,17 @@ green at everything before it:
 
     the queue answered 200
     the queue was served to somebody who is not an administrator.
+
+`proof/67-the-channel-knows-who-is-asking` makes the one folder's name depend on the caller, which
+is the smallest way per-user data comes back to that surface. Run `32647542023`, both lines red at
+the first walk:
+
+    the first person, browsing was handed ['Open the requests page on this server to see what you asked for. 1b789934-1111-4859-8973-dc24ade9c6d9'] and the whole of this channel is ['Open the requests page on this server to see what you asked for.'].
+
+That branch reds the suite as well, and the strongest thing said for the channel walk is not it. The
+walk refused the mainline, on both lines, for a defect nobody had injected, and the shape of this
+surface changed because of it. That is the run quoted two sections above rather than a branch made
+to fail.
 
 ### What this does not reach
 
