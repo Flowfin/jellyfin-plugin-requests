@@ -353,6 +353,58 @@ public sealed class CreateRequestTests
         };
 
     /// <summary>
+    /// A request asked for over the endpoint records that it arrived there. The person named on it
+    /// is the one the server said was calling, so the entry says that a session stood behind the
+    /// name, which is the difference from the seam that an operator answering for a request needs.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task ARequestAskedForAtTheEndpointRecordsThatItArrivedThere()
+    {
+        var store = new InMemoryRequestStore();
+
+        _ = Answer(
+            await ControllerFor(store, Asker).CreateAsync(AFilm(), CancellationToken.None).ConfigureAwait(true),
+            expectedStatus: 201);
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true)).Request;
+        var entry = Assert.Single(made.History);
+
+        Assert.Equal(RequestArrival.Endpoint, entry.Arrival);
+        Assert.Equal(Asker, entry.ByUserId);
+        Assert.Equal(made.RequestedAt, entry.At);
+        Assert.Equal(made.State, entry.From);
+        Assert.Equal(made.State, entry.To);
+    }
+
+    /// <summary>
+    /// A second person asking for the same title joins the request that is there and adds no second
+    /// arrival to it. The entry says how the request reached this server, and the request reached it
+    /// once.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task JoiningARequestThatIsAlreadyHereAddsNoSecondArrival()
+    {
+        var store = new InMemoryRequestStore();
+
+        _ = Answer(
+            await ControllerFor(store, Asker).CreateAsync(AFilm(), CancellationToken.None).ConfigureAwait(true),
+            expectedStatus: 201);
+
+        var joined = Answer(
+            await ControllerFor(store, SecondPerson).CreateAsync(AFilm(), CancellationToken.None).ConfigureAwait(true),
+            expectedStatus: 200);
+
+        Assert.Equal(RequestOutcome.Joined, joined.Outcome);
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true)).Request;
+
+        Assert.Equal([SecondPerson], made.JoinedByUserIds);
+        Assert.Equal(Asker, Assert.Single(made.History).ByUserId);
+    }
+
+    /// <summary>
     /// A controller wired to one store and one identity, with a clock and an identifier source the
     /// test controls.
     /// </summary>

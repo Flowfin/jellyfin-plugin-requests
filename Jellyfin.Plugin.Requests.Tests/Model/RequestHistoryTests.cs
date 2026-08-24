@@ -21,14 +21,93 @@ public class RequestHistoryTests
     private static readonly RequestCaller BySecondOperator = RequestCaller.Administrator(SecondOperator);
 
     /// <summary>
-    /// A request nobody has decided has an empty history. Being created is not a move, and an entry
-    /// saying it was created would put a row in every history that says nothing an operator asked
-    /// about.
+    /// A request the model built and nothing has decided has an empty history. Being created is not
+    /// a move, so nothing here appends one.
+    /// <para>
+    /// The head of a real request's history is an arrival rather than a move, and it is written by
+    /// the surface the ask came in on rather than by this type, because only that surface knows
+    /// which of them it was. #118 is where that was decided, and the legs for it are on the two
+    /// surfaces. What this leg holds is that the model itself invents no row.
+    /// </para>
     /// </summary>
     [Fact]
     public void ARequestNothingHasDecidedHasNoHistory()
     {
         Assert.Empty(ARequest().History);
+    }
+
+    /// <summary>
+    /// An arrival entry is derived from the request it goes on, so a surface cannot write one that
+    /// disagrees with the record beneath it. Every field but the arrival itself comes off the
+    /// request, and the arrival is the one thing the record does not already hold.
+    /// </summary>
+    [Fact]
+    public void AnArrivalEntryIsDerivedFromTheRequestItIsOn()
+    {
+        var request = ARequest();
+
+        var entry = RequestHistoryEntry.Arriving(RequestArrival.Seam, request);
+
+        Assert.Equal(RequestArrival.Seam, entry.Arrival);
+        Assert.Equal(request.RequestedAt, entry.At);
+        Assert.Equal(request.RequestedByUserId, entry.ByUserId);
+        Assert.Equal(request.State, entry.From);
+        Assert.Equal(request.State, entry.To);
+        Assert.Null(entry.Reason);
+        Assert.Null(entry.Note);
+    }
+
+    /// <summary>
+    /// An arrival and a move are told apart by the arrival and never by the pair of states. An
+    /// arrival moves nothing, so both its states are the one the request came into existence in, and
+    /// a reader that separated the two rows by comparing <c>From</c> with <c>To</c> would be
+    /// separating them by a coincidence rather than by what they are.
+    /// </summary>
+    [Fact]
+    public void AnArrivalIsToldFromAMoveByTheArrivalRatherThanByItsStates()
+    {
+        var request = ARequest();
+
+        var arrival = RequestHistoryEntry.Arriving(RequestArrival.Endpoint, request);
+        var move = Assert.Single(
+            RequestLifecycle.Move(request, RequestState.Approved, At(9), ByFirstOperator).History);
+
+        Assert.NotNull(arrival.Arrival);
+        Assert.Equal(arrival.From, arrival.To);
+
+        Assert.Null(move.Arrival);
+        Assert.NotEqual(move.From, move.To);
+    }
+
+    /// <summary>
+    /// A move appends beneath an arrival rather than replacing it. The history is append-only, so
+    /// the row saying where the request came from has to survive every decision made on it
+    /// afterwards, which is what makes it worth writing at all.
+    /// </summary>
+    [Fact]
+    public void AMoveAppendsBeneathAnArrivalAndLeavesItThere()
+    {
+        var request = ARequest();
+        var arrived = request with { History = [RequestHistoryEntry.Arriving(RequestArrival.Seam, request)] };
+
+        var approved = RequestLifecycle.Move(arrived, RequestState.Approved, At(9), ByFirstOperator);
+
+        Assert.Equal(2, approved.History.Count);
+        Assert.Equal(RequestArrival.Seam, approved.History[0].Arrival);
+        Assert.Null(approved.History[1].Arrival);
+        Assert.Equal(RequestState.Approved, approved.History[1].To);
+    }
+
+    /// <summary>
+    /// There is no arrival to derive without a request to derive it from. It refuses rather than
+    /// building an entry out of defaults, because an entry naming nobody at the epoch is a row that
+    /// reads as a fact.
+    /// </summary>
+    [Fact]
+    public void AnArrivalCannotBeDerivedFromNothing()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => RequestHistoryEntry.Arriving(RequestArrival.Endpoint, null!));
     }
 
     /// <summary>

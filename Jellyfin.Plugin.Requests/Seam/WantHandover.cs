@@ -295,6 +295,16 @@ public sealed class WantHandover : IWantHandover
             WantIds = [want.WantId]
         };
 
+        // The one thing a request made here records about the seam. Which plugin handed the want
+        // over is not part of it and never will be: the contract carries no field naming the caller,
+        // decided on #118, and a value read off anything else would be the sender saying who they
+        // are. What this side knows is that no session stood behind the person named, and that is
+        // what the entry says.
+        incoming = incoming with
+        {
+            History = [RequestHistoryEntry.Arriving(RequestArrival.Seam, incoming)]
+        };
+
         Answer<IntakeResult> intake;
 
         try

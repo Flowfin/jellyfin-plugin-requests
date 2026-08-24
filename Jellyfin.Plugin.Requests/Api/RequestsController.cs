@@ -241,6 +241,16 @@ public sealed class RequestsController : RequestsControllerBase
             RequesterNote = body.Note
         };
 
+        // How the ask reached this server, written once at the head of the history and never again.
+        // It is set here rather than inside the intake because the intake is asked by both surfaces
+        // and cannot see which of them is asking, and because a request that joins an existing one
+        // keeps that request's history: what is recorded is how the request arrived, not how each
+        // later person reached it.
+        incoming = incoming with
+        {
+            History = [RequestHistoryEntry.Arriving(RequestArrival.Endpoint, incoming)]
+        };
+
         CreatedRequest answer;
 
         try
