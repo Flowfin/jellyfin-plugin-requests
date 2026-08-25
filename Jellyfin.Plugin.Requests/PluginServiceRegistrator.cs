@@ -141,14 +141,32 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<ILogger<OutboundSink>>(),
             OutboundSink.DefaultAnswerWithin));
 
+        // Who has said they do not want to be told about their own requests. One per server for the
+        // reason the request store is: it holds the set in memory and serialises its writes against
+        // it, and a second instance over one directory would be two sets deciding independently what
+        // the file should say. Built from a factory for the same reason too, because the directory
+        // is the plugin's own data folder and only the plugin knows it.
+        serviceCollection.AddSingleton<INoticePreferences>(_ => new FileNoticePreferences(
+            (Plugin.Instance ?? throw new InvalidOperationException(
+                "What people have set about being told was asked for before this plugin was loaded, so there is no data directory to keep it in."))
+            .DataFolderPath));
+
         // The path that tells the person who asked that their own request moved, on whatever they
         // are signed in on right now. Registered beside the two above rather than instead of either:
         // the journal is the record an operator reads afterwards, the sink is what leaves the
         // machine on an install that has somewhere to send to, and this is the only one of the three
         // aimed at the person waiting.
-        serviceCollection.AddSingleton<IRequesterNotice>(provider => new ServerRequesterNotice(
-            provider.GetRequiredService<ISessionManager>(),
-            provider.GetRequiredService<ILogger<ServerRequesterNotice>>()));
+        //
+        // The person's own switch is in front of it rather than inside it, so the one class that
+        // names the host stays the one call it is, and so that neither of the two paths that tell
+        // somebody has to remember to ask. What is registered is the wrapper, because everything
+        // above resolves the interface and nothing above may reach past the switch.
+        serviceCollection.AddSingleton<IRequesterNotice>(provider => new QuietedRequesterNotice(
+            new ServerRequesterNotice(
+                provider.GetRequiredService<ISessionManager>(),
+                provider.GetRequiredService<ILogger<ServerRequesterNotice>>()),
+            provider.GetRequiredService<INoticePreferences>(),
+            provider.GetRequiredService<ILogger<QuietedRequesterNotice>>()));
 
         // The path that tells whoever administers the server that somebody has asked for something,
         // on whatever they are signed in on right now. It is a fourth registration rather than a

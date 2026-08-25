@@ -198,8 +198,13 @@ path that has a switch, and it grows when a path does rather than ahead of one.
 be one. It reaches only the person the request belongs to and only while they are signed in, and who
 may turn it off was taken on #9 on 2026-08-24: that person, and nobody acting on their behalf. So its
 absence from this page is the answer rather than an omission, and an operator field for it would be
-the shape that answer refuses. #287 is where the person's own switch is built.
-[`notifications.md`](notifications.md) carries the answer and says what is not built yet.
+the shape that answer refuses.
+
+The switch itself is built and it is the person's own. It is on their own requests page, it is kept
+in `notices.json` in the plugin's data directory rather than in the settings file this page is about,
+and it is on by default so an install nobody has touched behaves as it always did. **No setting on
+this page overrides it**, and none ever will. [`notifications.md`](notifications.md) carries where it
+lives, what the two endpoints are, and why neither of them takes an identifier.
 
 **A bridge address and a credential.** The only bridge in this tree is the one for a server that has
 none. A field for an address would be somewhere to type something nothing reads. #82 brings the

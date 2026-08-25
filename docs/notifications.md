@@ -341,18 +341,40 @@ it stops there.
 hands nothing back for a caller to check, and every way a push can fail costs the same: a line in the
 server's log and nothing else. Nothing is retried and nothing is queued.
 
-**There is no setting for it, and who one would belong to is no longer an open question.** The three
-switches below narrow the outbound sink and none of them reaches this, and the activity log has no
-switch either. Whether an operator or the person themself should be the one to turn this off was
-taken on #9 on 2026-08-24: the switch belongs to the person who made the request, default on, because
-a person controls what they are told about their own request and nobody else does.
+### The switch, and whose it is
 
-**The answer is written down and the switch is not built**, which are two states rather than one. An
-operator setting is refused by the answer rather than missing from it, so no field is coming beside
-the three below; what a person's own switch needs is somewhere per person to keep a preference, and
-this plugin keeps nothing per person today. That is #287. Until it lands, the message goes to the
-person on every movement it has a sentence for, which is the default the answer names, and nobody -
-the person included - can turn it off.
+**It belongs to the person who made the request, and to nobody else.** That was taken on #9 on
+2026-08-24: a person controls what they are told about their own request. The three operator switches
+below narrow the outbound sink and none of them reaches this path; the activity log has no switch
+either. **No operator setting overrides a person's own**, and that is a refusal rather than an
+omission - an administrator able to silence what somebody else is told is the shape the decision
+refuses, so no field is coming beside the three below.
+
+**Where it lives.** On the person's own page, which is the surface every signed-in person can reach
+without a dashboard, and behind two endpoints under the versioned prefix:
+
+    GET  MediaRequests/v1/Notices/Mine
+    POST MediaRequests/v1/Notices/Mine   {"TellsMe": false}
+
+**Neither of them takes an identifier, and that is the whole mechanism rather than a check.** Whose
+setting is being read or written comes off the credential the call carries, so there is no field,
+route segment or parameter through which any caller - an administrator included - could name somebody
+else. A refusal of such a call is not written anywhere because there is no such call to refuse.
+
+**The default is on**, and it is the absence of a value rather than a value. A server that upgrades
+into this holds nothing at all about anybody, so it behaves exactly as it did before the switch
+existed, and what is kept is the list of people who said no rather than a row per person.
+
+**Where it is kept.** `notices.json` in the plugin's own data directory, beside `requests.json`,
+written whole or not at all the same way. It is deliberately not the plugin configuration: that file
+is rewritten whole by the dashboard whenever an administrator saves the page, it is the operator's to
+change, and this is not.
+
+**A setting that cannot be read silences the message rather than sending it.** The two ways of being
+wrong are not equal. Not sending a courtesy costs somebody a line they would have read on their own
+page anyway; sending it costs a person who asked not to be told being told, and nothing afterwards
+can tell that from a person who never asked. The refusal is written to the server log, so an operator
+meets a file to repair rather than silence nobody can explain.
 
 ## What a live administrator is told when something arrives
 
