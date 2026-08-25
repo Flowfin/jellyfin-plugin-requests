@@ -341,10 +341,18 @@ it stops there.
 hands nothing back for a caller to check, and every way a push can fail costs the same: a line in the
 server's log and nothing else. Nothing is retried and nothing is queued.
 
-**There is no setting for it.** The three switches below narrow the outbound sink and none of them
-reaches this, and the activity log has no switch either. Whether an operator or the person themself
-should be the one to turn this off is a question nobody has taken, and it is written here rather than
-answered by adding a field.
+**There is no setting for it, and who one would belong to is no longer an open question.** The three
+switches below narrow the outbound sink and none of them reaches this, and the activity log has no
+switch either. Whether an operator or the person themself should be the one to turn this off was
+taken on #9 on 2026-08-24: the switch belongs to the person who made the request, default on, because
+a person controls what they are told about their own request and nobody else does.
+
+**The answer is written down and the switch is not built**, which are two states rather than one. An
+operator setting is refused by the answer rather than missing from it, so no field is coming beside
+the three below; what a person's own switch needs is somewhere per person to keep a preference, and
+this plugin keeps nothing per person today. That is #287. Until it lands, the message goes to the
+person on every movement it has a sentence for, which is the default the answer names, and nobody -
+the person included - can turn it off.
 
 ## What a live administrator is told when something arrives
 
