@@ -194,10 +194,12 @@ with an address set is refused rather than treated as silence.
 than its absence, so the set above names the three movements the sink announces plus the one arrival
 path that has a switch, and it grows when a path does rather than ahead of one.
 
-**A switch for the message to the person who asked.** There is none. It reaches only the person the
-request belongs to and only while they are signed in, and whether an operator or that person should
-be the one to turn it off is a question nobody has taken. It is written down in
-[`notifications.md`](notifications.md) rather than answered by adding a field here.
+**A switch for the message to the person who asked.** There is none here and there is not going to
+be one. It reaches only the person the request belongs to and only while they are signed in, and who
+may turn it off was taken on #9 on 2026-08-24: that person, and nobody acting on their behalf. So its
+absence from this page is the answer rather than an omission, and an operator field for it would be
+the shape that answer refuses. #287 is where the person's own switch is built.
+[`notifications.md`](notifications.md) carries the answer and says what is not built yet.
 
 **A bridge address and a credential.** The only bridge in this tree is the one for a server that has
 none. A field for an address would be somewhere to type something nothing reads. #82 brings the
