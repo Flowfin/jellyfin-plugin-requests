@@ -70,9 +70,15 @@ public sealed record RequesterMessage
     /// <para>
     /// <b>A state with no arm sends nothing, and so does a decline carrying no reason.</b>
     /// <see cref="RequestState.Open"/> is where a request starts and there is nothing to tell
-    /// anybody about arriving at it, <see cref="RequestState.Failed"/> has no path that reaches it
-    /// in this tree, and a state added later arrives here with nobody having written the sentence
-    /// for it. A decline is required to carry a reason and the model is what holds it to that, so a
+    /// anybody about arriving at it, <see cref="RequestState.Failed"/> has no sentence written for
+    /// it, and a state added later arrives here with nobody having written the sentence for it.
+    /// </para>
+    /// <para>
+    /// <b>Failed said no path reached it until the reconciliation landed, and now one does.</b> The
+    /// run in #83 moves a request there on the service's word and no sentence is written for that
+    /// state, so the person waiting is not told and finds out on their own page. That is a gap
+    /// rather than a decision, and closing it is a sentence in the catalogue and an arm here rather
+    /// than anything about this method's shape. A decline is required to carry a reason and the model is what holds it to that, so a
     /// declined request without one is a request written by something older than that rule; the
     /// sentence for it would have a hole where the reason goes, and sending nothing is what a person
     /// can recover from by opening their own page.
