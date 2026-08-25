@@ -78,10 +78,7 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
         };
 
         var full = RequestLifecycle.Move(
-            asked with
-            {
-                History = [RequestHistoryEntry.Arriving(RequestArrival.Seam, asked)]
-            },
+            RequestLifecycle.Arriving(asked, RequestArrival.Seam),
             RequestState.Approved,
             new DateTimeOffset(2026, 8, 8, 9, 0, 0, TimeSpan.Zero),
             RequestCaller.Administrator(approvedBy));

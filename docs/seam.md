@@ -403,7 +403,12 @@ A request made from a want carries one history entry saying so. It is written wh
 into existence, it is the head of that request's history, and every decision made on the request
 afterwards appends beneath it.
 
-    git grep -n 'RequestHistoryEntry.Arriving(RequestArrival.Seam' -- Jellyfin.Plugin.Requests/Seam/WantHandover.cs
+    git grep -n 'RequestLifecycle.Arriving(incoming, RequestArrival.Seam)' -- Jellyfin.Plugin.Requests/Seam/WantHandover.cs
+
+It is written through the lifecycle rather than onto the record, because that is the one place a
+request's history grows and a surface assigning the list itself is refused by name:
+
+    git grep -n 'id: history-is-only-appended-to' -- tools/opengrep/rules.yaml
 
 **What it says is how, and never who.** The entry names the surface and not the caller. The contract
 grows no field naming the plugin that handed the want over, decided on #118, because a field carrying

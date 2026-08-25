@@ -246,10 +246,7 @@ public sealed class RequestsController : RequestsControllerBase
         // and cannot see which of them is asking, and because a request that joins an existing one
         // keeps that request's history: what is recorded is how the request arrived, not how each
         // later person reached it.
-        incoming = incoming with
-        {
-            History = [RequestHistoryEntry.Arriving(RequestArrival.Endpoint, incoming)]
-        };
+        incoming = RequestLifecycle.Arriving(incoming, RequestArrival.Endpoint);
 
         CreatedRequest answer;
 

@@ -87,8 +87,7 @@ public class RequestHistoryTests
     [Fact]
     public void AMoveAppendsBeneathAnArrivalAndLeavesItThere()
     {
-        var request = ARequest();
-        var arrived = request with { History = [RequestHistoryEntry.Arriving(RequestArrival.Seam, request)] };
+        var arrived = RequestLifecycle.Arriving(ARequest(), RequestArrival.Seam);
 
         var approved = RequestLifecycle.Move(arrived, RequestState.Approved, At(9), ByFirstOperator);
 
@@ -99,15 +98,34 @@ public class RequestHistoryTests
     }
 
     /// <summary>
-    /// There is no arrival to derive without a request to derive it from. It refuses rather than
+    /// A request that already carries a history has already arrived, and a second arrival on it is
+    /// refused rather than appended. The history is append-only, so a row saying a request arrived
+    /// after somebody decided on it could never be taken back out.
+    /// </summary>
+    [Fact]
+    public void ARequestThatHasAlreadyArrivedCannotArriveAgain()
+    {
+        var arrived = RequestLifecycle.Arriving(ARequest(), RequestArrival.Endpoint);
+        var approved = RequestLifecycle.Move(arrived, RequestState.Approved, At(9), ByFirstOperator);
+
+        Assert.Throws<InvalidOperationException>(
+            () => RequestLifecycle.Arriving(arrived, RequestArrival.Endpoint));
+        Assert.Throws<InvalidOperationException>(
+            () => RequestLifecycle.Arriving(approved, RequestArrival.Seam));
+    }
+
+    /// <summary>
+    /// There is no arrival to record without a request to record it on. It refuses rather than
     /// building an entry out of defaults, because an entry naming nobody at the epoch is a row that
     /// reads as a fact.
     /// </summary>
     [Fact]
-    public void AnArrivalCannotBeDerivedFromNothing()
+    public void AnArrivalCannotBeRecordedOnNothing()
     {
         Assert.Throws<ArgumentNullException>(
             () => RequestHistoryEntry.Arriving(RequestArrival.Endpoint, null!));
+        Assert.Throws<ArgumentNullException>(
+            () => RequestLifecycle.Arriving(null!, RequestArrival.Endpoint));
     }
 
     /// <summary>
