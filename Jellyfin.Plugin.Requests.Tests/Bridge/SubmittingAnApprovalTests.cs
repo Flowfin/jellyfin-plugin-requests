@@ -123,7 +123,7 @@ public sealed class SubmittingAnApprovalTests
     {
         var store = new InMemoryRequestStore();
         var service = new AServiceThatKeepsWhatItIsHanded();
-        var submission = new BridgeSubmission(service, store, new RecordingLogger());
+        var submission = new BridgeSubmission(service, store, TestClock.AtAFixedMoment(), new RecordingLogger());
         var approved = await AnApprovedRequestAsync(store).ConfigureAwait(true);
 
         var once = await submission.SubmitAsync(approved, CancellationToken.None).ConfigureAwait(true);
@@ -158,7 +158,7 @@ public sealed class SubmittingAnApprovalTests
             store,
             request => request with { RequesterNote = "moved by somebody else" });
 
-        var after = await new BridgeSubmission(service, contended, log)
+        var after = await new BridgeSubmission(service, contended, TestClock.AtAFixedMoment(), log)
             .SubmitAsync(approved, CancellationToken.None)
             .ConfigureAwait(true);
 
@@ -187,7 +187,7 @@ public sealed class SubmittingAnApprovalTests
         var log = new RecordingLogger();
         var approved = await AnApprovedRequestAsync(store).ConfigureAwait(true);
 
-        var after = await new BridgeSubmission(new NoRequestBackend(), store, log)
+        var after = await new BridgeSubmission(new NoRequestBackend(), store, TestClock.AtAFixedMoment(), log)
             .SubmitAsync(approved, CancellationToken.None)
             .ConfigureAwait(true);
 
@@ -294,7 +294,7 @@ public sealed class SubmittingAnApprovalTests
             new RecordingRequesterNotice(),
             new RecordingArrivalNotice(),
             new FakeLibrary(),
-            new BridgeSubmission(service, store, log ?? new RecordingLogger()));
+            new BridgeSubmission(service, store, TestClock.AtAFixedMoment(), log ?? new RecordingLogger()));
 
     /// <summary>
     /// The row a successful decision handed back, with the status code checked.

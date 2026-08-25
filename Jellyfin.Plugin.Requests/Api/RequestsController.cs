@@ -1159,7 +1159,9 @@ public sealed class RequestsController : RequestsControllerBase
             DeclineReason = stored.Request.DeclineReason,
             DeclineNote = stored.Request.DeclineNote,
             Availability = stored.Request.Availability,
-            AvailabilityCheckedAt = stored.Request.AvailabilityCheckedAt
+            AvailabilityCheckedAt = stored.Request.AvailabilityCheckedAt,
+            Backend = stored.Request.Backend,
+            HandoverFailedAt = stored.Request.HandoverFailedAt
         };
 
     /// <summary>

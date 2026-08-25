@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Storage;
+using Jellyfin.Plugin.Requests.Time;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Requests.Bridge;
@@ -19,9 +20,15 @@ namespace Jellyfin.Plugin.Requests.Bridge;
 /// <para>
 /// <b>An approval is never undone by a submission that failed.</b> The operator decided, the store
 /// already holds the decision, and a plugin that rolled it back would be overruling a person because
-/// a service on another machine was down. What a failure produces here is a log line and an approved
-/// request with no reference, which is a state that can be submitted again once the service is back.
-/// Making that failure visible to an operator without reading a log is #283.
+/// a service on another machine was down. What a failure produces here is a log line, an approved
+/// request with no reference, and the moment the attempt failed written onto the request, which is a
+/// state that can be submitted again once the service is back.
+/// </para>
+/// <para>
+/// <b>That moment is what an operator reads instead of the log.</b> Without it an approval nothing
+/// fetched and an approval a service accepted look the same in the queue, because both carry no
+/// reference. With it the two fields answer three states, and the one that needs somebody is the one
+/// that says so.
 /// </para>
 /// <para>
 /// <b>Submitting the same request twice is refused, and it is refused by looking at the request.</b>
@@ -41,6 +48,7 @@ public sealed class BridgeSubmission
 {
     private readonly IRequestBackend _backend;
     private readonly IRequestStore _store;
+    private readonly IClock _clock;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -48,11 +56,13 @@ public sealed class BridgeSubmission
     /// </summary>
     /// <param name="backend">Whatever else on this server fetches media.</param>
     /// <param name="store">Where requests are kept, for the reference to be written back into.</param>
+    /// <param name="clock">The clock, for the moment a failed handover is marked with.</param>
     /// <param name="logger">The server's log, which is where a failed submission is reported.</param>
-    public BridgeSubmission(IRequestBackend backend, IRequestStore store, ILogger logger)
+    public BridgeSubmission(IRequestBackend backend, IRequestStore store, IClock clock, ILogger logger)
     {
         _backend = backend;
         _store = store;
+        _clock = clock;
         _logger = logger;
     }
 
@@ -102,7 +112,7 @@ public sealed class BridgeSubmission
                 "Request {RequestId} was approved and could not be handed to the external request service. The approval stands and nothing was undone; it carries no reference, so it has not been fetched and can be submitted again.",
                 written.Request.Id);
 
-            return written;
+            return await MarkedAsFailedAsync(written, cancellationToken).ConfigureAwait(false);
         }
 
         if (reference is not BackendReference kept)
@@ -114,8 +124,11 @@ public sealed class BridgeSubmission
 
         try
         {
+            // The mark goes in the same write as the reference. A request carrying both would say
+            // the service has it and that handing it over failed, which are opposite facts, and a
+            // second write to clear it is a window in which the page shows exactly that.
             return await _store.ReplaceAsync(
-                written.Request with { Backend = kept },
+                written.Request with { Backend = kept, HandoverFailedAt = null },
                 written.Revision,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -132,6 +145,45 @@ public sealed class BridgeSubmission
                 written.Request.Id,
                 kept.Service,
                 kept.Id);
+
+            return written;
+        }
+    }
+
+    /// <summary>
+    /// Writes the moment a handover failed onto the request, and answers with the request as the
+    /// store holds it afterwards.
+    /// <para>
+    /// <b>Nothing here can cost the approval.</b> The decision is already written and this write is
+    /// about a field beside it, so a store that refuses this one answers with the request as it was:
+    /// the operator's decision stands, the failure is in the log, and the queue shows the request as
+    /// one nothing was tried on. That is a worse page than the one this method exists to draw and it
+    /// is not a worse record.
+    /// </para>
+    /// <para>
+    /// A request already carrying a mark is written again rather than left alone, because the moment
+    /// is the last attempt rather than the first, and an operator asked to act on a bridge that broke
+    /// needs the recent one.
+    /// </para>
+    /// </summary>
+    /// <param name="written">The request as the store wrote it, at its new revision.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>The request at the revision the store holds it at now.</returns>
+    private async Task<StoredRequest> MarkedAsFailedAsync(StoredRequest written, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _store.ReplaceAsync(
+                written.Request with { HandoverFailedAt = _clock.UtcNow },
+                written.Revision,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception reason)
+        {
+            _logger.LogWarning(
+                reason,
+                "Request {RequestId} could not be marked as one whose handover failed, so the queue will show it as a request nothing was tried on. The approval and the failure above are both unaffected.",
+                written.Request.Id);
 
             return written;
         }

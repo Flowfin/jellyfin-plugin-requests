@@ -94,6 +94,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<BridgeSubmission>(provider => new BridgeSubmission(
             provider.GetRequiredService<IRequestBackend>(),
             provider.GetRequiredService<IRequestStore>(),
+            provider.GetRequiredService<IClock>(),
             provider.GetRequiredService<ILogger<BridgeSubmission>>()));
 
         // When the bridge was last seen answering. One per server, because it is a fact about the

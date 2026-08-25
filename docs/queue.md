@@ -201,7 +201,10 @@ One question is deliberately not on the list because it would need one: whether 
 can actually fetch the title. That answer lives on the other side of the bridge, it changes without
 anybody here being told, and an operator who wants it is looking at the other system by definition.
 What this plugin owes instead is that a submission which fails is visible as a failure rather than as
-a request sitting in approved forever, which is the `Failed` state and is #82 and #86.
+a request sitting in approved forever. The column above is that owed to the operator's eye, from
+#283: a request the service took, one it refused, and one nothing was tried on are three different
+rows rather than two identical ones and a log line. What the request itself does about a handover
+that never arrives is the `Failed` state, which is #82 and #86.
 
 ## What the page shows today
 
@@ -209,25 +212,30 @@ The page was a shell when this list was written and it is not one now. It draws 
 row carries the decisions its state admits, from #61, and the two items above are columns on it:
 
     git grep -n "cell(row, " -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:348:                    function cell(row, text) {
-    Jellyfin.Plugin.Requests/Web/queue.html:637:                            cell(row, title(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:638:                            cell(row, RequestsShell.named("kind", request.Kind));
-    Jellyfin.Plugin.Requests/Web/queue.html:639:                            cell(row, RequestsShell.named("queue.state", request.State));
-    Jellyfin.Plugin.Requests/Web/queue.html:640:                            cell(row, moment(request.RequestedAt));
-    Jellyfin.Plugin.Requests/Web/queue.html:641:                            cell(row, moment(request.StateChangedAt));
-    Jellyfin.Plugin.Requests/Web/queue.html:642:                            cell(row, who(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:643:                            cell(row, waitingFor(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:644:                            cell(row, held(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:645:                            cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
-    Jellyfin.Plugin.Requests/Web/queue.html:646:                            cell(row, request.RequesterNote || "");
-    Jellyfin.Plugin.Requests/Web/queue.html:647:                            cell(row, decided(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:364:                    function cell(row, text) {
+    Jellyfin.Plugin.Requests/Web/queue.html:679:                            cell(row, title(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:680:                            cell(row, RequestsShell.named("kind", request.Kind));
+    Jellyfin.Plugin.Requests/Web/queue.html:681:                            cell(row, RequestsShell.named("queue.state", request.State));
+    Jellyfin.Plugin.Requests/Web/queue.html:682:                            cell(row, moment(request.RequestedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:683:                            cell(row, moment(request.StateChangedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:684:                            cell(row, who(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:685:                            cell(row, waitingFor(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:686:                            cell(row, held(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:687:                            cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
+    Jellyfin.Plugin.Requests/Web/queue.html:688:                            cell(row, request.RequesterNote || "");
+    Jellyfin.Plugin.Requests/Web/queue.html:689:                            cell(row, decided(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:692:                                cell(row, handover(request));
 
-The first of those twelve lines is the function that writes a cell and the other eleven are the cells
-one row carries. The twelfth column beside them is the decisions that row admits, which is #61:
+The first of those thirteen lines is the function that writes a cell and the rest are the cells one
+row carries. The last of them is indented one level deeper than the others because it is the only
+conditional one: what an external request service has to do with a request is drawn only where such a
+service is configured, so on a server that runs none the column is not in the page at all rather than
+being a column of blanks about a bridge nobody set up. Beside them is the decisions that row admits,
+which is #61:
 
     git grep -n "decide(row, request)" -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:469:                    function decide(row, request) {
-    Jellyfin.Plugin.Requests/Web/queue.html:648:                            decide(row, request);
+    Jellyfin.Plugin.Requests/Web/queue.html:511:                    function decide(row, request) {
+    Jellyfin.Plugin.Requests/Web/queue.html:695:                            decide(row, request);
 
 Read against the six items above, that is all of them.
 
