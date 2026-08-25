@@ -162,6 +162,57 @@ as an improvement in the diff.
 What a request itself carries to the service, as opposed to whose name it carries, is #82's, and it
 is not decided here.
 
+## Asking the service where things stand
+
+The service is where a handed-over request is actually worked on, so its state moves without this
+plugin being told. `ReconciliationTask` asks, hourly and at startup, in the `Requests` category of
+the server's own task list; `BridgeReconciliation` is what it runs.
+
+**What it looks at is the rule rather than a check inside it.** Only requests that are still
+approved and carry a reference are asked about. That is the one state a handover leaves behind, and
+it is what makes the precedence rule a property of the run's shape:
+
+- **A local decline is never reversed**, because a declined request is never asked about, so there
+  is no answer that could resurrect it. A decline an operator has to make twice because a remote
+  system keeps undoing it is the failure they never forgive.
+- **A fulfilled request is never asked about either.** Fulfilled is the library's word here,
+  observed when the person who asked can actually watch it, and no service on another machine knows
+  better.
+- **A request nothing was handed over for is never asked about**, because there is nothing to ask
+  with.
+
+**Every change goes through the transition table, with the plugin as the actor.** The entry the
+history keeps carries no person, which is true: nobody here decided it. A move the table refuses is
+reported in the log naming the request, and the request is left exactly as it is. Today the only
+word that moves anything moves an approved request to failed, so a request that has been sent onward
+and will not arrive stops looking like an operator forgot about it.
+
+**A word this table has not seen is a logged refusal and nothing else**, which is the section above
+applied at the one place that could have guessed.
+
+**A service that did not answer is said rather than swallowed**, once for the run and not once per
+request: the fact is about the service. Nothing is walked, every request is left as it is, and the
+next run asks again. A service that could not be asked at all is the same answer, because an
+unhandled exception in a scheduled task is a task that stops running.
+
+**One request the service cannot answer about does not stop the others.** That failure is a fact
+about one reference - it may have been issued by a service an operator has since replaced - and a
+run that stopped at the first would let one unknown title hold up every other request on the server.
+
+**A request that moved underneath the run is left as the newer decision left it.** What the service
+said is dropped rather than retried, because a retry would put its word over an answer an operator
+gave a moment ago.
+
+**On the ordinary install this does nothing and costs one call.** Most servers have no service, the
+run ends at the reachability check, and it says nothing above debug.
+
+**What is not claimed.** No run of this task on a server has been watched, and no service was
+reached: what the suite measures is the reconciliation against a double, on both claimed target
+frameworks. Which failures an adapter tells apart, and what each of them then does, is #86 and is
+not decided here. And **the person who asked is not told when their request fails this way** - no
+sentence is written for that state, so they find out on their own page. That is a gap rather than a
+decision, and `RequesterMessage.ForMove` is where it is written down.
+
 ## What needs a bridge
 
 Nothing does, and that is a claim the suite refuses to let drift rather than a sentence somebody
@@ -174,11 +225,12 @@ cannot arrive quietly: it either gets a line in this table saying so, or the cha
 
 <!-- needs-a-bridge begins -->
 
-| What                     | Without a bridge                                                          |
-| ------------------------ | ------------------------------------------------------------------------- |
-| `BridgeSubmission`       | Hands nothing over, keeps nothing, and writes no line about it.           |
-| `CapabilitiesController` | Answers, and says that no bridge is configured.                           |
-| `HealthController`       | Answers, and says the bridge is not configured rather than not answering. |
+| What                     | Without a bridge                                                                |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `BridgeReconciliation`   | Ends at the reachability check, walks no request, and says nothing above debug. |
+| `BridgeSubmission`       | Hands nothing over, keeps nothing, and writes no line about it.                 |
+| `CapabilitiesController` | Answers, and says that no bridge is configured.                                 |
+| `HealthController`       | Answers, and says the bridge is not configured rather than not answering.       |
 
 <!-- needs-a-bridge ends -->
 

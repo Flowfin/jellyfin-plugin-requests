@@ -223,6 +223,22 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
 
         serviceCollection.AddSingleton<IScheduledTask, RetentionTask>();
 
+        // What asks the external request service where the requests handed to it stand. Registered
+        // on every install rather than only where a service is configured, for the reason the bridge
+        // itself is: whether one exists is a value in a file an operator edits while the server is
+        // running, and a task list built at startup would answer with whatever was true then. On an
+        // install with no service the run ends at the reachability check and walks nothing.
+        serviceCollection.AddSingleton(provider => new BridgeReconciliation(
+            provider.GetRequiredService<IRequestStore>(),
+            provider.GetRequiredService<IRequestBackend>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<IActivityJournal>(),
+            provider.GetRequiredService<IRequesterNotice>(),
+            provider.GetRequiredService<BridgeWatch>(),
+            provider.GetRequiredService<ILogger<BridgeReconciliation>>()));
+
+        serviceCollection.AddSingleton<IScheduledTask, ReconciliationTask>();
+
         // The surface every client can reach. The server resolves its channels out of this
         // container, so this registration is what puts a place beside a person's libraries on
         // clients this project will never change.

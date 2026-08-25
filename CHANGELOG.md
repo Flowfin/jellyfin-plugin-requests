@@ -17,6 +17,15 @@ what came before it. What landed before this file existed is in the git history,
 where it carries the pull request and the issue it came from, and rewriting it
 from memory into entries would be a description nobody measured.
 
+- The queue no longer drifts away from an external request service. A scheduled
+  task asks that service, hourly and at startup, where the requests handed to it
+  stand, and applies what it says through the mapping table: today that means a
+  request the service gave up on stops sitting in approved looking like an
+  operator forgot about it. A decision made on this server is never reversed by
+  anything the service says, a word the table does not hold is reported and moves
+  nothing, and a service that did not answer leaves every request exactly as it
+  is. On a server with no such service the task does nothing at all.
+
 - Whether the title somebody asked for has arrived is now answered for them
   rather than for the server. Their own list asks the library on their behalf, so
   a person restricted by a parental rating or without access to the library a

@@ -30,7 +30,13 @@ public class NoBackendCompletenessTests
     /// Everything in the plugin that touches the bridge. Each is a place that has to keep working
     /// on a server with no external service.
     /// </summary>
-    private static readonly string[] Expected = ["BridgeSubmission", "CapabilitiesController", "HealthController"];
+    private static readonly string[] Expected =
+    [
+        "BridgeReconciliation",
+        "BridgeSubmission",
+        "CapabilitiesController",
+        "HealthController"
+    ];
 
     /// <summary>
     /// Everything that takes the bridge is named in the register, and nothing is named there that
