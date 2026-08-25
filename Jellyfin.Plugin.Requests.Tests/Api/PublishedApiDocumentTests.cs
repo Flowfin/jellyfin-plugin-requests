@@ -12,6 +12,7 @@ using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Localisation;
 using Jellyfin.Plugin.Requests.Model;
+using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
 using Microsoft.AspNetCore.Mvc;
@@ -85,6 +86,10 @@ public sealed class PublishedApiDocumentTests
         // is reading it to find out why.
         "GET MediaRequests/v1/Health () -> 200:PluginHealth",
 
+        // The one setting a person owns. No parameter at all: whose setting it is comes off the
+        // credential, and the absence of a parameter is the mechanism rather than an omission.
+        "GET MediaRequests/v1/Notices/Mine () -> 200:MyNoticeSetting, 403:RequestFailure, 503:RequestFailure",
+
         // The page a browser opens. One status and one shape, and the shape is a string because
         // what comes back is a document rather than a record: a generated client that expected a
         // record here would parse the markup. It refuses nothing of its own, so it publishes no
@@ -109,6 +114,12 @@ public sealed class PublishedApiDocumentTests
         // recognises is answered in English rather than refused, because a caller asking for words
         // wants words and the catalogue already falls back per key.
         "GET MediaRequests/v1/Strings (culture@Query:String) -> 200:PageStrings",
+
+        // Setting it. The body carries one field and no identifier, so the 400 is a body that said
+        // nothing rather than one that named the wrong person: there is no field on it that could.
+        "POST MediaRequests/v1/Notices/Mine"
+            + " (body@Body:SetMyNoticeBody)"
+            + " -> 200:MyNoticeSetting, 400:RequestFailure, 403:RequestFailure, 503:RequestFailure",
 
         // Asking for something. Two success codes with one shape: 201 is a new request and 200 is
         // one that was joined or was already the caller's, and a client tells them apart by the
@@ -289,6 +300,8 @@ public sealed class PublishedApiDocumentTests
         const string DeclineMany = "POST MediaRequests/v1/Requests/Decline";
         const string Strings = "GET MediaRequests/v1/Strings";
         const string Health = "GET MediaRequests/v1/Health";
+        const string ReadNotice = "GET MediaRequests/v1/Notices/Mine";
+        const string SetNotice = "POST MediaRequests/v1/Notices/Mine";
 
         // What this install allows. One call and one status: it reads no store, refuses nothing and
         // has no failure to walk, which is why it publishes one code where every other endpoint
@@ -324,6 +337,22 @@ public sealed class PublishedApiDocumentTests
         Saw(Mine, await ControllerFor(store, Asker).MineAsync(take: RequestsController.MaximumPageSize + 1, cancellationToken: CancellationToken.None).ConfigureAwait(true));
         Saw(Mine, await ControllerFor(store, caller: null).MineAsync(cancellationToken: CancellationToken.None).ConfigureAwait(true));
         Saw(Mine, await ControllerFor(unreadable, Asker).MineAsync(cancellationToken: CancellationToken.None).ConfigureAwait(true));
+
+        // The one setting a person owns. Three calls each: the answer, the caller that names no
+        // person, and the setting that could not be read. There is no fourth on the read and no
+        // fifth on the write, because neither endpoint takes anything that could be wrong except
+        // the one field the body carries.
+        var preferences = new InMemoryNoticePreferences();
+        var refusingPreferences = new NoticePreferencesThatCannotBeRead();
+
+        Saw(ReadNotice, await NoticesFor(preferences, Asker).MineAsync(CancellationToken.None).ConfigureAwait(true));
+        Saw(ReadNotice, await NoticesFor(preferences, caller: null).MineAsync(CancellationToken.None).ConfigureAwait(true));
+        Saw(ReadNotice, await NoticesFor(refusingPreferences, Asker).MineAsync(CancellationToken.None).ConfigureAwait(true));
+
+        Saw(SetNotice, await NoticesFor(preferences, Asker).SetMineAsync(new SetMyNoticeBody { TellsMe = false }, CancellationToken.None).ConfigureAwait(true));
+        Saw(SetNotice, await NoticesFor(preferences, Asker).SetMineAsync(new SetMyNoticeBody(), CancellationToken.None).ConfigureAwait(true));
+        Saw(SetNotice, await NoticesFor(preferences, caller: null).SetMineAsync(new SetMyNoticeBody { TellsMe = false }, CancellationToken.None).ConfigureAwait(true));
+        Saw(SetNotice, await NoticesFor(refusingPreferences, Asker).SetMineAsync(new SetMyNoticeBody { TellsMe = false }, CancellationToken.None).ConfigureAwait(true));
 
         Saw(Queue, await ControllerFor(store, Operator).QueueAsync(cancellationToken: CancellationToken.None).ConfigureAwait(true));
         Saw(Queue, await ControllerFor(store, Operator).QueueAsync(take: RequestsController.MaximumPageSize + 1, cancellationToken: CancellationToken.None).ConfigureAwait(true));
@@ -542,6 +571,15 @@ public sealed class PublishedApiDocumentTests
     /// <returns>The controller under test.</returns>
     private RequestsController ControllerFor(IRequestStore store, Guid? caller)
         => ControllerFor(store, caller, new FakeInstallSettings());
+
+    /// <summary>
+    /// The endpoint that holds one person's own switch, wired to what is kept and to one identity.
+    /// </summary>
+    /// <param name="preferences">What is kept about who wants to be told.</param>
+    /// <param name="caller">Who the server says is calling.</param>
+    /// <returns>The controller.</returns>
+    private static MyNoticeSettingController NoticesFor(INoticePreferences preferences, Guid? caller)
+        => new MyNoticeSettingController(new FakeCallerIdentity(caller), preferences);
 
     /// <summary>
     /// A controller wired to one store, one identity and one install, for the answer that depends on

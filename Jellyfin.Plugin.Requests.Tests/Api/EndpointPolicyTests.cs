@@ -70,6 +70,17 @@ public sealed class EndpointPolicyTests
         // sits where the queue sits, which is the only other place the whole store is readable.
         "HealthController.HealthAsync GET Health -> RequiresElevation",
 
+        // Reading the one setting a person owns here. A signed-in person, and it may never be more
+        // than that: an elevated policy would say an administrator is who reads this, and there is
+        // nothing on it to read but the caller's own answer.
+        "MyNoticeSettingController.MineAsync GET Notices/Mine -> (the server's default)",
+
+        // Setting it. The same policy as reading it, and it is the one place on this API where a
+        // signed-in person writes something that is not a request. What stops an administrator
+        // reaching somebody else's is not a policy and could not be one: the endpoint takes no
+        // identifier, so there is no call that names another person to refuse.
+        "MyNoticeSettingController.SetMineAsync POST Notices/Mine -> (the server's default)",
+
         // The page a person opens in a browser to see their own requests. A signed-in person, and
         // it is the policy that makes the page a page rather than a shell: a caller the server has
         // not authenticated is turned away instead of being handed the document and left to meet

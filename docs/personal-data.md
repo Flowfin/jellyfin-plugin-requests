@@ -31,6 +31,18 @@ Four of those seven name a person. What each one is, and what it is for:
 | `MediaRequest.StateChangedByUserId` | whoever last moved it, usually an operator                           | the queue file      |
 | `RequestHistoryEntry.ByUserId`      | the person who asked, on the arrival row, and whoever moved it after | the queue file      |
 
+One more identifier is held outside the record, so the derivation above does not reach it and it is
+named here rather than left to be found:
+
+| Field                       | Who it names                                   | Where it is written |
+| --------------------------- | ---------------------------------------------- | ------------------- |
+| `notices.json` -> `Quiet[]` | everybody who has turned their own notices off | the notices file    |
+
+It is the switch [notifications.md](notifications.md) describes. What it holds is a list of
+identifiers and nothing else: no title, no date, no request. The list is the people who said no,
+because the default is on, so a person who has never touched it is not in the file and an install
+nobody has touched has no file.
+
 The other three name nothing about a person. `MediaRequest.Id` and `MediaRequest.WantIds` are this
 plugin's own identifier for a request and the browsing sibling's identifiers for the asks it handed
 over. `RequestCaller.UserId` is who is making the call being handled right now, and it is an argument
@@ -80,11 +92,12 @@ when.
 
 ## Where it is
 
-Two files, both under the server's own data directory, and the table of them is in
+Three files, all under the server's own data directory, and the table of them is in
 [storage.md](storage.md) under "What is on the disk, and where". This page does not repeat the paths,
 because two copies of a path are two answers the day one of them moves.
 
-Everything above is in the queue file. The settings file holds no person at all, which is the whole
+Everything in the first table above is in the queue file, and the identifier in the second is in the
+notices file. The settings file holds no person at all, which is the whole
 of that class rather than a sample:
 
     git grep -nE '^    public (const )?(int|bool|string) ' -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
@@ -165,6 +178,12 @@ sweep, against the store the plugin ships, on both claimed target frameworks; th
 and starts the task on either line is the same unrun procedure every other scheduled behaviour here
 carries, in [testing.md](testing.md).
 
+**Nothing removes an entry from the notices file by age, and nothing should.** It is a setting rather
+than an event: it has no date on it, it stops meaning anything the moment it is dropped, and a sweep
+that removed it after a year would turn a person's own choice back on without telling them. What it
+holds about somebody is that they said no, and the way it goes is that they say yes or that their
+account goes, which is the section below.
+
 ## What happens when a Jellyfin user is deleted
 
 **Nothing.** No part of this plugin is told that a user was removed, and nothing looks:
@@ -180,6 +199,14 @@ going away.
 So a request record outlives the account it names. The identifier stays in the file, in up to four
 places for one deleted person: their own requests, requests they joined that somebody else asked for,
 and every decision they made as an operator, which is written into the record and into its history.
+
+**And there is now a fifth place, in the other file.** Somebody who turned their own notices off is
+an identifier in the notices file, and a deleted account leaves it there exactly as it leaves the
+four above. It is the least revealing of the five - it says that a person on this server once said
+no and nothing more - and it is still an identifier for somebody who is gone. #49 is where the rule
+for all of them is decided, and this one is deliberately not answered ahead of the other four: a
+plugin that swept one file on a deletion it is not told about would be describing a behaviour it does
+not have.
 
 **What the rule should be is open, and it is open for a reason rather than by neglect.** The history
 a decision is written into is append-only and a lint rule refuses any other writer, so stripping an

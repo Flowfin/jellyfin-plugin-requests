@@ -61,12 +61,22 @@
             <!--
                 What this page is and is not. It shows one person their own requests and offers no
                 decision, because a decision is an administrator's and the endpoints that make one
-                require elevation. The reason it holds no control at all is that everything it
-                could offer is either an administrator's or waits on a state this plugin does not
-                have: cancelling something still open needs a state a request can be withdrawn
-                into, which is an open decision on #113.
+                require elevation. The one control it holds is below, and it is the only kind that
+                belongs here: a setting about this person rather than about a request. Cancelling
+                something still open is still absent, because it needs a state a request can be
+                withdrawn into, which is an open decision on #113.
             -->
             <p class="requestsMineMessage" role="status"></p>
+
+            <!--
+                The switch on what this plugin pushes at the person reading the page. It ships
+                hidden and is revealed once the endpoint has answered, so a page that could not
+                reach it shows no control rather than an unchecked box that reads as "off".
+            -->
+            <p class="requestsMineNotices" hidden>
+                <input type="checkbox" id="RequestsMineNotices" />
+                <label for="RequestsMineNotices" data-i18n="mine.notices.label"></label>
+            </p>
 
             <table>
                 <caption class="requestsMineSummary" aria-live="polite"></caption>
@@ -93,6 +103,8 @@
                 var rows = page.querySelector(".requestsMineRows");
                 var summary = page.querySelector(".requestsMineSummary");
                 var message = page.querySelector(".requestsMineMessage");
+                var notices = page.querySelector(".requestsMineNotices");
+                var noticesBox = page.querySelector("#RequestsMineNotices");
 
                 /*
                  * The largest page the endpoint serves. This page asks for it in one call and has
@@ -164,6 +176,25 @@
 
                 function fetched(endpoint, asked) {
                     return fetch(address(endpoint, asked), { headers: { Accept: "application/json" } }).then(function (answered) {
+                        if (!answered.ok) {
+                            throw new Error(String(answered.status));
+                        }
+
+                        return answered.json();
+                    });
+                }
+
+                /*
+                 * The one call this page makes that changes anything. It sends no identifier: whose
+                 * setting is being changed is read off the credential by the endpoint, which is what
+                 * makes it impossible for this page, or for anything else, to change somebody else's.
+                 */
+                function sent(endpoint, body) {
+                    return fetch(address(endpoint), {
+                        method: "POST",
+                        headers: { Accept: "application/json", "Content-Type": "application/json" },
+                        body: JSON.stringify(body),
+                    }).then(function (answered) {
                         if (!answered.ok) {
                             throw new Error(String(answered.status));
                         }
@@ -290,9 +321,9 @@
 
                 /*
                  * Every element that names a key gets the word under it. Attributes are not walked
-                 * here because nothing on this page carries a translatable one; the two that would
-                 * be, a label and a title on a control, arrive with the controls this page does not
-                 * have.
+                 * here because nothing on this page carries a translatable one: the label on the
+                 * one control is an element of its own rather than an attribute, exactly so that it
+                 * arrives through this walk like every other word.
                  */
                 function fill() {
                     document.querySelectorAll("[data-i18n]").forEach(function (element) {
@@ -311,6 +342,40 @@
                     return window.navigator && window.navigator.language ? { culture: window.navigator.language } : {};
                 }
 
+                /*
+                 * The switch, once the endpoint has said which way it is set. It is shown only
+                 * after that answer, because a checkbox drawn before it is a control claiming a
+                 * state nobody has read, and the state it would claim is the one somebody would
+                 * least want claimed for them.
+                 *
+                 * A change that the endpoint refuses puts the box back where it was. Leaving it
+                 * where the person clicked would show them a setting the server does not hold, and
+                 * the next thing they would notice is a message they thought they had turned off.
+                 */
+                function showNotices(setting) {
+                    noticesBox.checked = Boolean(setting.TellsMe);
+                    notices.hidden = false;
+                }
+
+                function changeNotices() {
+                    var wanted = noticesBox.checked;
+
+                    noticesBox.disabled = true;
+
+                    return sent("Notices/Mine", { TellsMe: wanted })
+                        .then(function (setting) {
+                            noticesBox.checked = Boolean(setting.TellsMe);
+                            tell("");
+                        })
+                        .catch(function () {
+                            noticesBox.checked = !wanted;
+                            tell("mine.notices.notSaved");
+                        })
+                        .then(function () {
+                            noticesBox.disabled = false;
+                        });
+                }
+
                 function read() {
                     return fetched("Strings", culture())
                         .then(function (answer) {
@@ -322,11 +387,25 @@
                         .then(function (answer) {
                             tell("");
                             draw(answer);
+
+                            /*
+                             * After the rows and never instead of them. The setting is a courtesy
+                             * about a courtesy, and a page that could not read it is still the page
+                             * that answers what somebody came here for, so this failure leaves the
+                             * requests drawn and takes the control away rather than the list.
+                             */
+                            return fetched("Notices/Mine")
+                                .then(showNotices)
+                                .catch(function () {
+                                    notices.hidden = true;
+                                });
                         })
                         .catch(function () {
                             tell("mine.notRead");
                         });
                 }
+
+                noticesBox.addEventListener("change", changeNotices);
 
                 read();
             })();

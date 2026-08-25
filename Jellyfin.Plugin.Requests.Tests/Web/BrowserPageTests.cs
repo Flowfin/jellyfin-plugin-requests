@@ -42,9 +42,17 @@ namespace Jellyfin.Plugin.Requests.Tests.Web;
 public sealed class BrowserPageTests
 {
     /// <summary>
+    /// The one endpoint the page is allowed to send to, and the one element a person can operate on
+    /// it. Both are the switch on what this plugin pushes at whoever is reading the page, which is
+    /// the only kind of control that belongs here: a setting about this person rather than a
+    /// decision about a request.
+    /// </summary>
+    private const string TheOneItSendsTo = "Notices/Mine";
+
+    /// <summary>
     /// The endpoints the page is allowed to name, in the order the assertion compares them.
     /// </summary>
-    private static readonly string[] TheTwoItAsksFor = ["Requests", "Strings"];
+    private static readonly string[] TheThreeItAsksFor = ["Notices/Mine", "Requests", "Strings"];
 
     /// <summary>
     /// The elements a browser gives a person something to operate. Anything a page offers a
@@ -110,30 +118,36 @@ public sealed class BrowserPageTests
     }
 
     /// <summary>
-    /// The page asks this plugin for two things and they are its own words and the caller's own
-    /// requests.
+    /// The page asks this plugin for three things and they are its own words, the caller's own
+    /// requests, and the caller's own setting about being told.
     /// <para>
     /// The address is built against the page's own, so what is asserted is the relative part and
-    /// that there is one place that builds it. A third call added to this page is a third thing a
+    /// that there is one place that builds it. A fourth call added to this page is a fourth thing a
     /// user's browser asks for on their behalf, and that is the shape by which an administrator's
     /// answer arrives on a page that was never meant to hold one. The set is written out rather
     /// than counted, so a call swapped for another of the same number fails here too.
     /// </para>
     /// <para>
-    /// The words are the second because the page ships with none, which is #73. What that costs is
+    /// The words are among them because the page ships with none, which is #73. What that costs is
     /// in the page's own comment: a catalogue that cannot be fetched leaves the page wordless.
+    /// </para>
+    /// <para>
+    /// Two <c>fetch</c> calls rather than one, because reading and sending are two shapes and the
+    /// sending one carries a method and a body. One <c>new URL</c> still, which is the thing that
+    /// actually matters: every address this page uses is built in the one place that carries the
+    /// credential no further than the call.
     /// </para>
     /// </summary>
     [Fact]
-    public void ThePageAsksForNothingButItsWordsAndTheCallersOwnRequests()
+    public void ThePageAsksForNothingButItsWordsAndTheCallersOwn()
     {
         var body = Page();
 
-        Assert.Equal(1, Occurrences(body, "fetch("));
+        Assert.Equal(2, Occurrences(body, "fetch("));
         Assert.Equal(1, Occurrences(body, "new URL("));
         Assert.Equal(
-            TheTwoItAsksFor,
-            Regex.Matches(body, @"fetched\(""(?<endpoint>[A-Za-z]+)""")
+            TheThreeItAsksFor,
+            Regex.Matches(body, @"(?:fetched|sent)\(""(?<endpoint>[A-Za-z/]+)""")
                 .Select(match => match.Groups["endpoint"].Value)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(endpoint => endpoint, StringComparer.Ordinal)
@@ -195,16 +209,24 @@ public sealed class BrowserPageTests
     }
 
     /// <summary>
-    /// The page offers no way to decide anything.
+    /// The page offers no way to decide anything about a request, and exactly one way to set
+    /// something about the person reading it.
     /// <para>
-    /// A control is how a decision arrives on a page, and this one has none: everything it could
-    /// offer is either an administrator's or waits on a state a request can be withdrawn into,
-    /// which is an open decision on #113. So the assertion is over the elements a person can
-    /// operate rather than over the words on the page, and it reds the moment one is added.
+    /// A control is how a decision arrives on a page. This one carries a single checkbox, and what
+    /// it sets is what this plugin pushes at whoever is signed in; everything else a page like this
+    /// could offer is either an administrator's or waits on a state a request can be withdrawn
+    /// into, which is an open decision on #113. So the assertion is over the elements a person can
+    /// operate rather than over the words, and it reds the moment a second one is added.
+    /// </para>
+    /// <para>
+    /// The second half is the one that matters more, because a control is only as narrow as what it
+    /// sends: the page's one sending call goes to the endpoint that takes no identifier, so there
+    /// is no address on this page through which anybody's setting but the caller's own could be
+    /// changed.
     /// </para>
     /// </summary>
     [Fact]
-    public void ThePageCarriesNoControlAPersonCanOperate()
+    public void TheOnlyControlThePageCarriesIsThePersonsOwnSwitch()
     {
         var body = Page();
 
@@ -212,8 +234,10 @@ public sealed class BrowserPageTests
             .Where(element => body.Contains(element, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
-        Assert.Empty(carried);
-        Assert.DoesNotContain(@"method: ""POST""", body, StringComparison.Ordinal);
+        Assert.Equal(["<input"], carried);
+        Assert.Equal(1, Occurrences(body, "<input"));
+        Assert.Equal(1, Occurrences(body, @"method: ""POST"""));
+        Assert.Equal(1, Occurrences(body, @"sent(""" + TheOneItSendsTo + @""""));
     }
 
     /// <summary>

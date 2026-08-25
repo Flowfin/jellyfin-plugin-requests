@@ -49,6 +49,8 @@
   "mine.countAll": "{0} in all",
   "mine.countSome": "The first {0} of {1}",
   "mine.empty": "You have not asked for anything yet.",
+  "mine.notices.label": "Tell me here when one of my requests moves",
+  "mine.notices.notSaved": "That setting could not be saved, so it is left as it was.",
   "mine.notRead": "Your requests could not be read. If this page was opened from a link that has expired, sign in again and open it afresh.",
   "mine.state.Approved": "Approved",
   "mine.state.Declined": "Declined",

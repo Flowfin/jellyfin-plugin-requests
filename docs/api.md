@@ -338,6 +338,40 @@ a real cost and it is stated here and in [surface.md](surface.md) rather than le
 This endpoint neither creates such a credential nor extends one, and the page carries what it was
 opened with no further than the one call it makes.
 
+## The one setting a person owns
+
+    GET  MediaRequests/v1/Notices/Mine
+    POST MediaRequests/v1/Notices/Mine
+
+Whether this plugin pushes the caller a message when one of their own requests moves. Both carry the
+server's default policy, so any signed-in caller reaches them, and what each answers is about the
+caller and nobody else.
+
+**Neither takes an identifier, and that is the mechanism rather than a check.** There is no path
+segment, no query parameter and no body field naming a person: whose setting is read or written comes
+off the credential the call carries. So there is no call an administrator can make that changes what
+somebody else is told, and no refusal for one is documented because there is no such call to refuse.
+Who the switch belongs to was decided on #9 and the reasoning is in
+[notifications.md](notifications.md).
+
+The body of the write carries one field:
+
+```json
+{ "TellsMe": false }
+```
+
+**A body that leaves it out is refused rather than read as `false`.** A client sending an empty
+object would otherwise silence the person, which is the direction in which a mistake is not noticed:
+the person finds out by not being told something. The refusal is `InvalidBody` naming `tellsMe`.
+
+**The answer is the setting as it stands after the call**, so a client draws what the server holds
+rather than what it sent. A call that sets it to what it already is answers the same shape and writes
+nothing.
+
+**A setting that cannot be read is `503` and not `500`.** Nothing is wrong with the call; the file
+this plugin keeps it in could not be read, and an operator repairing that makes the same call work.
+Nothing of the underlying refusal reaches the caller, because its message is written for a log.
+
 ## Reading the queue
 
     GET MediaRequests/v1/Requests/Queue

@@ -208,14 +208,23 @@ by hand, which is the thing this rule is against.
 
 ### What is on the disk, and where
 
-Two files, both under the directory the server keeps its own data in, so a backup of that directory
-is a backup of this plugin and an operator has nothing extra to configure:
+Everything is under the directory the server keeps its own data in, so a backup of that directory is
+a backup of this plugin and an operator has nothing extra to configure:
 
-| What              | Where                                                    | In a backup |
-| ----------------- | -------------------------------------------------------- | ----------- |
-| The queue         | `plugins/Jellyfin.Plugin.Requests/requests.json`         | Required    |
-| The settings      | `plugin-configurations/Jellyfin.Plugin.Requests.xml`     | Required    |
-| A write in flight | `plugins/Jellyfin.Plugin.Requests/requests.json.writing` | Not needed  |
+| What                 | Where                                                    | In a backup |
+| -------------------- | -------------------------------------------------------- | ----------- |
+| The queue            | `plugins/Jellyfin.Plugin.Requests/requests.json`         | Required    |
+| The settings         | `plugin-configurations/Jellyfin.Plugin.Requests.xml`     | Required    |
+| Who wants no notices | `plugins/Jellyfin.Plugin.Requests/notices.json`          | Required    |
+| A write in flight    | `plugins/Jellyfin.Plugin.Requests/requests.json.writing` | Not needed  |
+| A write in flight    | `plugins/Jellyfin.Plugin.Requests/notices.json.writing`  | Not needed  |
+
+The third row is absent on a server where nobody has turned their own notices off, which is what a
+fresh install is: the default is the absence of a value rather than a value, so the file appears the
+first time somebody says no. A backup taken before that carries nothing about anybody, and that is
+correct rather than a gap. It is `Required` because a restore without it turns everybody's own
+setting back on, and the person who set it would find out by being told something they had asked not
+to be told. [`notifications.md`](notifications.md) is where the switch itself is written down.
 
 The paths are relative to the server's data directory. Where that directory is differs by
 installation and by operating system, and this document does not name it: the server is the
@@ -236,9 +245,10 @@ that line reads is a static that any other test class can replace while a leg is
 built on it would fail for reasons nobody caused. It is a line to read rather than a property the
 suite holds.
 
-The third row is the file a write is built in before it replaces the queue. It is listed so a backup
-that swept it up is not read as a problem: a restore that carries one ignores it and reads the queue,
-which is `APendingFileCarriedIntoTheBackupIsNotWhatIsRestored`.
+The last two rows are the files a write is built in before it replaces the one beside it. They are
+listed so a backup that swept one up is not read as a problem: a restore that carries one ignores it
+and reads the file it was going to replace, which for the queue is
+`APendingFileCarriedIntoTheBackupIsNotWhatIsRestored`.
 
 ### Restoring
 

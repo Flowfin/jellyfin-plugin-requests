@@ -167,10 +167,22 @@ operator handing this address to their household should treat it as handing over
 
 ### What the page does not do
 
-**It offers no decision and no control at all.** Approving and declining need an administrator, and
+**It offers no decision about a request.** Approving and declining need an administrator, and
 cancelling something still open needs a state a request can be withdrawn into, which this plugin does
 not have: whether there is a cancelled state is an open decision on #113. So the page is a thing to
 read, and a control that could not do anything would be worse than none.
+
+**It carries one control, and it is not a decision.** A checkbox that turns off the message this
+plugin pushes at the person reading the page when one of their own requests moves. It belongs there
+because it is a setting about that person rather than about a request, and because the surface it
+would otherwise live on is the dashboard, which is the administrator's - an operator able to silence
+what somebody else is told is the shape #9's decision refuses.
+[notifications.md](notifications.md) carries the switch and both endpoints.
+
+The checkbox is hidden until the endpoint has answered which way it is set, so a page that could not
+read it shows no control rather than an unchecked box that reads as "off". A change the server
+refuses puts it back where it was, because showing somebody a setting the server does not hold is how
+a person finds out by being told something they thought they had turned off.
 
 **It has no pager.** It asks for the largest page the endpoint serves and says how many matched
 beside how many it drew, so somebody with more requests than that is told so rather than shown a

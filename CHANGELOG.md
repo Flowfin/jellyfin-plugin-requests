@@ -30,8 +30,17 @@ from memory into entries would be a description nobody measured.
   signed-in clients and to nobody else's, carrying the title and, on a decline,
   the reason. It reaches whoever is connected at that moment and nothing
   remembers who was missed, so the answer to rely on is still their own page,
-  which shows the state whenever they next look. There is no setting for it and
-  nothing leaves the machine.
+  which shows the state whenever they next look. Nothing leaves the machine, and
+  the person it is about can turn it off, which is the entry below.
+
+- A person can turn off the message this plugin pushes them about their own
+  request. The switch is a checkbox on their own requests page and it is theirs
+  alone: no setting an operator can reach overrides it, and nothing an
+  administrator can call changes anybody's but their own. It is on by default, so
+  a server that upgrades into this behaves exactly as it did before, and what is
+  kept is a small file of the people who said no rather than a row per person. A
+  setting that cannot be read leaves the message unsent rather than sending it,
+  and says so in the server log.
 
 - `FinishedRequestRetentionDays` is enforced. A scheduled task removes a request
   that has been fulfilled, declined or failed for longer than that number of
