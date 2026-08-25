@@ -250,6 +250,49 @@ public static class RequestLifecycle
     }
 
     /// <summary>
+    /// The request as it comes into existence, carrying the one entry that says how the ask reached
+    /// this server.
+    /// <para>
+    /// An arrival is the only row in a history that is not a move, and it lives here for the same
+    /// reason every move does: this is the one place a history grows. A surface assigning the list
+    /// itself is refused by <c>history-is-only-appended-to</c>, and the refusal is the rule rather
+    /// than a style preference, because a caller that can build a list can build one with a decision
+    /// left out of it.
+    /// </para>
+    /// <para>
+    /// It appends rather than replaces, and it refuses a request that already has a history, so the
+    /// row can only ever be the first. An arrival written underneath a decision would say a request
+    /// arrived after it was answered, and the history is append-only, so nothing could take it back
+    /// out afterwards.
+    /// </para>
+    /// <para>
+    /// What the entry says is derived from the request itself, in
+    /// <see cref="RequestHistoryEntry.Arriving"/>. The only thing this adds is which surface the ask
+    /// came in on, which is the one fact the record does not already hold.
+    /// </para>
+    /// </summary>
+    /// <param name="request">The request being made, as the surface built it.</param>
+    /// <param name="over">Which surface the ask arrived on.</param>
+    /// <returns>The request with its arrival recorded.</returns>
+    /// <exception cref="ArgumentNullException">Where no request was given.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Where the request already carries a history, which means it has already arrived.
+    /// </exception>
+    public static MediaRequest Arriving(MediaRequest request, RequestArrival over)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.History.Count > 0)
+        {
+            throw new InvalidOperationException(
+                FormattableString.Invariant(
+                    $"A request carrying {request.History.Count} history entries has already arrived, so recording an arrival on it would put one underneath a decision that was already made."));
+        }
+
+        return request with { History = [.. request.History, RequestHistoryEntry.Arriving(over, request)] };
+    }
+
+    /// <summary>
     /// The one place a request changes state, and therefore the one place the history grows and the
     /// one place a caller's authority is checked. Both public methods above go through here, so
     /// "every transition appends exactly one entry" and "every transition asks who is making it" are

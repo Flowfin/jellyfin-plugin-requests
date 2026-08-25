@@ -55,6 +55,12 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
     /// record, so the request carries a history and the round trip has one to lose. A request whose
     /// history is empty would let a store that drops the field entirely pass this.
     /// </para>
+    /// <para>
+    /// The history is two rows rather than one, and they are of the two different kinds there are:
+    /// the arrival the surface wrote when the request came into existence, and the move an operator
+    /// made afterwards. A round trip over one kind would let a store that drops the arrival back
+    /// through, and the arrival is the row that carries the field this record gained last.
+    /// </para>
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
@@ -62,15 +68,17 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
     {
         var directory = ADirectory();
         var approvedBy = new Guid("2b7b4f1d-4f0e-4a63-9a3d-0f5a1c9e77aa");
+        var asked = ARequest(1) with
+        {
+            DisplayTitle = "A title with a comma, an accent é and a quote \"",
+            DisplayYear = 1999,
+            ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "603", ["Imdb"] = "tt0133093" },
+            Availability = LibraryAvailability.Partial,
+            AvailabilityCheckedAt = new DateTimeOffset(2026, 3, 3, 0, 0, 0, TimeSpan.Zero)
+        };
+
         var full = RequestLifecycle.Move(
-            ARequest(1) with
-            {
-                DisplayTitle = "A title with a comma, an accent é and a quote \"",
-                DisplayYear = 1999,
-                ProviderIds = new Dictionary<string, string>(StringComparer.Ordinal) { ["Tmdb"] = "603", ["Imdb"] = "tt0133093" },
-                Availability = LibraryAvailability.Partial,
-                AvailabilityCheckedAt = new DateTimeOffset(2026, 3, 3, 0, 0, 0, TimeSpan.Zero)
-            },
+            RequestLifecycle.Arriving(asked, RequestArrival.Seam),
             RequestState.Approved,
             new DateTimeOffset(2026, 8, 8, 9, 0, 0, TimeSpan.Zero),
             RequestCaller.Administrator(approvedBy));
@@ -108,10 +116,14 @@ public sealed class FileRequestStoreDurabilityTests : IDisposable
             full.ProviderIds.OrderBy(pair => pair.Key, StringComparer.Ordinal),
             readFull.Value.Request.ProviderIds.OrderBy(pair => pair.Key, StringComparer.Ordinal));
 
-        // Entry by entry, and the entries are records of values, so this compares what each move
-        // said and not which list it is in. The approval above is the one entry there is to lose.
+        // Entry by entry, and the entries are records of values, so this compares what each row
+        // said and not which list it is in. The arrival and the approval above are the two entries
+        // there are to lose, and the arrival is asserted by name because it is the only row
+        // carrying an arrival at all.
         Assert.Equal(full.History, readFull.Value.Request.History);
-        Assert.Single(readFull.Value.Request.History);
+        Assert.Equal(2, readFull.Value.Request.History.Count);
+        Assert.Equal(RequestArrival.Seam, readFull.Value.Request.History[0].Arrival);
+        Assert.Null(readFull.Value.Request.History[1].Arrival);
 
         Assert.Equal(full.JoinedByUserIds, readFull.Value.Request.JoinedByUserIds);
         Assert.Single(readFull.Value.Request.JoinedByUserIds);

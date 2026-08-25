@@ -358,15 +358,15 @@ somebody closed a browser, and a replay that can only be run once is one nobody 
     git grep -n 'TheWholeSetReplayedTwiceIsTheQueueItMadeTheFirstTime\|AReplayThatStoppedHalfwayIsSafeToRunAgainFromTheStart' -- Jellyfin.Plugin.Requests.Tests/Seam/WantHandoverTests.cs
 
 **What is not answered, and it is the rest of #93.** An adopted request is not distinguishable from
-one that arrived live. A request carries no history entry when it is made, and
-`RequestHistoryEntry` has no field that could say how the ask reached this side:
+one that arrived live. Both cross on the same call, so the entry a request now carries says the seam
+for either of them, and the moment on it is the moment the replay ran rather than the moment the
+person asked, because that is the only moment this side ever sees:
 
-    git grep -n 'public required RequestState From\|public Guid? ByUserId' -- Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs
+    git grep -n 'At = request.RequestedAt' -- Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs
 
-So an operator who finds a sudden queue cannot see where it came from. What a request records about
-having arrived over the seam is the entry below that belongs to #118, and it has to be settled there
-rather than added afterwards, because the history is append-only and entries written without it
-cannot be corrected.
+So an operator who finds a sudden queue can see that it came over the seam and cannot see that it is
+a replay. Telling the two apart needs something the contract does not carry, which is #93's question
+rather than this section's. What a request does record about having arrived is the section below.
 
 ## What this side trusts, and what it checks anyway
 
@@ -396,6 +396,45 @@ a user nobody has is a row no surface can ever show to anyone and a person nothi
 The check costs one reference, which is written down in `SiblingIndependenceTests` with the reason:
 the server's user manager answers this question with the user record, and this plugin reads nothing
 out of that record.
+
+## What a request records about having arrived over the seam
+
+A request made from a want carries one history entry saying so. It is written when the request comes
+into existence, it is the head of that request's history, and every decision made on the request
+afterwards appends beneath it.
+
+    git grep -n 'RequestLifecycle.Arriving(incoming, RequestArrival.Seam)' -- Jellyfin.Plugin.Requests/Seam/WantHandover.cs
+
+It is written through the lifecycle rather than onto the record, because that is the one place a
+request's history grows and a surface assigning the list itself is refused by name:
+
+    git grep -n 'id: history-is-only-appended-to' -- tools/opengrep/rules.yaml
+
+**What it says is how, and never who.** The entry names the surface and not the caller. The contract
+grows no field naming the plugin that handed the want over, decided on #118, because a field carrying
+it would be the sender saying who they are, and a history that records an unverified self-declaration
+as fact is worse than one that records less. Reading a caller off an assembly name or a call stack
+instead is the same invented value with a different excuse.
+
+**That cost is permanent in one direction, and it is written here rather than only on the issue.** If
+a second handing sibling ever ships, the rows written before it do not carry the distinction and
+cannot be backfilled, because the history is append-only. The question "which plugin filed this"
+therefore becomes unanswerable for everything already landed, on the day somebody first asks it.
+
+**What the entry is for is the trust position above.** A request that arrived here is filed against
+whoever the caller said asked for it, with no session behind the name. A request asked for over this
+plugin's own endpoint carries the other value and means the opposite: the server authenticated the
+person it is filed against. An operator answering for a request can tell those two apart from the
+record now, which was not possible before this entry existed.
+
+    git grep -n '^    Seam = 0,\|^    Endpoint = 1' -- Jellyfin.Plugin.Requests/Model/RequestArrival.cs
+
+**One arrival per request, not one per person.** A want naming something already in the queue joins
+the request that is there, and a want handed over a second time writes nothing at all, so neither
+adds a row. What the entry records is how the request reached this server and not how each person
+waiting on it did.
+
+    git grep -n 'SomebodyJoiningOverTheSeamAddsNoSecondArrival\|TheSameWantHandedOverAgainRecordsNoSecondArrival' -- Jellyfin.Plugin.Requests.Tests/Seam/WantHandoverTests.cs
 
 ## A field set this side does not understand is refused whole
 
@@ -445,13 +484,10 @@ install is refusing and why is the diagnostics view in #63.
 
 ## What this document does not yet hold
 
-Named here so the absence is read as absence rather than as a decision nobody wrote down. Each is
-the closing condition of the issue beside it.
+Named here so an absence is read as absence rather than as a decision nobody wrote down. Each entry
+is the closing condition of the issue beside it.
 
-- What a request records about having arrived over the seam. Which caller handed it over is settled
-  and is not part of it: the contract grows no field naming the caller, decided on #118, because a
-  field carrying it would be the sender saying who they are, and a history that records an
-  unverified self-declaration as fact is worse than one that records less. That cost is permanent in
-  one direction. If a second handing sibling ever ships, the rows written before it do not carry the
-  distinction and cannot be backfilled, so the question becomes unanswerable for everything already
-  landed. What is still owed here is the history itself, which does not exist yet. #118.
+**Nothing today.** The one entry that stood here was what a request records about having arrived over
+the seam, and that is a section of this document now rather than a gap in it. The permanent cost it
+carried has moved with it and is not softened on the way: which plugin handed a want over is not
+recorded, and for everything already landed it never can be. #118.

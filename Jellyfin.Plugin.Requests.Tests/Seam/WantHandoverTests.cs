@@ -733,6 +733,83 @@ public class WantHandoverTests
         };
 
     /// <summary>
+    /// A request made from a want records that it arrived over the seam, and that is the whole of
+    /// what it records about the handover.
+    /// <para>
+    /// The failure this stands against is an operator who finds a request filed against somebody and
+    /// has no way to see that no session stood behind the name on it. Which plugin handed it over is
+    /// deliberately absent, decided on #118, and the leg below asserts every field of the entry
+    /// rather than only the arrival, so a field quietly carrying a caller would show up here.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task ARequestMadeFromAWantRecordsThatItArrivedOverTheSeam()
+    {
+        var store = new InMemoryRequestStore();
+
+        Assert.True(await Seam(store).AcceptAsync(Want(), CancellationToken.None));
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None)).Request;
+        var entry = Assert.Single(made.History);
+
+        Assert.Equal(RequestArrival.Seam, entry.Arrival);
+        Assert.Equal(Asker, entry.ByUserId);
+        Assert.Equal(Noon, entry.At);
+        Assert.Equal(made.State, entry.From);
+        Assert.Equal(made.State, entry.To);
+        Assert.Null(entry.Reason);
+        Assert.Null(entry.Note);
+    }
+
+    /// <summary>
+    /// The same want handed over again records no second arrival. A replay is the ordinary case
+    /// here rather than the exception, and a history that grew a row every time the other side
+    /// restarted would say a request arrived as many times as the sibling was reinstalled.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task TheSameWantHandedOverAgainRecordsNoSecondArrival()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+
+        Assert.True(await handover.AcceptAsync(Want(), CancellationToken.None));
+        Assert.True(await handover.AcceptAsync(Want(), CancellationToken.None));
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None)).Request;
+
+        Assert.Equal(RequestArrival.Seam, Assert.Single(made.History).Arrival);
+    }
+
+    /// <summary>
+    /// Somebody joining a request that is already here adds no second arrival. The request arrived
+    /// once; what a later person did is join something already in the queue, and the entry is about
+    /// the record rather than about each person waiting on it.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task SomebodyJoiningOverTheSeamAddsNoSecondArrival()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+
+        Assert.True(await handover.AcceptAsync(Want(), CancellationToken.None));
+        Assert.True(await handover.AcceptAsync(
+            Want() with
+            {
+                WantId = new Guid("44444444-4444-4444-4444-444444444444"),
+                RequestedByUserId = SecondAsker
+            },
+            CancellationToken.None));
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None)).Request;
+
+        Assert.Equal([SecondAsker], made.JoinedByUserIds);
+        Assert.Equal(Asker, Assert.Single(made.History).ByUserId);
+    }
+
+    /// <summary>
     /// What the sibling had already recorded on a server that ran it before this plugin arrived.
     /// <para>
     /// Four wants, chosen for the shapes that go wrong together. Two people want one film, so the

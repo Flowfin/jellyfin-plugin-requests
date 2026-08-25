@@ -14,22 +14,22 @@ The record is one type, and everything below is a property of it or of an entry 
 identifiers are derived rather than listed from memory:
 
     git grep -nE 'public (required )?(Guid|Guid\?|IReadOnlyList<Guid>) ' -- Jellyfin.Plugin.Requests/Model/
-    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:60:    public required Guid Id { get; init; }
-    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:67:    public required Guid RequestedByUserId { get; init; }
-    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:144:    public IReadOnlyList<Guid> JoinedByUserIds { get; init; } = [];
-    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:165:    public IReadOnlyList<Guid> WantIds
-    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:189:    public Guid? StateChangedByUserId { get; init; }
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:61:    public required Guid Id { get; init; }
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:68:    public required Guid RequestedByUserId { get; init; }
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:145:    public IReadOnlyList<Guid> JoinedByUserIds { get; init; } = [];
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:166:    public IReadOnlyList<Guid> WantIds
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:190:    public Guid? StateChangedByUserId { get; init; }
     Jellyfin.Plugin.Requests/Model/RequestCaller.cs:52:    public Guid? UserId { get; }
-    Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs:44:    public Guid? ByUserId { get; init; }
+    Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs:50:    public Guid? ByUserId { get; init; }
 
 Four of those seven name a person. What each one is, and what it is for:
 
-| Field                               | Who it names                                         | Where it is written |
-| ----------------------------------- | ---------------------------------------------------- | ------------------- |
-| `MediaRequest.RequestedByUserId`    | the person who asked                                 | the queue file      |
-| `MediaRequest.JoinedByUserIds`      | everybody else who asked for the same title          | the queue file      |
-| `MediaRequest.StateChangedByUserId` | whoever last moved it, usually an operator           | the queue file      |
-| `RequestHistoryEntry.ByUserId`      | whoever made that one move, for every move ever made | the queue file      |
+| Field                               | Who it names                                                         | Where it is written |
+| ----------------------------------- | -------------------------------------------------------------------- | ------------------- |
+| `MediaRequest.RequestedByUserId`    | the person who asked                                                 | the queue file      |
+| `MediaRequest.JoinedByUserIds`      | everybody else who asked for the same title                          | the queue file      |
+| `MediaRequest.StateChangedByUserId` | whoever last moved it, usually an operator                           | the queue file      |
+| `RequestHistoryEntry.ByUserId`      | the person who asked, on the arrival row, and whoever moved it after | the queue file      |
 
 The other three name nothing about a person. `MediaRequest.Id` and `MediaRequest.WantIds` are this
 plugin's own identifier for a request and the browsing sibling's identifiers for the asks it handed
@@ -39,6 +39,20 @@ store writes that record whole.
 
     git grep -n 'public MediaRequest? Request' -- Jellyfin.Plugin.Requests/Storage/PersistedRequest.cs
     Jellyfin.Plugin.Requests/Storage/PersistedRequest.cs:29:    public MediaRequest? Request { get; init; }
+
+**Every request carries one of those history rows from the moment it is made.** The first entry on a
+request is not a move: it says how the ask reached this server, and it names the person it is filed
+against, so `RequestHistoryEntry.ByUserId` is written for every request rather than only for those
+somebody has decided on. It is the same identifier as `MediaRequest.RequestedByUserId` on the same
+record, so it names nobody the file did not already name, and what it adds is provenance rather than
+a person.
+
+    git grep -n 'public RequestArrival? Arrival' -- Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs
+
+The value says which surface, and never which caller. A request handed over the seam is filed against
+whoever the calling plugin said asked for it, with no session behind the name, and one asked for over
+the endpoint is filed against the person the server authenticated. `docs/seam.md` argues why the
+plugin that handed it over is not recorded.
 
 **A person is held as the server's user identifier and never as a name.** No field carries a user
 name, a display name, an email address or an external account. Whoever the identifier belongs to is a
