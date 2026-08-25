@@ -77,6 +77,13 @@ A person who has asked for something reads their own requests on a page this plu
 [surface.md](surface.md). It is worth reading before you send it to a household, because a browser
 opening an address sends no session and the credential therefore travels in the address.
 
+**What to tell a person who asks you how to use this** is [user-guide.md](user-guide.md), which
+answers it per client family, because the answer differs by what the client in their hand can draw
+and there is no single one to give. It is not repeated here: an operator who paraphrases it into
+their own house rules ends up with a second copy that goes stale against the reach matrix in
+[surface.md](surface.md), and the families that get nothing from this plugin are exactly the ones a
+paraphrase gets wrong.
+
 ## Wiring an external request service
 
 **Nothing in this tree talks to one.** The only bridge that ships is the one for a server that has no
