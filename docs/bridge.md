@@ -84,10 +84,22 @@ side does about it. It runs after the decision has been written and never instea
 
 **A submission that failed never takes an approval back.** The operator decided, the queue already
 holds the decision, and undoing it because a service on another machine was down would be the plugin
-overruling a person. What a failure leaves is an approved request carrying no reference and a line in
-the server log, which is a state that can be handed over again once the service answers. Making that
-failure visible to an operator without reading a log is #283, and until that lands the log is the only
-place it appears.
+overruling a person. What a failure leaves is an approved request carrying no reference, a line in the
+server log, and the moment the attempt failed written onto the request, which is a state that can be
+handed over again once the service answers.
+
+**That moment is what an operator reads instead of the log.** Two fields answer three states rather
+than two: a reference and no failure is a request the service took, no reference and a failure is one
+it refused, and neither is a request nothing has been tried on. Without the second field the first
+and third read as the same row, and the one that needs somebody is the one that looks ordinary. The
+operator's queue draws it as a column of its own, and only on a server where a service is configured:
+
+    git grep -n 'queue.handover' -- Jellyfin.Plugin.Requests/Localisation/Strings/en.json
+
+**A failure that cannot be marked costs nothing but the column.** The mark is a second write, after
+the one that holds the decision, and a store that refuses it leaves the approval and the log line
+exactly as they were. What is lost then is the row reading as one nothing was tried on, which is a
+worse page and not a worse record.
 
 **Submitting the same request twice is refused, and the request itself is what refuses it.** The
 reference is written only after a service answered, so a request carrying one has already been handed

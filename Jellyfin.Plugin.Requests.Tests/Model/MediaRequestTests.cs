@@ -30,6 +30,7 @@ public class MediaRequestTests
         "DeclineReason",
         "DisplayTitle",
         "DisplayYear",
+        "HandoverFailedAt",
         "History",
         "Id",
         "JoinedByUserIds",

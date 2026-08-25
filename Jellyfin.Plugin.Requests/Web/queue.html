@@ -150,6 +150,7 @@
                                 <th scope="col" data-i18n="queue.column.askedBefore"></th>
                                 <th scope="col" data-i18n="queue.column.note"></th>
                                 <th scope="col" data-i18n="queue.column.decision"></th>
+                                <th scope="col" class="requestsQueueHandoverColumn" data-i18n="queue.column.handover"></th>
                                 <th scope="col" data-i18n="queue.column.decide"></th>
                             </tr>
                         </thead>
@@ -264,6 +265,21 @@
                      */
                     var showing = null;
                     var declining = null;
+
+                    /*
+                     * Whether this install has an external request service behind it at all, read
+                     * once per opening of the page from the capabilities answer.
+                     *
+                     * It starts false, and false is the state that draws no column. On a server that
+                     * runs no such service there is nothing about a handover to say about any
+                     * request, and a column of "not handed over" on every row would be this page
+                     * telling an operator about a bridge they never configured. It is read once
+                     * rather than per page turn because it is a fact about the install: a service
+                     * appearing while the queue is open is read the next time the page is opened,
+                     * and the health panel above the rows is what says a configured one has stopped
+                     * answering.
+                     */
+                    var bridged = false;
 
                     /*
                      * The names this server knows, by identifier. Empty until the list has been read
@@ -400,6 +416,32 @@
                      * two says nothing certain about season five, and an operator reading "Declined"
                      * against a series would otherwise take it as covering the show.
                      */
+                    /*
+                     * What an external request service has to do with this request, in one of three
+                     * answers. Only drawn where one is configured.
+                     *
+                     * Three rather than two, and none of them is an empty cell. A request the
+                     * service accepted and a request nothing was ever tried on both carry no
+                     * reference, so a column that only spoke when there was a reference would leave
+                     * an approval nobody is fetching looking exactly like an approval that has not
+                     * been reached yet. That is the failure this column exists for, and it is the
+                     * one an operator cannot see in a log they are not reading.
+                     *
+                     * The service's own name and its own identifier are shown unread, because what
+                     * an operator does next is quote one of them at that service.
+                     */
+                    function handover(request) {
+                        if (request.Backend) {
+                            return RequestsShell.fill("queue.handover.accepted", [request.Backend.Service, request.Backend.Id]);
+                        }
+
+                        if (request.HandoverFailedAt) {
+                            return RequestsShell.fill("queue.handover.failed", [moment(request.HandoverFailedAt)]);
+                        }
+
+                        return RequestsShell.word("queue.handover.notTried");
+                    }
+
                     function askedBefore(request) {
                         var context = request.Context;
 
@@ -645,6 +687,11 @@
                             cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
                             cell(row, request.RequesterNote || "");
                             cell(row, decided(request));
+
+                            if (bridged) {
+                                cell(row, handover(request));
+                            }
+
                             decide(row, request);
 
                             drawn.appendChild(row);
@@ -674,6 +721,35 @@
                      * page that refused to draw because the user list was unavailable would trade a
                      * worse column for no queue at all.
                      */
+                    /*
+                     * Whether this install has an external request service, and the header cell that
+                     * follows from it.
+                     *
+                     * A failure is swallowed the way the user list's is, and it leaves the flag
+                     * false: a page that could not read the capabilities answer draws the queue with
+                     * no handover column, which says nothing about a bridge rather than guessing at
+                     * one. The header is removed rather than hidden, so a column that is not drawn
+                     * is not in the page for a reader or a screen reader to find.
+                     */
+                    function bridge() {
+                        return RequestsShell.get("Capabilities")
+                            .then(function (answer) {
+                                bridged = answer.BridgeConfigured === true;
+                            })
+                            .catch(function () {
+                                bridged = false;
+                            })
+                            .then(function () {
+                                if (!bridged) {
+                                    var column = page.querySelector(".requestsQueueHandoverColumn");
+
+                                    if (column) {
+                                        column.remove();
+                                    }
+                                }
+                            });
+                    }
+
                     function known() {
                         return ApiClient.getUsers()
                             .then(function (users) {
@@ -827,6 +903,7 @@
                                 return RequestsShell.load();
                             })
                             .then(known)
+                            .then(bridge)
                             .then(function () {
                                 RequestsShell.attach(page, "RequestsQueue");
                                 RequestsShell.draw(page);

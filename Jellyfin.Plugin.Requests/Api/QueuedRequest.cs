@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Model;
 
 namespace Jellyfin.Plugin.Requests.Api;
@@ -118,6 +119,24 @@ public sealed record QueuedRequest
     /// Gets when that was last worked out, where it has been.
     /// </summary>
     public DateTimeOffset? AvailabilityCheckedAt { get; init; }
+
+    /// <summary>
+    /// Gets what an external request service called this after it was handed over, or
+    /// <see langword="null"/> where nothing was handed over. Both halves are the service's own
+    /// strings, unread here, which is what lets an operator quote one back at the service.
+    /// </summary>
+    public BackendReference? Backend { get; init; }
+
+    /// <summary>
+    /// Gets when a handover to an external request service was last tried and failed, or
+    /// <see langword="null"/> where none has.
+    /// <para>
+    /// This is the field that makes an approval nobody is fetching readable. With
+    /// <see cref="Backend"/> alone, a request the service never took and a request it accepted both
+    /// answer null, and the one that needs an operator is the one that looks ordinary.
+    /// </para>
+    /// </summary>
+    public DateTimeOffset? HandoverFailedAt { get; init; }
 
     /// <summary>
     /// Gets the two facts a decision needs that are not on the request: what was decided about the

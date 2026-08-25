@@ -20,5 +20,5 @@ internal static class ABridgeSubmission
     /// <param name="store">The store under test, which the submission writes a reference back into.</param>
     /// <returns>The submission.</returns>
     public static BridgeSubmission WithNothingBehindIt(IRequestStore store)
-        => new BridgeSubmission(new NoRequestBackend(), store, new RecordingLogger());
+        => new BridgeSubmission(new NoRequestBackend(), store, TestClock.AtAFixedMoment(), new RecordingLogger());
 }

@@ -301,6 +301,32 @@ public sealed record MediaRequest
     public BackendReference? Backend { get; init; }
 
     /// <summary>
+    /// Gets when a handover to an external request service was last tried and failed, or
+    /// <see langword="null"/> where none has. Null is the ordinary value on every server, including
+    /// every server that runs no such service and therefore never tries.
+    /// <para>
+    /// It exists because <see cref="Backend"/> alone cannot answer the question an operator working
+    /// the queue actually has. A request that was never submitted and a request whose submission
+    /// failed both carry no reference, so with one field the two read as the same request, and the
+    /// second one is an approval nobody is fetching. Two fields make three states: nothing tried,
+    /// tried and failed, handed over.
+    /// </para>
+    /// <para>
+    /// <b>It is the last attempt and not a count.</b> A tally of failures would be a number an
+    /// operator cannot act on differently, and the moment is what separates a service that broke an
+    /// hour ago from one that broke while they were reading the page.
+    /// </para>
+    /// <para>
+    /// <b>Only <see cref="Bridge.BridgeSubmission"/> writes it, and a handover that succeeds clears
+    /// it in the same write that sets <see cref="Backend"/>.</b> So the pair can never say both at
+    /// once, and a request carrying a reference carries no failure behind it. A request re-approved
+    /// after a failure keeps the mark until the next attempt answers, which is the honest reading:
+    /// what is known then is still that the last attempt failed.
+    /// </para>
+    /// </summary>
+    public DateTimeOffset? HandoverFailedAt { get; init; }
+
+    /// <summary>
     /// Whether this person is one of the people waiting for this request, whether they asked first
     /// or joined an existing one. Both surfaces have to answer "is this yours" the same way, and a
     /// caller working it out for themselves is a caller that will check one of the two lists.
