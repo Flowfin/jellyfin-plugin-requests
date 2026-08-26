@@ -258,6 +258,64 @@ visible today, and the conditions above are what decide the next one. A test ref
 condition not yet met by any proposal gets its own entry here when the proposal arrives, together
 with what replaces it.
 
+### The rule, run from a clean clone
+
+The condition #3 holds this rule to is that `dotnet test` passes from a clean clone, on a machine
+with no display, with no administrator rights, and with no certificate installed by this project.
+That is a property of a run rather than of the tree, so what is recorded here is a run, what it
+reached, and the one part of the condition it did not reach.
+
+Taken at `037a664567acbd9eb0defa88118ddf6331ff3bed`, into a directory that is no working tree of this
+repository:
+
+    git clone https://github.com/Flowfin/jellyfin-plugin-requests.git cleanclone
+    git -C cleanclone rev-parse HEAD
+    037a664567acbd9eb0defa88118ddf6331ff3bed
+    git -C cleanclone status --short
+    (prints nothing)
+
+    dotnet --list-sdks
+    10.0.301 [C:\Program Files\dotnet\sdk]
+
+    cd cleanclone
+    DOTNET_CLI_UI_LANGUAGE=en dotnet test Jellyfin.Plugin.Requests.sln --configuration Release -warnaserror ; echo "EXIT=$?"
+    Passed!  - Failed:     0, Passed:   715, Skipped:     0, Total:   715, Duration: 22 s - Jellyfin.Plugin.Requests.Tests.dll (net9.0)
+    Passed!  - Failed:     0, Passed:   715, Skipped:     0, Total:   715, Duration: 22 s - Jellyfin.Plugin.Requests.Tests.dll (net10.0)
+    EXIT=0
+
+715 tests on each claimed target framework, none failed and none skipped, from a restore and a build
+the clone made for itself. One SDK was installed on that machine and it built both frameworks. The
+language variable is in the command because that machine prints its summary in its own language
+otherwise, and this document is written in English.
+
+Two of the three machine conditions were established by that run.
+
+**No administrator rights.** The process that ran it held no administrator role, and nothing in the
+run asked for elevation or raised a consent prompt:
+
+    powershell -NoProfile -Command "([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"
+    False
+
+**No certificate installed by this project.** Nothing was written to a trust store: the clone was
+made, the solution restored, the tests executed, and nothing else ran against that machine. What
+makes that a property rather than the habit of one run is `no-certificate-store-access` above, which
+refuses the constructs a test would need in order to do it.
+
+**No display was NOT established by this run, and the reason is the machine rather than the suite.**
+That machine has a display attached, so the run says nothing about one that has none. What it says
+is narrower and is worth keeping narrow: nothing in the run opened a window and nothing needed one.
+
+The half it cannot reach is covered by a different machine rather than by this paragraph. The gate
+runs the same suite on a hosted Linux runner, which has no display and is not a clone of anybody's
+working tree:
+
+    git grep -n "runs-on" .github/workflows/gate.yaml
+
+That job reported `success` at the same commit. So one machine is a clean clone with a display and
+the other is a machine with no display that is not a clean clone, and the condition stands on the
+two together. Neither is the whole of it, and a later reader should not take this section for a
+single run that met all three at once.
+
 ## Coverage, and the rule it does not replace
 
 Full unit-test coverage is a claim somebody has to be able to check, so the gate collects the number
