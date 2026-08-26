@@ -175,6 +175,49 @@ registration and what the probe resolves it finds by name, and neither of those 
 package. And nothing separates a container that found no implementation from one that found none
 because the type did not match, so an operator meeting either one meets the same silence.
 
+### What the package actually contains, read out of the package
+
+The paragraphs above read the project file. #11's third condition refuses that reading as sufficient
+on purpose: it asks that this plugin builds, installs, runs and passes its suite with no sibling
+present, proven by the package's dependency list rather than by the project file. The Package check
+builds the package on every push to `master` and keeps the archive, so that list can be read out of
+the thing that ships.
+
+Taken from the run of `037a664567acbd9eb0defa88118ddf6331ff3bed`:
+
+    gh run download 32888209248 --repo Flowfin/jellyfin-plugin-requests --dir pkg
+    unzip -l pkg/package-10.11.0.0/requests_0.1.0.0.zip
+          900  2026-08-25 19:13   meta.json
+       380928  2026-08-25 19:13   Jellyfin.Plugin.Requests.dll
+    unzip -l pkg/package-12.0.0.0/requests_0.1.0.0.zip
+          899  2026-08-25 19:12   meta.json
+       380928  2026-08-25 19:12   Jellyfin.Plugin.Requests.dll
+
+Two files on each claimed line: this plugin's own assembly and the metadata a server reads. Nothing
+of the other board ships, and nothing that could be a second copy of a shared type ships either,
+which is the baseline the choice above changes: when the contract package exists, exactly one side
+carries it and this listing is where that becomes visible.
+
+That list is derived rather than asserted. The same job publishes the plugin and compares what the
+publish leaves behind against the `artifacts:` list in `build.yaml`, ending non-zero on a name in
+either set and not the other, so an assembly the host does not provide cannot be absent from both:
+
+    gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/97933626171/logs | grep -a -A3 "published assemblies:"
+    published assemblies:
+    Jellyfin.Plugin.Requests.dll
+    named in artifacts:
+    Jellyfin.Plugin.Requests.dll
+
+It then installs the package's own bytes into a server of the line it was built for and requires that
+server to report the plugin active, which is the reading no file in this repository can make on its
+own.
+
+**What this does not say.** Neither of those servers held the sibling, so nothing here measures the
+two plugins in one process; that is the section above, which was measured separately and by a probe
+built for it. The archive read here is the one the check keeps for fourteen days rather than a
+released asset, so the download command stops resolving after that and the reading has to be retaken
+against a newer run; `0.1.0.0-stable` is no substitute, because it predates every line of this seam.
+
 ## Both sides watch the library, and neither tells the other
 
 This plugin decides that a request is fulfilled by watching the server's library for the thing
