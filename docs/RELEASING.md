@@ -67,7 +67,49 @@ that downloads the archive and runs no build tooling.
 
 Nothing here writes a plugin catalog. A GitHub release is the whole output. If this
 repository previously published through the Jellyfin meta plugins workflow, that path
-is gone and no catalog is fed until a manifest generator is added.
+is gone, and no catalog is fed by this route. The generator that would write one now
+exists and this route does not call it; the section below says what it does and what
+is still missing between it and an operator adding a repository.
+
+## The manifest
+
+A Jellyfin server does not install from a GitHub release. It fetches a manifest,
+finds the newest entry whose `targetAbi` its own version accepts, downloads the
+`sourceUrl` and checks the download against the entry's `checksum`.
+
+`scripts/build-manifest.sh` writes that document from built packages. Every field
+except the checksum is copied out of the `<archive>.zip.meta.json` the packaging tool
+writes beside each archive, so the entry describes the package that shipped rather
+than a file read back out of the tree, and the checksum is the MD5 of the archive's
+own bytes. `MANIFEST_BASE` names the manifest already published, so a release adds
+its versions to it instead of replacing them.
+
+Run over the release that exists today:
+
+```
+gh release download 0.1.0.0-stable --repo Flowfin/jellyfin-plugin-requests
+SOURCE_URL_PREFIX=https://github.com/Flowfin/jellyfin-plugin-requests/releases/download/0.1.0.0-stable/ \
+  scripts/build-manifest.sh manifest.json requests_0.1.0.0.zip
+```
+
+The output is reproducible: the entries are sorted by version, and there is no build
+timestamp and no serial number in it, so two runs over the same packages produce the
+same bytes and can be compared with `diff`.
+
+**What it refuses is the pair of packages a server cannot tell apart.** A server
+keeps every entry whose `targetAbi` is at or below its own version and then takes the
+highest version number of what is left, so the version number is the only thing
+separating two entries it has already accepted. Two entries at one version are one
+entry to it, and an entry with a higher version and a lower `targetAbi` is what a
+newer server takes in preference to the build meant for it. Both are refused rather
+than written, and `scripts/prove-manifest-refusals.sh` drives one manifest per defect
+and asserts each is refused for its own reason, with a clean pair beside them that has
+to pass.
+
+**Two things stand between this and an operator adding a repository, and neither is
+in this document.** The release route publishes one package for the one line
+`build.yaml` names and does not call the generator, and both packaging files declare
+one version number, which is the pair the generator refuses. #110 carries both.
 
 ## The bill of materials
 
