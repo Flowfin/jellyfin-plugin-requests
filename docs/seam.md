@@ -151,6 +151,38 @@ binds a compile-time reference to that same loaded assembly is a further step an
 here. And nothing above installs two copies of one contract assembly, so the premise the first
 rejected option rests on is still unmeasured, which is what that option's own paragraph says.
 
+### That answer is refused rather than reported, since 2026-08-26
+
+The run that took the measurement above refused one thing only: a probe that wrote nothing. Both
+answers were results while the three options were open, because each of them decided which options
+were available. They are not both results any more. The choice above rests on the answer the two
+lines gave, so a run that comes back with the other one is a defect and a run that prints it and
+passes tells nobody.
+
+`scripts/read-seam-probe-answer.sh` reads the one line the probe writes as a verdict and refuses four
+answers, each for its own reason: no assembly of that name loaded, more than one of them, a contract
+type a second plugin cannot reach, and a container that handed back nothing. The last of those is the
+silence #117's fourth condition is about, and it is refused here rather than printed.
+
+What made this worth doing before the package exists is that moving the type is what breaks it. The
+probe names the contract by string:
+
+    git grep -n 'OtherAssembly = \|Contract = ' -- tools/seam-probe/ContainerReport.cs
+    tools/seam-probe/ContainerReport.cs:38:    private const string OtherAssembly = "Jellyfin.Plugin.Requests";
+    tools/seam-probe/ContainerReport.cs:39:    private const string Contract = "Jellyfin.Plugin.Requests.Seam.IWantHandover";
+
+so the day the contract moves into the package neither string names anything that declares it, and
+under the old rule the job stayed green about an assembly that no longer held the type. It now reds
+and names the two constants. The trigger carries the same reasoning: `Jellyfin.Plugin.Requests/Seam/`
+and the service registrator are in the paths that start the job, because the change that breaks the
+measurement arrives through them rather than through the probe's own files. A rename of the assembly
+lives in the project file and is still not covered.
+
+Every refusal above is watched biting in `scripts/prove-seam-probe-refusals.sh`, over one log per
+answer, with the answer both lines gave beside them as the case that has to pass. It needs no
+container and no server, so the reader that decides a probe run is checked on machines that cannot
+run one.
+
 ### What the tree does today is not yet the choice above
 
 The type the sibling would name is declared in this plugin's own assembly, and this project

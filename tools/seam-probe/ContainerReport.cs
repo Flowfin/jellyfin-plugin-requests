@@ -27,6 +27,14 @@ public sealed class ContainerReport : IHostedService
     /// </summary>
     public const string Marker = "SEAM-PROBE";
 
+    /// <summary>
+    /// The word that opens the one line a run reads as the answer. The lines around it are prose for
+    /// a person; this one is the verdict, in fields, so that reading it is not parsing sentences that
+    /// were written to be read rather than matched. `scripts/read-seam-probe-answer.sh` is what reads
+    /// it, and it refuses a log that carries no such line at all.
+    /// </summary>
+    public const string Result = "result";
+
     private const string OtherAssembly = "Jellyfin.Plugin.Requests";
     private const string Contract = "Jellyfin.Plugin.Requests.Seam.IWantHandover";
 
@@ -89,6 +97,7 @@ public sealed class ContainerReport : IHostedService
         if (contract is null)
         {
             Say("the type {0} is not reachable from this plugin", Contract);
+            Answer(loaded.Length, reachable: false, implementations: 0);
             return;
         }
 
@@ -96,6 +105,28 @@ public sealed class ContainerReport : IHostedService
 
         int returned = _services.GetServices(contract).Count();
         Say("the container returned {0} implementation(s) of it", returned);
+        Answer(loaded.Length, reachable: true, implementations: returned);
+    }
+
+    /// <summary>
+    /// The verdict, written once, in fields rather than in a sentence.
+    /// <para>
+    /// It is emitted on every path that reached an answer, including the one where the type was not
+    /// found, because "the type is missing" is an answer and only a probe that never ran is silence.
+    /// A run that produced no line of this shape is refused as having measured nothing.
+    /// </para>
+    /// </summary>
+    /// <param name="assemblies">How many assemblies of the named simple name were loaded.</param>
+    /// <param name="reachable">Whether the contract type resolved out of one of them.</param>
+    /// <param name="implementations">How many implementations the container returned for it.</param>
+    private void Answer(int assemblies, bool reachable, int implementations)
+    {
+        Say(
+            "{0} assemblies={1} contract={2} implementations={3}",
+            Result,
+            assemblies,
+            reachable ? "reachable" : "missing",
+            implementations);
     }
 
     private void Say(string format, params object[] values)

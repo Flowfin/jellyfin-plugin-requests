@@ -8,22 +8,50 @@
 # `scripts/verify-seam-probe.sh` is what this runs and `tools/seam-probe` is the second plugin. Both
 # say more about the question than a workflow file usefully can.
 #
-# THIS RECORDS AN ANSWER RATHER THAN HOLDING A MERGE, which is why it is not on every pull request.
-# A shared load context and a separate one are both results, and each decides which of the three
-# options #117 lists is available. What reds is a run that produced no answer at all.
+# IT RECORDED AN ANSWER AND IT NOW REFUSES ONE. While #117 listed three options for where the shared
+# type comes from, a shared load context and a separate one were both results and each decided which
+# of the three was available, so the only thing that redded this was a run that produced no answer at
+# all. #117 chose one of them on 2026-08-21 and `docs/seam.md` says the choice rests on the answer
+# both lines gave, so the opposite answer is now a defect rather than a result.
+# `scripts/read-seam-probe-answer.sh` carries the reasons and `scripts/prove-seam-probe-refusals.sh`
+# is where each of them is watched biting. It is still not a required check: the required set is a
+# repository setting rather than a file in this tree, and #107 carries the criterion.
 name: What a second plugin can see
 
 on:
   workflow_dispatch:
-  push:
-    # The files the measurement is made of. A change to any of them makes the recorded answer a
-    # claim about a procedure that has moved, so the answer is taken again.
+  pull_request:
     paths:
       - 'tools/seam-probe/**'
+      - 'scripts/read-seam-probe-answer.sh'
+      - 'scripts/prove-seam-probe-refusals.sh'
       - 'scripts/verify-seam-probe.sh'
       - 'scripts/server-under-test.sh'
       - 'scripts/server-image-for.sh'
       - 'scripts/server-lines.tsv'
+      - 'Jellyfin.Plugin.Requests/Seam/**'
+      - 'Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs'
+      - '.github/workflows/seam-probe.yaml'
+  push:
+    # The files the measurement is made of. A change to any of them makes the recorded answer a
+    # claim about a procedure that has moved, so the answer is taken again.
+    #
+    # THE LAST TWO ARE WHAT THE PROBE IS ABOUT RATHER THAN WHAT IT IS MADE OF, and they are here
+    # because the failure this job now refuses arrives through them. The probe names the contract
+    # type by string, so moving that type into the contract package leaves the two constants in
+    # `tools/seam-probe/ContainerReport.cs` naming nothing, and a trigger listing only the probe's
+    # own files would not start the job on the change that broke it. What is still not covered is a
+    # rename of the assembly itself, which lives in the project file rather than under `Seam/`.
+    paths:
+      - 'tools/seam-probe/**'
+      - 'scripts/read-seam-probe-answer.sh'
+      - 'scripts/prove-seam-probe-refusals.sh'
+      - 'scripts/verify-seam-probe.sh'
+      - 'scripts/server-under-test.sh'
+      - 'scripts/server-image-for.sh'
+      - 'scripts/server-lines.tsv'
+      - 'Jellyfin.Plugin.Requests/Seam/**'
+      - 'Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs'
       - '.github/workflows/seam-probe.yaml'
 
 # Explicit deny-all at workflow level; the job grants what it needs.
@@ -38,6 +66,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prove:
+    # The reader that decides a probe run, handed every answer it refuses, one log at a time. It
+    # starts no container and needs no server, so it answers in seconds and it answers on a machine
+    # that has neither. A reader nobody has watched saying no is a reader that might say yes to
+    # everything, and this job is the whole of what stands behind the refusals below.
+    name: the seam probe reader refuses what it says it refuses
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Every answer the reader refuses, refused for its own reason
+        run: |
+          set -euo pipefail
+          ./scripts/prove-seam-probe-refusals.sh
+
   probe:
     name: probe ${{ matrix.line }}
     runs-on: ubuntu-latest
