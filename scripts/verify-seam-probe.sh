@@ -13,9 +13,14 @@
 # assembly reference would fail to resolve before anything could be reported on exactly the servers
 # where the answer is interesting, and a probe that cannot run is a probe that says nothing.
 #
-# THIS RECORDS AN ANSWER RATHER THAN REFUSING ONE. Both answers are results: a shared context and a
-# separate one each decide which of #117's three options is available. What it refuses is a run that
-# produced no answer at all, because that is the only outcome nobody can read.
+# THIS REFUSED ONLY SILENCE UNTIL 2026-08-26 AND NOW REFUSES THE ANSWER TOO. While #117 listed three
+# options for where the shared type comes from, a shared load context and a separate one were both
+# results, and each decided which of the three was available. #117 chose one of them on 2026-08-21 -
+# a contract-only package both sides compile against, with exactly one copy shipped - and
+# `docs/seam.md` says that choice rests on a plugin being able to name a type whose assembly ships in
+# another plugin's directory. Once a decision rests on an answer, the opposite answer is a defect and
+# not a result. `scripts/read-seam-probe-answer.sh` is what refuses it and carries the reasons one at
+# a time; `scripts/prove-seam-probe-refusals.sh` is where each of them is watched biting.
 #
 # usage: scripts/verify-seam-probe.sh <image> <target-framework> [host-port]
 #   scripts/verify-seam-probe.sh jellyfin/jellyfin:10.11.11 net9.0  18098
@@ -54,8 +59,11 @@ EXTRA_PLUGIN_DIRECTORY="$probe_out" EXTRA_PLUGIN_NAME="SeamProbe" \
 
 step "what the second plugin could see"
 dk logs "$CONTAINER" >"$probe_log" 2>&1 || true
-if ! grep -a "SEAM-PROBE" "$probe_log"; then
-    echo "The probe wrote nothing, so this run measured nothing." >&2
+grep -a "SEAM-PROBE" "$probe_log" || true
+
+# The prose above is for a person. The verdict is one line and is read by a script of its own, so the
+# same reading can be handed every answer it refuses without a server being started for each.
+if ! "$here/read-seam-probe-answer.sh" "$probe_log"; then
     echo "What the server said about loading plugins:" >&2
     grep -aiE "seamprobe|plugin" "$probe_log" | tail -40 >&2
     exit 1
