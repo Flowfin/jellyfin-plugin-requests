@@ -1,0 +1,63 @@
+# The manifest generator, watched refusing what it says it refuses.
+#
+# A Jellyfin server installs a plugin from a manifest it fetches, so that document is the product as
+# far as an installing operator is concerned. It is also the one release artefact nothing else
+# checks: an entry whose checksum does not match its archive, or whose targetAbi lets a server take
+# a build it cannot load, is a broken install for everybody who added the repository, and the run
+# that wrote it is green.
+#
+# `scripts/build-manifest.sh` writes that document from the packages themselves. This runs
+# `scripts/prove-manifest-refusals.sh`, which drives it over one manifest per defect and asserts
+# that each is refused for its own reason, with a clean pair of packages beside them that has to
+# pass. A generator that has never said no writes a manifest for a clean pair, which is also what a
+# generator with no rules in it does.
+#
+# THE TWO RULES THIS EXISTS FOR ARE THE ORDERING RULES, because they are the ones a reader has to
+# take on trust. A server keeps every entry whose targetAbi is at or below its own version and then
+# picks the highest version number of what is left, so two entries at one version number are one
+# entry to it, and an entry with a higher version and a lower targetAbi is what a newer server takes
+# in preference to the build meant for it. Neither shape is visible in the JSON.
+#
+# It needs no container, no server and no network, so it answers in seconds.
+#
+# THIS IS NOT A REQUIRED CHECK. The required set is a repository setting rather than a file in this
+# tree, #107 carries the criterion and the list it produced, so a red job here does not by itself
+# hold a merge today.
+name: Manifest
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+# Explicit deny-all at workflow level; the job grants only what it needs.
+permissions: {}
+
+# Cancel a superseded run on the same ref so a new push or pull-request update does not queue behind
+# an obsolete check.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prove:
+    # The check name a branch ruleset would require. It is matched literally and it is built from no
+    # matrix value, so it does not move when a claimed server line is added or dropped.
+    name: the manifest refuses what it says it refuses
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, so do not leave the token in .git/config.
+          persist-credentials: false
+
+      - name: Every rule the generator claims, refused for its own reason
+        run: |
+          set -euo pipefail
+          ./scripts/prove-manifest-refusals.sh

@@ -291,12 +291,12 @@ produce several.
 Twelve files here map onto a file there and are placed by the table above:
 `dco.yml`, `dependency-review.yml`, `invariant-lint.yaml`, `mutation.yaml`,
 `package.yaml`, `prettier.yml`, `pr-hygiene.yaml`, `publish.yaml`,
-`scan-codeql.yaml`, `scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Eight
-of the rows below name a file that is present, and twelve plus eight is what the
+`scan-codeql.yaml`, `scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Nine
+of the rows below name a file that is present, and twelve plus nine is what the
 directory holds:
 
     $ ls .github/workflows/ | wc -l
-    20
+    21
 
 This paragraph said eleven and three and pasted 14, and the three numbers were
 wrong in one way: `package.yaml`, `seam-probe.yaml` and `user-isolation.yaml` had
@@ -327,6 +327,7 @@ longer tracks it.
 | `seam-probe.yaml`       | adopted, landed   | What a second plugin in the same server process can see of this one, measured on a real server of each line with `tools/seam-probe` as the second plugin. It records an answer rather than holding a merge, so what reds it is a run that produced no answer at all. #117.   |
 | `user-isolation.yaml`   | adopted, landed   | Two ordinary accounts on a real server of each line, each asking for something and reading back what they are given, with the queue asked as somebody who is not an administrator. The server's own evaluation of a policy is the half no double here reaches. #67.          |
 | `full-disk.yaml`        | adopted, landed   | What a caller sees when the volume the store writes to runs out of room, on a mount with a hard size, on the runtime of each line. The suite cannot ask it: filling a filesystem needs one to fill, and the headless rule refuses a test that needs a container engine. #46. |
+| `manifest.yaml`         | adopted, landed   | The manifest generator watched refusing what it says it refuses, over one manifest per defect, with a clean pair of packages beside them. A generator that has never said no writes a manifest for a clean pair, which is also what a generator with no rules does. #110.    |
 | `changelog.yaml`        | declined, deleted | It drafts a release changelog against a version scheme this repository has not fixed, and nothing covers that risk here because there is nothing to release yet; #107.                                                                                                       |
 | `command-dispatch.yaml` | declined, deleted | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                                                                                                                  |
 | `command-rebase.yaml`   | declined, deleted | Same comment-driven surface, the half that rewrites pull request branches on command, and the same absence.                                                                                                                                                                  |
