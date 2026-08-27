@@ -196,13 +196,38 @@ built from carries no store to write anything:
     Jellyfin.Plugin.Requests/Storage/RequestConcurrencyException.cs
     Jellyfin.Plugin.Requests/Storage/StoredRequest.cs
 
-The contract and its two exceptions, and no implementation. So the shape the fixture holds is what a
-server running the mainline between `7b62877` and this change has on its disk, and no released
-version of this plugin has ever written a request file at all.
+The contract and its two exceptions, and no implementation. So the shape that fixture holds is what a
+server running the mainline between `7b62877` and the change that landed the version has on its disk.
 
-Whoever builds the next package should keep that package's own output as the next fixture at the
-moment it is built. After a field has been added there is no way to produce those bytes again except
-by hand, which is the thing this rule is against.
+### The second fixture, which is a shipped version's output
+
+That sentence used to end by saying no released version had ever written a request file. One has
+since. `0.2.0.0-stable` is the first release that ships a store at all, and its own output is kept:
+
+    Jellyfin.Plugin.Requests.Tests/Storage/Fixtures/version-1-written-by-0.2.0.0-at-60faf41.json
+
+It was captured the way the paragraph above asks for, through `AddAsync` at the commit the package
+was built from, which is the tag's own commit:
+
+    git rev-parse 0.2.0.0-stable^{commit}
+    60faf415328e88461656d4c245e093e357883983
+
+Two requests again, chosen the same way: one carrying something in every field the shape has, so a
+field lost in a write or in a read fails, and one carrying nothing but what a new ask has to carry,
+so a loader that filled an absent field is caught as well as one that dropped a present one.
+`WhatTheShippedVersionWroteTests` reads it back field by field and refuses a change that drops a
+field out of what is written. Watched failing: `Backend` marked `[JsonIgnore]` reds
+`TheQueueTheShippedVersionWroteIsReadAndNothingInItIsLost` and leaves the shape-version leg green,
+and the tree was restored afterwards.
+
+**No server wrote it.** It is this tree's own store at the commit the package was built from, which
+is what this rule asks for and is not the same as an installation's file. That distinction is the
+one to keep: what makes the bytes trustworthy here is that they came out of the shipped code path
+rather than out of somebody's belief about it.
+
+Whoever builds the next package should do the same at the moment it is built. After a field has been
+added there is no way to produce those bytes again except by hand, which is the thing this rule is
+against, and the window is exactly as long as the mainline still carries the shipped code.
 
 ## Backing up, and restoring
 
@@ -289,10 +314,10 @@ other four left passing:
 
 ### What this does not cover
 
-Nothing here restores across two shipped versions of the plugin, because there are none to restore
-across: no released version has ever written a request file, which is the same absence the fixture
-rule above names. The hop between shipped versions is #97, and the fixture it needs is captured at
-release time or not at all.
+Nothing here restores across two shipped versions of the plugin. Two have shipped, and the older of
+them carries no store, so there is one shipped file shape and nothing to restore from one shape into
+another yet. What the hop between the two shipped versions does carry is the settings, and that is
+in [docs/compatibility.md](compatibility.md) with the test that holds it.
 
 Nothing here has been run against a server's own backup and restore feature. What is asserted is
 about the files and the store that reads them, and an operator who takes their backup some other way

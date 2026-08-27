@@ -144,8 +144,81 @@ one, and the first write afterwards puts the understood half back over the file 
 touched until some later write replaces it whole, so a server opened by a newer plugin and then put
 back to the older one finds the file it left.
 
-That is the on-disk shape and nothing else. **Configuration carried between plugin versions is not
-implemented**, which is #97, so nothing in this section is a promise about settings.
+That is the on-disk shape and nothing else. What happens to the settings across the same upgrade is
+the section below.
+
+## Upgrading from one shipped version to the next
+
+Two versions have shipped, so there is one hop an operator can actually perform:
+
+```
+gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName --jq '.[].tagName'
+0.2.0.0-stable
+0.1.0.0-stable
+```
+
+**What `0.1.0.0` left on a disk is its settings file and nothing else.** That version carried the
+store contract and no implementation of it, so an install of it wrote no requests anywhere:
+
+```
+git ls-tree -r --name-only 0.1.0.0-stable -- Jellyfin.Plugin.Requests/Storage/
+Jellyfin.Plugin.Requests/Storage/DuplicateRequestException.cs
+Jellyfin.Plugin.Requests/Storage/IRequestStore.cs
+Jellyfin.Plugin.Requests/Storage/RequestConcurrencyException.cs
+Jellyfin.Plugin.Requests/Storage/StoredRequest.cs
+```
+
+There is therefore no queue in this hop to carry forward, and an upgraded server starts with an
+empty one because it never had another.
+
+**The settings carry, and every one of them comes up at the value a fresh install runs.** The older
+configuration class held no settings at all, so the file the server wrote for it names none, and
+this version's class supplies its own values for everything the file does not mention. That is
+worth a test rather than an assumption: four of the ten settings decide whether the install can run,
+and a reader that filled the absent elements with the type default instead would bring every
+upgraded server up with a quota of zero, neither media kind accepted and a retention period below
+the floor, which this plugin refuses to run on. The hop is tested in
+`Jellyfin.Plugin.Requests.Tests/Configuration/UpgradeFromAShippedVersionTests.cs`.
+
+**The fixture that test starts from is what the older version produced**, not a document written to
+look like it. It is the XML the shipped `0.1.0.0` assembly's own configuration type serialises to,
+taken out of the released package:
+
+```
+gh release download 0.1.0.0-stable --repo Flowfin/jellyfin-plugin-requests \
+  --pattern 'requests_0.1.0.0.zip'
+unzip -q requests_0.1.0.0.zip -d shipped
+```
+
+and then serialised with the type inside `shipped/Jellyfin.Plugin.Requests.dll`, using
+`System.Xml.Serialization.XmlSerializer`, which is what the host serialises a plugin configuration
+with. The result is one empty element and it is kept at
+`Jellyfin.Plugin.Requests.Tests/Configuration/Fixtures/plugin-configuration-written-by-0.1.0.0.xml`.
+
+**No server wrote it, and no server performed this upgrade.** A running Jellyfin was not available
+where this was captured, so what stands behind those bytes is the shipped type and the serialiser
+the host uses, and not an installation. Read this section as a statement about what the two versions
+do with the same file, never as a report of an upgrade that was watched.
+
+### Whether a version can be skipped
+
+**None so far, and the rule rather than the count is the thing to read.** Neither of the two things
+that cross an upgrade needs a particular version to have run:
+
+- The settings file is read by element name, and an element this version's class does not know is
+  ignored while one it knows and the file omits keeps the class's own value. Nothing accumulates
+  across versions, so going from any shipped version to any later one reads the same file the same
+  way.
+- The queue file carries the version of its own shape, and whichever plugin version opens it
+  migrates it forward as it reads it. The migration is from a shape number to a shape number and
+  not from a plugin version to a plugin version, so it does not matter which releases were installed
+  in between.
+
+**What would make a version a required stop, so that this section is a promise and not a
+description.** A change that reads the settings file for something other than the settings, or one
+that moves the queue forward in steps rather than in one read, makes the version carrying it a
+version nobody may skip. Such a change names itself here and in `CHANGELOG.md`; a change that says
+nothing here is one that can be skipped over.
 
 ## What is not promised at all
 
@@ -156,5 +229,7 @@ implemented**, which is #97, so nothing in this section is a promise about setti
   interface behind it is defined.
 - **What a server does with a version it reads from a manifest.** No manifest is published, which is
   #110, and how a server compares versions in one is not measured by this repository.
-- **Any upgrade path from any released version.** One release exists and it was built from a commit
-  carrying no store and no API, so there is no shipped shape for this version to be compatible with.
+- **An upgrade watched on a running server.** The hop from `0.1.0.0-stable` is set out above and is
+  measured against what the older version's own type writes, not against an installation. Nothing in
+  this repository has installed one version of this plugin on a server and then replaced it with the
+  next.
