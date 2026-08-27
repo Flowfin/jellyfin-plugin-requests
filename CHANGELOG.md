@@ -1,9 +1,11 @@
 # Changelog
 
 One section per released version, newest first, and an `Unreleased` section
-holding what has landed since the last one. The scheme the numbers follow, and
-what each part of a number means for somebody who has this plugin installed, is
-in [docs/versioning.md](docs/versioning.md).
+holding what has landed since the last one. A section carrying a number that no
+tag has been pushed for is the version being prepared; it becomes a released
+section when the tag goes out, and nothing in the file changes at that moment.
+The scheme the numbers follow, and what each part of a number means for somebody
+who has this plugin installed, is in [docs/versioning.md](docs/versioning.md).
 
 Entries say what changed for somebody using the plugin. A change that alters
 nothing an operator or a user can observe, such as a workflow or a test, does
@@ -11,11 +13,15 @@ not need an entry; the git history is where that is read.
 
 ## Unreleased
 
-Nothing has been released. There are no tags and no packages, so everything in
-the tree is unreleased and this section starts here rather than reconstructing
-what came before it. What landed before this file existed is in the git history,
-where it carries the pull request and the issue it came from, and rewriting it
-from memory into entries would be a description nobody measured.
+Nothing has landed since the entries below were collected under `0.2.0.0`.
+
+## 0.2.0.0
+
+Two of the entries below change what a server already doing its work does, which
+is the kind of change the scheme reserves for a `MAJOR` bump. Below `1.0.0.0` a
+`MINOR` bump is allowed to carry one and the entry says so, which is what the
+marked entries do. What each part of a number means is in
+[docs/versioning.md](docs/versioning.md).
 
 - The queue no longer drifts away from an external request service. A scheduled
   task asks that service, hourly and at startup, where the requests handed to it
@@ -32,7 +38,9 @@ from memory into entries would be a description nobody measured.
   file sits in is told the same thing about that title as somebody whose server
   does not have it. Until now the row carried what the server holds, which said
   that a library they cannot open has something in it. The lookup is made only
-  for the rows on the page being returned.
+  for the rows on the page being returned. **This gives an existing response
+  field a different meaning**, which above `1.0.0.0` would be a `MAJOR` bump;
+  below it, this entry is the notice the scheme asks for.
 
 - The person who asked is told when their own request is answered. Approving,
   declining or fulfilling a request pushes one message to that person's
@@ -56,6 +64,10 @@ from memory into entries would be a description nobody measured.
   days, counted from the move that finished it, and it runs daily and at
   startup. A request nobody has answered is never removed by age. Until now the
   number was a setting nothing acted on and a server kept every request.
+  **A server that upgrades into this starts deleting records it was keeping**,
+  under a number nobody had to choose before, which above `1.0.0.0` would be a
+  `MAJOR` bump; below it, this entry is the notice the scheme asks for. Read
+  `FinishedRequestRetentionDays` before updating.
 
 - A person signed in to the server can open a page in a browser and see what
   they asked for and what happened to it, at `MediaRequests/v1/Page`. It shows
@@ -63,6 +75,11 @@ from memory into entries would be a description nobody measured.
   no session. What it costs to open one in a browser, which is a credential in
   the address, is in [docs/surface.md](docs/surface.md).
 
+## 0.1.0.0
+
+Published on 2026-08-08. What that release carries is the entry below and
+nothing else; everything under `0.2.0.0` landed after its tag.
+
 - The version starts at `0.1.0.0`. It was `1.0.0.0`, inherited from the
-  template, which claimed a released first version of a plugin that has never
+  template, which claimed a released first version of a plugin that had never
   been released.
