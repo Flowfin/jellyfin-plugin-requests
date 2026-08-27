@@ -571,10 +571,11 @@ check on this board refuses either of them:
     score is 8: nugetCommand not pinned by hash
 
 `Branch-Protection` at 3 is a repository setting rather than a file here, and
-what the ruleset should require is #30. `Security-Policy` at 0 is a file this
-tree does not have yet, which is #106. Neither is closed by this decision and
-neither is a reason for a floor: a floor would report the same absences the
-report already reports.
+what the ruleset should require is #30. `Security-Policy` at 0 was a file this
+tree did not have when that report ran; `SECURITY.md` has landed since, under
+#106, and **the score above has not been re-read here**. Neither is closed by
+this decision and neither is a reason for a floor: a floor would report the same
+absences the report already reports.
 
 So the workflow keeps its shape, its header says in the file that it refuses
 nothing, and #25's second condition is answered for the fifth workflow by there
