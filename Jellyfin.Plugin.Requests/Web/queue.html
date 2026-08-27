@@ -144,6 +144,7 @@
                                 <th scope="col" data-i18n="queue.column.state"></th>
                                 <th scope="col" data-i18n="queue.column.requestedAt"></th>
                                 <th scope="col" data-i18n="queue.column.stateChangedAt"></th>
+                                <th scope="col" data-i18n="queue.column.movedBy"></th>
                                 <th scope="col" data-i18n="queue.column.requester"></th>
                                 <th scope="col" data-i18n="queue.column.waitingFor"></th>
                                 <th scope="col" data-i18n="queue.column.availability"></th>
@@ -283,8 +284,8 @@
 
                     /*
                      * The names this server knows, by identifier. Empty until the list has been read
-                     * and empty for good where it could not be, and a row falls back to the
-                     * identifier in both cases.
+                     * and empty for good where it could not be, and the requester cell falls back to
+                     * the identifier in both cases.
                      *
                      * It is asked for once per opening of the page rather than on every page turn,
                      * so somebody renamed while the queue is open reads as their old name until it
@@ -296,6 +297,23 @@
                      * looking up a name for it in the list it can already read.
                      */
                     var people = {};
+
+                    /*
+                     * Whether that list was read at all, which is a different fact from whether it
+                     * holds a particular identifier and is the whole of what separates two answers
+                     * a row would otherwise give identically.
+                     *
+                     * An empty list is what a successful read of a server with no users and a read
+                     * that failed both leave behind, so an identifier missing from it means "this
+                     * server has nobody by that identifier" only where the read happened. Without
+                     * this flag the queue says an account was deleted every time the user list call
+                     * does not answer, which is a statement about a person made out of a network
+                     * failure.
+                     *
+                     * It starts false, so nothing is concluded from a list this page has not been
+                     * given.
+                     */
+                    var peopleRead = false;
 
                     /*
                      * Every word this page draws comes from the catalogue the shell fetched, keyed
@@ -500,6 +518,47 @@
                     }
 
                     /*
+                     * Who last moved this request, in four answers that are four different
+                     * statements rather than one sentence and three ways of saying nothing.
+                     *
+                     * A request nobody has moved carries no identifier, and that is said in words.
+                     * An empty cell there would be indistinguishable from a cell this page failed
+                     * to fill, and it is the ordinary state of every open request, so it is the one
+                     * an operator reads most often and the one least worth leaving ambiguous.
+                     *
+                     * An identifier the user list answers for is a name, the same lookup the
+                     * requester gets, in the same list, read on the same call.
+                     *
+                     * An identifier that list does not hold is a person this server no longer has,
+                     * which is what a deleted account leaves behind: #308 removes the requests a
+                     * deleted person asked for and takes them off the ones they joined, and leaves
+                     * this field alone, because clearing it would say that no person moved the
+                     * request rather than that the person who did is gone.
+                     *
+                     * The fourth is the one this function exists for. Where the user list was never
+                     * read, no identifier in it means nothing at all, so the cell falls back to the
+                     * identifier - which is what the requester cell does in the same circumstance,
+                     * and which is worse to read rather than wrong. Concluding a deletion from a
+                     * call that did not answer would tell an operator that somebody's account is
+                     * gone on the evidence of a failed request to their own server.
+                     */
+                    function movedBy(request) {
+                        if (!request.StateChangedByUserId) {
+                            return RequestsShell.word("queue.movedBy.nobody");
+                        }
+
+                        if (people[request.StateChangedByUserId]) {
+                            return people[request.StateChangedByUserId];
+                        }
+
+                        if (!peopleRead) {
+                            return request.StateChangedByUserId;
+                        }
+
+                        return RequestsShell.word("queue.movedBy.deleted");
+                    }
+
+                    /*
                      * The decisions open on one row, as buttons.
                      *
                      * A real button rather than a styled element with a click handler on it: the
@@ -681,6 +740,7 @@
                             cell(row, RequestsShell.named("queue.state", request.State));
                             cell(row, moment(request.RequestedAt));
                             cell(row, moment(request.StateChangedAt));
+                            cell(row, movedBy(request));
                             cell(row, who(request));
                             cell(row, waitingFor(request));
                             cell(row, held(request));
@@ -720,6 +780,11 @@
                      * A failure is swallowed on purpose. The queue is readable without names and a
                      * page that refused to draw because the user list was unavailable would trade a
                      * worse column for no queue at all.
+                     *
+                     * What is not swallowed is that it failed. Two columns read this list and one of
+                     * them draws a conclusion from an identifier being absent from it, so whether
+                     * the read happened is kept beside the list rather than guessed at from whether
+                     * the list has anything in it.
                      */
                     /*
                      * Whether this install has an external request service, and the header cell that
@@ -756,9 +821,14 @@
                                 users.forEach(function (user) {
                                     people[user.Id] = user.Name;
                                 });
+
+                                // Last, so a list that was half walked when something threw is not
+                                // recorded as one this page was given.
+                                peopleRead = true;
                             })
                             .catch(function () {
                                 people = {};
+                                peopleRead = false;
                             });
                     }
 
