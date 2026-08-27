@@ -19,10 +19,17 @@ today. The last part is what makes the list checkable rather than aspirational. 
 can answer is work that has to be named, and two of the six were exactly that until the answer was
 widened to carry them.
 
-The measurements are read at `16d73b4`, which is the parent of the commit carrying this text. Every
-command below was re-run there rather than carried over from an earlier reading, and the line numbers
-in this file moved for that reason: the panel described at the end sits above everything the page
-already drew.
+The measurements are read at `211b90c`, which is the parent of the commit carrying this text. Every
+command below was re-run there rather than carried over from an earlier reading, and every line
+number in this file moved for that reason.
+
+**Three of them had already stopped reproducing before that re-run, and that is the reason to
+re-run rather than to copy.** The two readings of the page under "What the page shows today" were
+taken when the page was several hundred lines shorter, and the count of what the queue answer
+carries was taken before the handover column was added to it. Nothing in this file said so, because
+a pasted number goes stale in silence: the sentence around it still reads correctly and only the
+command underneath it disagrees. They were found by running each command in this file at the commit
+above rather than by anybody noticing the text.
 
 ## Who asked, and when
 
@@ -34,9 +41,9 @@ arrived while the page was open.
 The queue answer carries the identifier and both timestamps:
 
     git grep -n "RequestedByUserId\|RequestedAt\|StateChangedAt" -- Jellyfin.Plugin.Requests/Api/QueuedRequest.cs
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:45:    public required Guid RequestedByUserId { get; init; }
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:85:    public required DateTimeOffset RequestedAt { get; init; }
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:90:    public required DateTimeOffset StateChangedAt { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:46:    public required Guid RequestedByUserId { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:86:    public required DateTimeOffset RequestedAt { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:91:    public required DateTimeOffset StateChangedAt { get; init; }
 
 What it carries is an identifier and not a name. Turning one into the other is the server's own user
 list, which the dashboard page reaches without leaving the server, so the name is a rendering
@@ -46,12 +53,12 @@ asks it to start.
 The page does that turning:
 
     git grep -n "people\[request.RequestedByUserId\]" -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:457:                        return people[request.RequestedByUserId] || request.RequestedByUserId;
+    Jellyfin.Plugin.Requests/Web/queue.html:517:                        return people[request.RequestedByUserId] || request.RequestedByUserId;
 
 The list behind `people` is asked for once when the page opens:
 
     git grep -n "getUsers" -- Jellyfin.Plugin.Requests/Web/
-    Jellyfin.Plugin.Requests/Web/queue.html:678:                        return ApiClient.getUsers()
+    Jellyfin.Plugin.Requests/Web/queue.html:819:                        return ApiClient.getUsers()
 
 A list that cannot be read leaves the identifier in the cell, which is worse to read rather than
 wrong, and it leaves the queue readable. This is the only call either page makes that is not to this
@@ -61,6 +68,48 @@ business asking this server who everybody is.
 The page is administrators only, which is where a name belongs and stops. What a user may learn
 about another user's request is `docs/api.md`, and it is nothing.
 
+## Who moved it last, and the four things that cell can say
+
+This is not a seventh item on the list above, and the sentence that closes this document counts six
+because six is what a decision needs. What it is instead is what the decision leaves behind. On a
+server with one administrator the queue is a record of that person's own answers; on a server with
+several it is the only place saying which of them declined a title, and an operator who cannot read
+that goes and asks. The page could not answer it at all until #307: the queue answer has carried the
+identifier since the state was first written, and nothing drew it.
+
+    git grep -n "StateChangedByUserId" -- Jellyfin.Plugin.Requests/Api/QueuedRequest.cs
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:96:    public Guid? StateChangedByUserId { get; init; }
+
+It is resolved the way the requester is resolved, in the same user list, on the same call, so this
+plugin still holds no copy of anybody's name. What is different is that the requester cell has one
+fallback and this one has three answers, because an identifier with no name against it means three
+different things here and the operator is entitled to know which:
+
+- **A name**, where the user list holds that identifier.
+- **A person who has been deleted**, where the list was read and does not hold it. That is what a
+  deleted account leaves behind. The identifier is kept on purpose rather than cleared, decided on
+  #49 and built in #308, because an empty value means that no person moved the request, so clearing
+  it would say this plugin decided somebody's request by itself.
+- **Nobody has moved it**, where the request carries no identifier at all. It is said in words
+  rather than drawn as an empty cell: an empty cell there is also what a page that failed to fill it
+  leaves, and it is the state every open request is in, so it is the cell an operator reads most
+  often.
+
+**The fourth thing it can show is the identifier, and it is the case this cell is built around.** A
+user list that could not be read and a user list that does not hold an identifier leave exactly the
+same thing behind, and only one of them means the account is gone. So the page records whether the
+list arrived and concludes a deletion only where it did; where it did not, the cell falls back to the
+identifier, which is what the requester cell does in the same circumstance and is worse to read
+rather than wrong. Without that separation the queue tells an operator that an administrator was
+deleted every time a call to their own server does not answer, which is a statement about a person
+made out of a network error.
+
+    git grep -n "var peopleRead" -- Jellyfin.Plugin.Requests/Web/queue.html
+    Jellyfin.Plugin.Requests/Web/queue.html:316:                    var peopleRead = false;
+
+What a caller reading the field over the API rather than this page can and cannot conclude from it is
+`docs/api.md`, and it is less than this cell knows.
+
 ## What was asked for, including which seasons
 
 Approving a series without knowing whether it is one season or nine is approving an unknown quantity
@@ -68,11 +117,11 @@ of somebody's disk. The kind, the title, the year and the seasons are the reques
 requester wrote is the only place they get to say why.
 
     git grep -n "Kind\|DisplayTitle\|DisplayYear\|Seasons\|RequesterNote" -- Jellyfin.Plugin.Requests/Api/QueuedRequest.cs
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:55:    public required RequestedItemKind Kind { get; init; }
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:60:    public required string DisplayTitle { get; init; }
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:65:    public int? DisplayYear { get; init; }
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:75:    public IReadOnlyList<int> Seasons { get; init; } = [];
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:100:    public string? RequesterNote { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:56:    public required RequestedItemKind Kind { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:61:    public required string DisplayTitle { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:66:    public int? DisplayYear { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:76:    public IReadOnlyList<int> Seasons { get; init; } = [];
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:101:    public string? RequesterNote { get; init; }
 
 The year is what stops two films with one title being one decision. The provider identifiers are on
 the same answer and are not for the operator to read: they are what the fulfilment check matches on,
@@ -91,8 +140,8 @@ which is the trip this plugin is meant to remove, and the answer is worth more f
 a film because half of one is a real state.
 
     git grep -n "Availability" -- Jellyfin.Plugin.Requests/Api/QueuedRequest.cs
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:115:    public required LibraryAvailability Availability { get; init; }
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:120:    public DateTimeOffset? AvailabilityCheckedAt { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:116:    public required LibraryAvailability Availability { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:121:    public DateTimeOffset? AvailabilityCheckedAt { get; init; }
 
 `LibraryAvailability` has four values and `Partial` is the one this item exists for. `Unknown` is a
 fourth answer rather than a missing one, and the page has to show it as what it is: nothing has
@@ -111,7 +160,7 @@ time it is somebody else's memory, or approves something that was refused for a 
 changed. The reason is in the store: a decline carries one, and a finished request is kept.
 
     git grep -n "FinishedRequestRetentionDays" -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
-    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:99:    public int FinishedRequestRetentionDays { get; set; } = 365;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:100:    public int FinishedRequestRetentionDays { get; set; } = 365;
 
 `JoinedByUserIds` on the queue answer is not this: it is the several people standing behind one
 request that is still open, decided in #38, and it says nothing about a request that was finished
@@ -141,7 +190,7 @@ than this install keeps them, so what an operator sees here is every decision in
 rather than every decision ever made about that work:
 
     git grep -n "FinishedRequestRetentionDays" -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
-    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:99:    public int FinishedRequestRetentionDays { get; set; } = 365;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:100:    public int FinishedRequestRetentionDays { get; set; } = 365;
 
 ## Whether this person is asking for a lot
 
@@ -150,14 +199,14 @@ row cannot see that it is the eleventh from the same person this week, and the c
 is a number in the configuration rather than something the queue shows:
 
     git grep -n "OpenRequestsPerUser" -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
-    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:67:    public int OpenRequestsPerUser { get; set; } = 10;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:68:    public int OpenRequestsPerUser { get; set; } = 10;
 
 The store can count a person's requests, in `IRequestStore.FindForUserAsync`, so the fact was
 available and was not on the queue answer. It is now, beside the decisions:
 
     git grep -n "get; init;" -- Jellyfin.Plugin.Requests/Api/QueueContext.cs
-    Jellyfin.Plugin.Requests/Api/QueueContext.cs:36:    public IReadOnlyList<EarlierDecision> EarlierDecisions { get; init; } = [];
-    Jellyfin.Plugin.Requests/Api/QueueContext.cs:47:    public required int OpenRequestsByRequester { get; init; }
+    Jellyfin.Plugin.Requests/Api/QueueContext.cs:37:    public IReadOnlyList<EarlierDecision> EarlierDecisions { get; init; } = [];
+    Jellyfin.Plugin.Requests/Api/QueueContext.cs:48:    public required int OpenRequestsByRequester { get; init; }
 
 It counts what the quota counts, which is open and approved requests, joined ones included, and it
 counts the row being read as one of them. Anything else would put a number beside a row that
@@ -212,21 +261,22 @@ The page was a shell when this list was written and it is not one now. It draws 
 row carries the decisions its state admits, from #61, and the two items above are columns on it:
 
     git grep -n "cell(row, " -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:364:                    function cell(row, text) {
-    Jellyfin.Plugin.Requests/Web/queue.html:679:                            cell(row, title(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:680:                            cell(row, RequestsShell.named("kind", request.Kind));
-    Jellyfin.Plugin.Requests/Web/queue.html:681:                            cell(row, RequestsShell.named("queue.state", request.State));
-    Jellyfin.Plugin.Requests/Web/queue.html:682:                            cell(row, moment(request.RequestedAt));
-    Jellyfin.Plugin.Requests/Web/queue.html:683:                            cell(row, moment(request.StateChangedAt));
-    Jellyfin.Plugin.Requests/Web/queue.html:684:                            cell(row, who(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:685:                            cell(row, waitingFor(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:686:                            cell(row, held(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:687:                            cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
-    Jellyfin.Plugin.Requests/Web/queue.html:688:                            cell(row, request.RequesterNote || "");
-    Jellyfin.Plugin.Requests/Web/queue.html:689:                            cell(row, decided(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:692:                                cell(row, handover(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:382:                    function cell(row, text) {
+    Jellyfin.Plugin.Requests/Web/queue.html:738:                            cell(row, title(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:739:                            cell(row, RequestsShell.named("kind", request.Kind));
+    Jellyfin.Plugin.Requests/Web/queue.html:740:                            cell(row, RequestsShell.named("queue.state", request.State));
+    Jellyfin.Plugin.Requests/Web/queue.html:741:                            cell(row, moment(request.RequestedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:742:                            cell(row, moment(request.StateChangedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:743:                            cell(row, movedBy(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:744:                            cell(row, who(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:745:                            cell(row, waitingFor(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:746:                            cell(row, held(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:747:                            cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
+    Jellyfin.Plugin.Requests/Web/queue.html:748:                            cell(row, request.RequesterNote || "");
+    Jellyfin.Plugin.Requests/Web/queue.html:749:                            cell(row, decided(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:752:                                cell(row, handover(request));
 
-The first of those thirteen lines is the function that writes a cell and the rest are the cells one
+The first of those fourteen lines is the function that writes a cell and the rest are the cells one
 row carries. The last of them is indented one level deeper than the others because it is the only
 conditional one: what an external request service has to do with a request is drawn only where such a
 service is configured, so on a server that runs none the column is not in the page at all rather than
@@ -234,26 +284,36 @@ being a column of blanks about a bridge nobody set up. Beside them is the decisi
 which is #61:
 
     git grep -n "decide(row, request)" -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:511:                    function decide(row, request) {
-    Jellyfin.Plugin.Requests/Web/queue.html:695:                            decide(row, request);
+    Jellyfin.Plugin.Requests/Web/queue.html:570:                    function decide(row, request) {
+    Jellyfin.Plugin.Requests/Web/queue.html:755:                            decide(row, request);
 
-Read against the six items above, that is all of them.
+Read against the six items above, that is all of them. Thirteen cells and thirteen headings, and
+that pairing is checked rather than counted by eye: a row carrying one cell more than the header
+declares slides every column after it one place, so the note is read as the decision and the
+decision as the handover, and every one of those cells is full of something plausible.
 
 What is asked for is there, with the seasons and the requester's note. Whether the server already
 holds it is there, with the time the answer was read, which is the `held` call. Who asked is there as
 a name, which is the `who` call and the user list behind it. What was decided before is the
 `askedBefore` call, one decision to a line, and how much this person is waiting for is `waitingFor`.
 What approving will do next is answered per install rather than per row and is the panel beside the
-queue, which is #63.
+queue, which is #63. Beside the six is the `movedBy` call, which is who last moved the request and is
+the section above rather than one of them.
 
 The two items that needed the answer widened are on it now:
 
     git grep -c "get; init;" -- Jellyfin.Plugin.Requests/Api/QueuedRequest.cs
-    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:19
+    Jellyfin.Plugin.Requests/Api/QueuedRequest.cs:21
 
-Nineteen properties, and the nineteenth is the `Context` the two arrive under. It is one shape rather
-than two fields because neither is a property of the request: both are worked out from everything the
-store holds, and a request knows nothing about its neighbours.
+Twenty-one properties, and the twenty-first is the `Context` the two arrive under. It is one shape
+rather than two fields because neither is a property of the request: both are worked out from
+everything the store holds, and a request knows nothing about its neighbours.
+
+**This paragraph said nineteen and the file returns twenty-one.** The two that arrived since are
+`Backend` and `HandoverFailedAt`, from the handover column above, and both are described in this
+document already - so the sentence was stale rather than wrong about anything it argues. It is
+corrected here because every command in this file was re-run at the commit named at the top, which
+is where the disagreement showed up.
 
 **What is short here is a cell an operator cannot read rather than an item nobody answered.** A row
 for a title decided a dozen times carries a dozen lines in one cell. The retention period bounds how
