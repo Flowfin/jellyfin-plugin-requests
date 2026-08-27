@@ -290,8 +290,9 @@ public sealed class RequestsController : RequestsControllerBase
 
         // 201 with no Location header, on purpose. Nothing reads one request back yet, so a
         // Location would point at something that answers 404, and a header that lies is worse than
-        // one that is absent. Adding it when #53 lands is not a breaking change under the rule in
-        // docs/api.md.
+        // one that is absent. No route here reads one request back: #53 landed a list rather than a
+        // read of one, and adding the header when something does read one back is not a breaking
+        // change under the rule in docs/api.md.
         return answer.Outcome == RequestOutcome.Created
             ? StatusCode(StatusCodes.Status201Created, answer)
             : Ok(answer);

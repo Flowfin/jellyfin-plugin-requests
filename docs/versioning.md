@@ -112,7 +112,15 @@ release. A version bump and a changelog entry are one change: raising
 `PluginVersion` without writing what moved leaves an operator with a number and
 no reason for it.
 
-Nothing refuses that today. No check reads `CHANGELOG.md`, and a commit raising
-`PluginVersion` with the file untouched is green everywhere. #26 is the hygiene
-check that would refuse it, and #107 stays open on that condition until it
-lands.
+Something refuses that, one step away from the number this page is about.
+`PluginVersion` cannot move on its own: `PluginVersionMatchesThePackagingMetadata`
+reds the suite until `build.yaml` and `build-jf12.yaml` carry the same number, and
+a pull request in which either of those `version:` fields moves without touching
+`CHANGELOG.md` fails the `Deterministic pull request hygiene checks` job, which
+#26 landed.
+
+Two absences the old wording named are still absences and are not softened here.
+The job asks whether `CHANGELOG.md` was touched and never what was written in it,
+so an entry that says nothing passes. And it is not in the required set on
+`master`, so a red one reports rather than holds a merge; whether it becomes
+required is #30's.
