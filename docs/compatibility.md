@@ -142,7 +142,12 @@ one, and the first write afterwards puts the understood half back over the file 
 
 **An older version's file is read and migrated forward as it is read.** The file itself is not
 touched until some later write replaces it whole, so a server opened by a newer plugin and then put
-back to the older one finds the file it left.
+back to the older one finds the file it left. Two older shapes are read today, and what each step
+does is in [storage.md](storage.md). The one worth knowing before an upgrade is version 1 to version
+2: a history entry stops naming the person who made each move and says what kind of caller they were,
+so an install that upgrades stops holding those identifiers at its next write. Nothing on this server
+can attribute a past decision to an individual afterwards, which is deliberate and is not reversible
+by going back to the older plugin.
 
 That is the on-disk shape and nothing else. What happens to the settings across the same upgrade is
 the section below.

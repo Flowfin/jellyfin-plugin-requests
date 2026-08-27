@@ -1,5 +1,6 @@
 using System;
 using System.Net.Http;
+using Jellyfin.Data.Events.Users;
 using Jellyfin.Plugin.Requests.Api;
 using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
@@ -7,12 +8,14 @@ using Jellyfin.Plugin.Requests.Fulfilment;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Localisation;
 using Jellyfin.Plugin.Requests.Notify;
+using Jellyfin.Plugin.Requests.People;
 using Jellyfin.Plugin.Requests.Seam;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Surface;
 using Jellyfin.Plugin.Requests.Time;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Channels;
+using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Activity;
@@ -222,6 +225,11 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<ILogger<RetentionSweep>>()));
 
         serviceCollection.AddSingleton<IScheduledTask, RetentionTask>();
+        serviceCollection.AddSingleton(provider => new AccountRemoval(
+            provider.GetRequiredService<IRequestStore>(),
+            provider.GetRequiredService<INoticePreferences>(),
+            provider.GetRequiredService<ILogger<AccountRemoval>>()));
+        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
 
         // What asks the external request service where the requests handed to it stand. Registered
         // on every install rather than only where a service is configured, for the reason the bridge

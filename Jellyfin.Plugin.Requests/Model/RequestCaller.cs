@@ -38,8 +38,9 @@ public sealed record RequestCaller
     /// <summary>
     /// Gets the caller that is the plugin itself, moving a request on something it observed rather
     /// than on a decision anybody took. It carries no user, which is what makes
-    /// <see cref="MediaRequest.StateChangedByUserId"/> and
-    /// <see cref="RequestHistoryEntry.ByUserId"/> read as absent for a move no person made.
+    /// <see cref="MediaRequest.StateChangedByUserId"/> read as absent for a move no person made,
+    /// and what makes <see cref="RequestHistoryEntry.By"/> read as
+    /// <see cref="RequestActor.Plugin"/> rather than as a person.
     /// </summary>
     public static RequestCaller Plugin { get; } = new(userId: null, RequestActor.Plugin);
 

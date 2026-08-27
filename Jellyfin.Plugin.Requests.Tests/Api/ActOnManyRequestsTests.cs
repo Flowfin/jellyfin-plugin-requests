@@ -74,7 +74,7 @@ public sealed class ActOnManyRequestsTests
             var history = Assert.Single(held.Request.History);
             Assert.Equal(RequestState.Open, history.From);
             Assert.Equal(RequestState.Approved, history.To);
-            Assert.Equal(Operator, history.ByUserId);
+            Assert.Equal(RequestActor.Administrator, history.By);
         }
     }
 

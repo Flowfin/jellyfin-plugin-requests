@@ -754,7 +754,7 @@ public class WantHandoverTests
         var entry = Assert.Single(made.History);
 
         Assert.Equal(RequestArrival.Seam, entry.Arrival);
-        Assert.Equal(Asker, entry.ByUserId);
+        Assert.Equal(RequestActor.Requester, entry.By);
         Assert.Equal(Noon, entry.At);
         Assert.Equal(made.State, entry.From);
         Assert.Equal(made.State, entry.To);
@@ -806,7 +806,7 @@ public class WantHandoverTests
         var made = Assert.Single(await store.GetAllAsync(CancellationToken.None)).Request;
 
         Assert.Equal([SecondAsker], made.JoinedByUserIds);
-        Assert.Equal(Asker, Assert.Single(made.History).ByUserId);
+        Assert.Equal(RequestActor.Requester, Assert.Single(made.History).By);
     }
 
     /// <summary>

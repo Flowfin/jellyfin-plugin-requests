@@ -87,7 +87,7 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
     /// bytes would be read wrongly by the version before it, which is the rule stated in
     /// <c>docs/storage.md</c> rather than restated here.
     /// </summary>
-    public const int OnDiskVersion = 1;
+    public const int OnDiskVersion = 2;
 
     /// <summary>
     /// The shape written before there was a version field: a bare array of entries, with no
@@ -434,7 +434,9 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
                     OnDiskVersion);
             }
 
-            return Entries(filePath, root);
+            using var older = MigrateForward(filePath, root);
+
+            return Entries(filePath, older.RootElement);
         }
 
         if (root.ValueKind != JsonValueKind.Object)
@@ -442,6 +444,80 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
             throw Refusing(filePath, "it holds a JSON null where the list of requests should be.");
         }
 
+        // The version is read off the bytes before anything else is, because what the rest of the
+        // document means depends on it. Deserialising first would refuse an older file for missing a
+        // field the version says it never carried, which reads to an operator as a damaged queue
+        // rather than as an upgrade.
+        var shape = ShapeOf(filePath, root);
+
+        if (shape > OnDiskVersion)
+        {
+            // The one refusal that is not damage. The file is whole and was written by a later
+            // version of this plugin, which is what an operator sees after a downgrade. Reading it
+            // would mean guessing what a field this version has never heard of means, and a guess
+            // that is wrong is written back over the file on the first write.
+            _logger.LogError(
+                "The requests in {FilePath} are version {Found} and this plugin reads at most version {Known}. They were written by a later version of this plugin, so nothing is read and nothing is written. Install the newer version again, or move the file aside to start an empty queue.",
+                filePath,
+                shape,
+                OnDiskVersion);
+
+            throw new RequestStoreLoadException(
+                filePath,
+                FormattableString.Invariant(
+                    $"it is version {shape} and this plugin reads at most version {OnDiskVersion}, so it was written by a later version of this plugin."));
+        }
+
+        if (shape < OnDiskVersion)
+        {
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "The requests in {FilePath} are version {From}. They are read as version {To} and migrated to it. The file is not changed until the next write.",
+                    filePath,
+                    shape,
+                    OnDiskVersion);
+            }
+
+            using var older = MigrateForward(filePath, root);
+
+            return RequestsOf(filePath, older.RootElement);
+        }
+
+        return RequestsOf(filePath, root);
+    }
+
+    /// <summary>
+    /// The shape number a versioned document declares.
+    /// </summary>
+    /// <param name="filePath">The file, for the refusal that names it.</param>
+    /// <param name="root">The document.</param>
+    /// <returns>The number on it.</returns>
+    /// <exception cref="RequestStoreLoadException">Where it carries none this store recognises.</exception>
+    private int ShapeOf(string filePath, JsonElement root)
+    {
+        if (!root.TryGetProperty(nameof(PersistedDocument.Version), out var version)
+            || version.ValueKind != JsonValueKind.Number
+            || !version.TryGetInt32(out var shape)
+            || shape < 1)
+        {
+            throw Refusing(
+                filePath,
+                "it carries no version this store recognises, so what its fields mean is not decidable.");
+        }
+
+        return shape;
+    }
+
+    /// <summary>
+    /// The stored requests out of a document already known to be this store's shape.
+    /// </summary>
+    /// <param name="filePath">The file, for the refusal that names it.</param>
+    /// <param name="root">The document.</param>
+    /// <returns>The entries, in the order the document holds them.</returns>
+    /// <exception cref="RequestStoreLoadException">Where it is not the document this store writes.</exception>
+    private PersistedRequest?[] RequestsOf(string filePath, JsonElement root)
+    {
         PersistedDocument? document;
 
         try
@@ -453,37 +529,36 @@ public sealed class FileRequestStore : IRequestStore, IDisposable
             throw Refusing(filePath, "it is not the document this store writes.", reason);
         }
 
-        if (document is null || document.Version < 1)
-        {
-            throw Refusing(
-                filePath,
-                "it carries no version this store recognises, so what its fields mean is not decidable.");
-        }
-
-        if (document.Version > OnDiskVersion)
-        {
-            // The one refusal that is not damage. The file is whole and was written by a later
-            // version of this plugin, which is what an operator sees after a downgrade. Reading it
-            // would mean guessing what a field this version has never heard of means, and a guess
-            // that is wrong is written back over the file on the first write.
-            _logger.LogError(
-                "The requests in {FilePath} are version {Found} and this plugin reads at most version {Known}. They were written by a later version of this plugin, so nothing is read and nothing is written. Install the newer version again, or move the file aside to start an empty queue.",
-                filePath,
-                document.Version,
-                OnDiskVersion);
-
-            throw new RequestStoreLoadException(
-                filePath,
-                FormattableString.Invariant(
-                    $"it is version {document.Version} and this plugin reads at most version {OnDiskVersion}, so it was written by a later version of this plugin."));
-        }
-
-        if (document.Requests is null)
+        if (document?.Requests is null)
         {
             throw Refusing(filePath, "it holds a JSON null where the list of requests should be.");
         }
 
         return document.Requests;
+    }
+
+    /// <summary>
+    /// Brings an older shape up to <see cref="OnDiskVersion"/> in memory.
+    /// <para>
+    /// It is a read: nothing here touches the file, and what comes back is a second document the
+    /// caller disposes. What the step does and why the number had to go up is in
+    /// <see cref="HistoryWithoutPeople"/> and in <c>docs/storage.md</c>.
+    /// </para>
+    /// </summary>
+    /// <param name="filePath">The file, for the refusal that names it.</param>
+    /// <param name="root">The document as it was read.</param>
+    /// <returns>The migrated document, which the caller disposes.</returns>
+    /// <exception cref="RequestStoreLoadException">Where the older bytes cannot be walked at all.</exception>
+    private JsonDocument MigrateForward(string filePath, JsonElement root)
+    {
+        try
+        {
+            return HistoryWithoutPeople.Migrated(root);
+        }
+        catch (JsonException reason)
+        {
+            throw Refusing(filePath, "it is not the document this store writes.", reason);
+        }
     }
 
     /// <summary>

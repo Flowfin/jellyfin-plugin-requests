@@ -2,14 +2,17 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Data.Events.Users;
 using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Model;
+using Jellyfin.Plugin.Requests.People;
 using Jellyfin.Plugin.Requests.Seam;
 using Jellyfin.Plugin.Requests.Storage;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
 using Jellyfin.Plugin.Requests.Time;
+using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -103,6 +106,26 @@ public class PluginServiceRegistrationTests
         using var provider = RegisteredWithTheServerStoodInFor(new InMemoryRequestStore());
 
         Assert.IsType<WantHandover>(provider.GetRequiredService<IWantHandover>());
+    }
+
+    /// <summary>
+    /// The server reaches the account removal, which is the half of #49 no test of the sweep itself
+    /// can cover.
+    /// <para>
+    /// The rule about what a deleted account leaves behind is worth nothing if nothing on a running
+    /// server ever calls it, and what calls it is the consumer the host resolves for its own
+    /// user-deleted event. So the registration is asserted by type rather than by the sweep being
+    /// constructible: a sweep nobody is wired to would pass every test in
+    /// <c>AccountRemovalTests</c> and do nothing on a server.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ServerGetsTheThingThatHearsAnAccountBeingDeleted()
+    {
+        using var provider = RegisteredWithTheServerStoodInFor(new InMemoryRequestStore());
+
+        Assert.IsType<RemovedAccounts>(provider.GetRequiredService<IEventConsumer<UserDeletedEventArgs>>());
+        Assert.NotNull(provider.GetRequiredService<AccountRemoval>());
     }
 
     /// <summary>

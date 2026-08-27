@@ -50,7 +50,7 @@ public class RequestHistoryTests
 
         Assert.Equal(RequestArrival.Seam, entry.Arrival);
         Assert.Equal(request.RequestedAt, entry.At);
-        Assert.Equal(request.RequestedByUserId, entry.ByUserId);
+        Assert.Equal(RequestActor.Requester, entry.By);
         Assert.Equal(request.State, entry.From);
         Assert.Equal(request.State, entry.To);
         Assert.Null(entry.Reason);
@@ -170,10 +170,10 @@ public class RequestHistoryTests
         var fulfilled = RequestLifecycle.Move(approved, RequestState.Fulfilled, At(13), RequestCaller.Plugin);
 
         Assert.Equal(At(9), fulfilled.History[0].At);
-        Assert.Equal(FirstOperator, fulfilled.History[0].ByUserId);
+        Assert.Equal(RequestActor.Administrator, fulfilled.History[0].By);
 
         Assert.Equal(At(13), fulfilled.History[1].At);
-        Assert.Null(fulfilled.History[1].ByUserId);
+        Assert.Equal(RequestActor.Plugin, fulfilled.History[1].By);
     }
 
     /// <summary>
@@ -291,6 +291,7 @@ public class RequestHistoryTests
                 From = RequestState.Open,
                 To = RequestState.Declined,
                 At = At(9),
+                By = RequestActor.Administrator,
                 Note = new string('x', MediaRequest.NoteMaximumLength + 1)
             });
 

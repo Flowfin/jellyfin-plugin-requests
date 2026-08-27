@@ -133,7 +133,7 @@ it could be.
 
 The file is one document, and the first field in it is the version of the shape:
 
-    {"Version":1,"Requests":[{"Revision":1,"Request":{ ... }}]}
+    {"Version":2,"Requests":[{"Revision":1,"Request":{ ... }}]}
 
 The version is a number about the bytes and not about the plugin. It says how a reader is to
 understand what follows, so it moves when the understanding changes and stays where it is when the
@@ -157,10 +157,22 @@ writes reaches the disk when some later write replaces the file whole, which is 
 store ever makes to it. So an install that is opened by a newer plugin and then put back to the older
 one finds the file it left, until something writes.
 
-There is one older shape today. Before the version existed the file was a bare array of entries with
-no document around it, and that is what the root being an array means. It is read as version 0 and
-its entries are exactly the entries of version 1, so the migration is the wrapper and nothing else.
-A file in that shape is read, and the line saying so is in the log.
+There are two older shapes today, and both are read.
+
+**Version 0** is the shape written before the version field existed: a bare array of entries with no
+document around it, which is what the root being an array means. Its entries are exactly the entries
+of version 1, so that step is the wrapper and nothing else.
+
+**Version 1** wrote an identifier on every history entry, naming the person who made each move.
+Version 2 writes what kind of caller they were instead, and the reason the number had to go up rather
+than a field being added is that the older bytes are wrong rather than incomplete: a reader of version
+2 meeting an identifier would have nothing to do with it, and the whole point of the change is that no
+entry carries one. `Jellyfin.Plugin.Requests/Storage/HistoryWithoutPeople.cs` is the step and it is
+the file to read for what the role is derived from, including the one distinction the older shape never
+held and this cannot recover.
+
+Both steps are reads, so a file in either shape is read and left exactly as it is, and the line saying
+which shape it was is in the log at a level an operator sees.
 
 ### What needs a new version
 
@@ -180,7 +192,7 @@ older version would have written agrees with the migration by construction: both
 same belief about the old shape, so the test passes whether or not that belief is right, which is
 the same trap #97 names for the hop between shipped plugin versions.
 
-The fixture that is there was produced by this tree's own store at `592e517`, the commit before the
+The version 0 fixture was produced by this tree's own store at `592e517`, the commit before the
 version landed, by adding two requests through `AddAsync` and copying `requests.json` out.
 
 It is not a shipped version's output, and it could not be. One release exists, and the commit it was
@@ -199,7 +211,7 @@ built from carries no store to write anything:
 The contract and its two exceptions, and no implementation. So the shape that fixture holds is what a
 server running the mainline between `7b62877` and the change that landed the version has on its disk.
 
-### The second fixture, which is a shipped version's output
+### The version 1 fixtures, which are a shipped version's output
 
 That sentence used to end by saying no released version had ever written a request file. One has
 since. `0.2.0.0-stable` is the first release that ships a store at all, and its own output is kept:
@@ -219,6 +231,17 @@ so a loader that filled an absent field is caught as well as one that dropped a 
 field out of what is written. Watched failing: `Backend` marked `[JsonIgnore]` reds
 `TheQueueTheShippedVersionWroteIsReadAndNothingInItIsLost` and leaves the shape-version leg green,
 and the tree was restored afterwards.
+
+A second file was captured the same way when version 2 landed, because the version 1 to version 2 step
+needs a history with one row of each kind and the pair above holds two of the three:
+
+    Jellyfin.Plugin.Requests.Tests/Storage/Fixtures/version-1-three-roles-written-by-0.2.0.0-at-60faf41.json
+
+One request whose history carries the ask, a move an administrator made and a move the plugin made
+after looking at the library. `HistoryWithoutPeopleTests` is what reads it, and it asserts the three
+roles by name, that nothing else on the request moves, that no identifier survives the write that
+follows the migration, and that the file itself is untouched until that write. Watched failing: an
+arrival migrated as an administrator reds the role leg.
 
 **No server wrote it.** It is this tree's own store at the commit the package was built from, which
 is what this rule asks for and is not the same as an installation's file. That distinction is the
@@ -314,9 +337,8 @@ other four left passing:
 
 ### What this does not cover
 
-Nothing here restores across two shipped versions of the plugin. Two have shipped, and the older of
-them carries no store, so there is one shipped file shape and nothing to restore from one shape into
-another yet. What the hop between the two shipped versions does carry is the settings, and that is
+Nothing here restores a backup taken from one shipped version onto another. Two have shipped and the
+older of them carries no store, so one file shape has ever been released. What the hop between the two shipped versions does carry is the settings, and that is
 in [docs/compatibility.md](compatibility.md) with the test that holds it.
 
 Nothing here has been run against a server's own backup and restore feature. What is asserted is

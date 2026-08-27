@@ -138,7 +138,7 @@ public sealed class WhatTheShippedVersionWroteTests : IDisposable
         Assert.Equal(RequestState.Open, full.Value.Request.History[0].From);
         Assert.Equal(RequestState.Open, full.Value.Request.History[0].To);
         Assert.Equal(RequestArrival.Seam, full.Value.Request.History[0].Arrival);
-        Assert.Equal(new Guid("b31d0f9a-5c2e-4a71-8f6b-0d4c3e2a1b58"), full.Value.Request.History[0].ByUserId);
+        Assert.Equal(RequestActor.Requester, full.Value.Request.History[0].By);
         Assert.Equal(RequestState.Approved, full.Value.Request.History[1].To);
         Assert.Null(full.Value.Request.History[1].Arrival);
         Assert.Equal("An operator's note.", full.Value.Request.History[1].Note);
