@@ -49,9 +49,14 @@ step "publish the probe for $framework"
 # dotnet and docker and those two disagree about what an absolute path looks like on this platform.
 rm -rf "$probe_out"
 dotnet publish "$repo_root/tools/seam-probe/SeamProbe.csproj" -c Release -f "$framework" -o "$probe_out" --nologo -v quiet
-# Only the assembly, for the same reason the plugin install takes only one file: a symbol file and a
-# documentation file are not what a server has any use for.
-find "$probe_out" -type f ! -name 'Jellyfin.Plugin.SeamProbe.dll' -delete
+# The assemblies and nothing else, for the same reason the plugin install takes only the files the
+# artifact list names: a symbol file and a documentation file are not what a server has any use for.
+#
+# THE SECOND ASSEMBLY IS THE MEASUREMENT RATHER THAN AN OVERSIGHT. A sibling resolving the contract
+# from a feed gets a package reference whose default is to copy that assembly into its own output, so
+# what ships beside such a sibling is its own copy of the contract. Deleting it here would measure a
+# shape a sibling has to go out of its way to produce.
+find "$probe_out" -type f ! -name '*.dll' -delete
 ls -1 "$probe_out"
 
 EXTRA_PLUGIN_DIRECTORY="$probe_out" EXTRA_PLUGIN_NAME="SeamProbe" \

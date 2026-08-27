@@ -27,9 +27,13 @@ namespace Jellyfin.Plugin.SeamProbe;
 /// reported answer rather than a plugin that failed to start.
 /// </para>
 /// <para>
-/// The probe ships no copy of the contract. Its project reference carries ExcludeAssets=runtime and
-/// Private=false, so the only copy of that assembly in the process is the one in the plugin's own
-/// directory, which is the arrangement #117 chose and the thing being measured.
+/// WHAT THE PROBE SHIPS IS THE VARIABLE, and it is what each run of this measures. It carried
+/// ExcludeAssets=runtime and Private=false while the arrangement under test was one shipped copy,
+/// and a run on both claimed lines on 2026-08-27 found that a plugin shipping no copy cannot resolve
+/// the assembly out of another plugin's directory at all - the type is visible to reflection and the
+/// reference is unresolvable, at the same time. It now ships its own copy, which is what a package
+/// reference does by default, so what is being measured is whether the host merges two copies into
+/// one type or leaves two. docs/seam.md carries both answers and what each one decides.
 /// </para>
 /// </summary>
 public sealed class ContainerReport : IHostedService

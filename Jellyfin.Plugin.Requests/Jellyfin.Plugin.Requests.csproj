@@ -29,12 +29,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- THE ONE SHIPPED COPY OF THE CONTRACT, WHICH IS WHAT #117 CHOSE. The sibling discover plugin
-         compiles against this same assembly and ships no copy of it, so there is one type rather
-         than two with one name, and a lookup from the other plugin is answered instead of silently
-         returning nothing. This reference carries no ExcludeAssets: unlike the host's packages,
-         nothing on the server provides this assembly, so the plugin package is where it comes from
-         and build.yaml names it in the artifact list. -->
+    <!-- THE CONTRACT THE SIBLING DISCOVER PLUGIN COMPILES AGAINST, SHIPPED WITH THIS PLUGIN. The
+         reference carries no ExcludeAssets: unlike the host's packages, nothing on the server
+         provides this assembly, so the plugin package is where it comes from and build.yaml names it
+         in the artifact list.
+
+         WHAT THE OTHER SIDE SHIPS IS NOT SETTLED BY THIS LINE AND IS NOT SETTLED YET. #117 chose
+         exactly one shipped copy, and a run on both claimed lines on 2026-08-27 found that a second
+         plugin shipping no copy cannot resolve this assembly out of another plugin's directory at
+         all. docs/seam.md carries that measurement and what it leaves open. Nothing about this side
+         changes with the answer: this plugin declares the type and ships it either way. -->
     <ProjectReference Include="..\Jellyfin.Plugin.Requests.Contract\Jellyfin.Plugin.Requests.Contract.csproj" />
   </ItemGroup>
 

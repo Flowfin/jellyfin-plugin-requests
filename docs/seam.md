@@ -181,6 +181,46 @@ binds a compile-time reference to that same loaded assembly is a further step an
 here. And nothing above installs two copies of one contract assembly, so the premise the first
 rejected option rests on is still unmeasured, which is what that option's own paragraph says.
 
+### The further step was taken on 2026-08-27, and it does not hold
+
+**A second plugin that ships no copy of the contract cannot BIND a compile-time reference to it, on
+either claimed line.** Reflection finds the type; the runtime refuses to load the assembly. Both
+answers come out of the same run, which is what makes the pair readable rather than two claims:
+
+    gh api --allow-escape-sequences repos/Flowfin/jellyfin-plugin-requests/actions/jobs/98702538786/logs \
+      | sed 's/\x1b\[[0-9;]*m//g' | grep -a "SEAM-PROBE" | sed -E 's/.*ContainerReport: //' | sort -u
+    SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests.Contract: 1
+    SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.Contract.dll
+    SEAM-PROBE the compile-time reference to Jellyfin.Plugin.Requests.Seam.IWantHandover did not bind: System.IO.FileNotFoundException: Could not load file or assembly 'Jellyfin.Plugin.Requests.Contract, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null'. The system cannot find the file specified.
+    SEAM-PROBE the container returned 1 implementation(s) of it
+    SEAM-PROBE the type Jellyfin.Plugin.Requests.Seam.IWantHandover is reachable from this plugin
+    SEAM-PROBE result assemblies=1 contract=reachable implementations=1 binding=unbound bound-implementations=0 same-type=no
+
+That job is the 10.11 line. The 12.0 line is job `98702538479` in the same run and its verdict line is
+identical.
+
+**Why the two answers differ, said once so the pair is not read as a contradiction.** Enumerating what
+a process has loaded reaches every plugin's assemblies whatever context they were loaded into, which
+is why the reflected lookup succeeds. Resolving an assembly by name is done by the load context of the
+plugin asking, and that context looks in that plugin's own directory and in what the host provides. A
+file in a THIRD plugin's directory is in neither. So the type is visible and the reference is
+unresolvable at the same time, and only the second of those is what a sibling depends on.
+
+**What that does to the choice taken on 2026-08-21.** Exactly one shipped copy is what it says, and it
+is the copy that makes the other side's reference resolvable. This measurement says the other side
+cannot resolve it, so the option as written is not available on this host. Which of the remaining two
+that leaves is not settled here and is #117's to take: the deduplicating option's premise is the next
+thing to measure and the run that measures it is described below, and reflection by name remains what
+it always was, immune to this class and paying for it with the fourth condition.
+
+**What is being measured next, so a reader knows what this page is waiting for.** The probe now ships
+its own copy of the contract, which is what a package reference gives a sibling by default rather than
+a shape anybody has to construct. Two answers are possible and they decide between the two remaining
+options. One assembly loaded, with the bound type the same type the plugin registered, means the host
+merges the copies and the second option works. Two assemblies, with the bound type a different type of
+the same full name, means no compile-time contract can be shared here at all and reflection is what is
+left. Neither is written down as expected.
+
 ### That answer is refused rather than reported, since 2026-08-26
 
 The run that took the measurement above refused one thing only: a probe that wrote nothing. Both
@@ -216,7 +256,7 @@ answer, with the answer both lines gave beside them as the case that has to pass
 container and no server, so the reader that decides a probe run is checked on machines that cannot
 run one.
 
-### What the tree holds today, which is now the choice above
+### What the tree holds today, and what the measurement above leaves of it
 
 THIS SECTION SAID THE TREE WAS NOT IN THE CHOSEN SHAPE AND IT IS. What stood here read the plugin's
 project file, found two references and both of them the host's, and said the decision was a thing to
@@ -226,15 +266,20 @@ an assembly of its own, and the plugin references it:
     git grep -n 'public interface IWantHandover' -- Jellyfin.Plugin.Requests.Contract/Seam/IWantHandover.cs
     git grep -n 'ProjectReference' -- Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj
 
-EXACTLY ONE COPY SHIPS, AND WHICH SIDE SHIPS IT IS THE WHOLE ARRANGEMENT. The plugin's reference
+THE PLUGIN SHIPS THE ASSEMBLY, AND THAT HALF IS UNAFFECTED BY THE MEASUREMENT ABOVE. Its reference
 carries no `ExcludeAssets`, so the assembly lands in the plugin's own directory and `build.yaml` names
 it in the artifact list beside the plugin's assembly; the Package check compares that list against a
-publish in both directions, so a package that left it out is refused rather than installed. A
-consumer of the contract does the opposite - compile against it, ship nothing - which is what the
-probe's own reference says:
+publish in both directions, so a package that left it out is refused rather than installed.
+
+    git grep -n 'artifacts:' -A3 -- build.yaml
+
+WHAT THE CONSUMER SIDE SHIPS IS THE OPEN HALF. The probe carried `ExcludeAssets` and `Private=false`
+so that it compiled against the contract and shipped nothing, which is the arrangement the choice
+names, and that is the arrangement the run above found unresolvable. It now ships its own copy, which
+is what a package reference does by default, so that the remaining question is measured rather than
+assumed:
 
     git grep -n -A3 'ProjectReference' -- tools/seam-probe/SeamProbe.csproj
-    git grep -n 'artifacts:' -A3 -- build.yaml
 
 WHAT REFUSES A RETURN TO THE OLD SHAPE. Copying the three types back into the plugin assembly
 compiles, ships one assembly again, and breaks nothing this repository builds - what it breaks is a
@@ -253,12 +298,18 @@ release workflow gains a step that puts it there, and no workflow in this tree p
 
     git grep -rn 'nuget push\|dotnet pack' -- .github/workflows/
 
-**The fourth condition of #117, which is the silent case.** With one shipped copy there is no second
-type to be a different type, so a sibling built against a contract version this plugin does not ship
-fails to bind rather than resolving nothing. The reader refuses that answer by name, and what has not
-been done is producing it: nothing in this tree builds a consumer against a divergent contract,
-installs it, and watches an operator being able to tell that from a sibling that was never installed
-at all. Until that exists, the refusal is a rule nobody has watched bite on a server.
+**The third condition of #117, which the measurement above turned from an assumption into an open
+question.** Nothing here proves that a sibling's container lookup finds this implementation through
+the reference a sibling actually holds, because the arrangement that was chosen for it does not
+resolve on either line. What exists is the measurement that says so and the run that decides between
+what is left.
+
+**The fourth condition of #117, which is the silent case.** A sibling built against a contract version
+this plugin does not ship fails to bind rather than resolving nothing, and the reader refuses that
+answer by name. What has not been done is producing it: nothing in this tree builds a consumer against
+a divergent contract, installs it, and watches an operator being able to tell that from a sibling that
+was never installed at all. Until that exists, the refusal is a rule nobody has watched bite on a
+server.
 
 ### What the package actually contains, read out of the package
 

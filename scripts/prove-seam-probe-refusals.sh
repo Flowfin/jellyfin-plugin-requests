@@ -98,7 +98,7 @@ refuses "two assemblies of one name in one process" \
 
 log none.log 'SEAM-PROBE result assemblies=0 contract=missing implementations=0 binding=unbound bound-implementations=0 same-type=no'
 refuses "the plugin under test was not loaded at all" \
-    "no assembly named Jellyfin.Plugin.Requests was loaded" \
+    "no assembly named Jellyfin.Plugin.Requests.Contract was loaded" \
     -- "$reader" "$work/none.log"
 
 log unanswered.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=0 binding=bound bound-implementations=0 same-type=yes'

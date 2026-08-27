@@ -43,8 +43,6 @@
          run, and the one that can crash is held inside a method of its own so that its failure is an
          answer rather than a silence. -->
     <ProjectReference Include="..\..\Jellyfin.Plugin.Requests.Contract\Jellyfin.Plugin.Requests.Contract.csproj">
-      <ExcludeAssets>runtime</ExcludeAssets>
-      <Private>false</Private>
     </ProjectReference>
   </ItemGroup>
 
