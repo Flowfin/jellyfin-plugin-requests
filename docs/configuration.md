@@ -165,7 +165,7 @@ fulfilled.
 
 Nothing leaves the server. The outbound notification sink exists and has nowhere to send to, because
 `OutboundNoticeAddress` is empty until an operator types one; there is no credential to hold and no
-other path that could carry anything, since the bridge adapter is #82 and is not built. Two things do
+other path that could carry anything, since no adapter to a request service is built here. Two things do
 happen on a fresh install and neither is a path off the machine. Every transition is written to the
 server's own activity log, which is a record rather than a message. And the person who asked is told
 on whatever they are signed in on when their own request is answered, down the connection the server
@@ -207,9 +207,9 @@ this page overrides it**, and none ever will. [`notifications.md`](notifications
 lives, what the two endpoints are, and why neither of them takes an identifier.
 
 **A bridge address and a credential.** The only bridge in this tree is the one for a server that has
-none. A field for an address would be somewhere to type something nothing reads. #82 brings the
-adapter; where a credential is kept when there is one, who on the machine can read it, and what is
-refused by name are in [`bridge.md`](bridge.md).
+none. A field for an address would be somewhere to type something nothing reads. No issue
+on this board asks for the adapter that would read one; where a credential is kept when there is one,
+who on the machine can read it, and what is refused by name are in [`bridge.md`](bridge.md).
 
 ## What an uninstall leaves behind
 

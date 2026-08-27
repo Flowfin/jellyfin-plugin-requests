@@ -30,8 +30,8 @@ namespace Jellyfin.Plugin.Requests.Configuration;
 /// <para>
 /// There is no bridge address and no credential. The only implementation of the bridge in this tree
 /// is the one for a server that has none, so a field for an address would be a place to type
-/// something nothing reads. #82 brings the adapter and #85 decides where a credential is kept and
-/// what may be claimed about it.
+/// something nothing reads. No issue on this board asks for the adapter that would need one, and
+/// #85 decides where a credential is kept and what may be claimed about it once there is one.
 /// </para>
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration

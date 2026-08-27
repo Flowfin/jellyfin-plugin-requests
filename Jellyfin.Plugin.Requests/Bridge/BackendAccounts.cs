@@ -23,10 +23,11 @@ namespace Jellyfin.Plugin.Requests.Bridge;
 /// sees something that is not theirs.
 /// </para>
 /// <para>
-/// Where the table is kept, and how an operator edits it, arrives with the adapter that reads it in
-/// #82. Nothing on this side reads it yet, so a settings field for it now would be somewhere to type
-/// something nothing uses. <c>docs/bridge.md</c> carries the decision, the two shapes it was chosen
-/// over, and what each of them costs.
+/// Where the table is kept, and how an operator edits it, arrives with the adapter that reads it.
+/// There is no adapter in this tree and no issue on this board asks for one, so nothing on this side
+/// reads the table yet and a settings field for it now would be somewhere to type something nothing
+/// uses. <c>docs/bridge.md</c> carries the decision, the two shapes it was chosen over, what each of
+/// them costs, and where the question of an adapter stands.
 /// </para>
 /// </summary>
 public sealed class BackendAccounts
