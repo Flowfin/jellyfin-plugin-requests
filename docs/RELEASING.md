@@ -149,25 +149,90 @@ PACKAGE_VERSION=<version> \
 diff regenerated.cdx.json <archive>.cdx.json
 ```
 
-A recorded run of the first command against `0.1.0.0-stable`, which is the release
-that exists at the time of writing:
+A recorded run of both commands against `0.2.0.0-stable`, which is the first release
+the publish route produced a bill of materials for:
 
 ```
-gh release download 0.1.0.0-stable --repo Flowfin/jellyfin-plugin-requests \
-  --pattern 'requests_0.1.0.0.zip'
-gh attestation verify requests_0.1.0.0.zip --repo Flowfin/jellyfin-plugin-requests
+gh release download 0.2.0.0-stable --repo Flowfin/jellyfin-plugin-requests \
+  --pattern 'requests_0.2.0.0.zip' --pattern 'requests_0.2.0.0.cdx.json'
+gh attestation verify requests_0.2.0.0.zip --repo Flowfin/jellyfin-plugin-requests
 echo "exit=$?"
 exit=0
 ```
 
-The command prints its result only to a terminal, so a run whose output is captured
-to a file or a pipe shows the exit status and nothing else. Reading the statement
-itself rather than the verdict takes `--format json`. Pointed at a repository that did
-not build the archive it exits 1 with an HTTP 404, which is the failing direction of
-the same command.
+```
+SOURCE_REPOSITORY=Flowfin/jellyfin-plugin-requests \
+SOURCE_COMMIT=60faf415328e88461656d4c245e093e357883983 \
+PACKAGE_VERSION=0.2.0.0 \
+  scripts/bill-of-materials.sh requests_0.2.0.0.zip regenerated.cdx.json
+bill-of-materials: wrote regenerated.cdx.json describing 2 file(s) from requests_0.2.0.0.zip.
+diff regenerated.cdx.json requests_0.2.0.0.cdx.json
+echo "exit=$?"
+exit=0
+```
+
+The commit to put in `SOURCE_COMMIT` is the one the shipped document names, which is
+read out of it rather than guessed:
+
+```
+python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["metadata"]["component"]["externalReferences"][0]["comment"])' \
+  requests_0.2.0.0.cdx.json
+built from commit 60faf415328e88461656d4c245e093e357883983
+```
+
+The first command prints its result only to a terminal, so a run whose output is
+captured to a file or a pipe shows the exit status and nothing else. Reading the
+statement itself rather than the verdict takes `--format json`. Pointed at a
+repository that did not build the archive it exits 1 with an HTTP 404, which is the
+failing direction of the same command.
+
+The second check was watched failing in both of the directions it exists for, on the
+same archive. A file inside the archive changed by one byte:
+
+```
+unzip -q requests_0.2.0.0.zip -d tampered && printf '\n' >> tampered/meta.json
+( cd tampered && zip -q -r ../tampered_0.2.0.0.zip . )
+SOURCE_REPOSITORY=Flowfin/jellyfin-plugin-requests \
+SOURCE_COMMIT=60faf415328e88461656d4c245e093e357883983 \
+PACKAGE_VERSION=0.2.0.0 \
+  scripts/bill-of-materials.sh tampered_0.2.0.0.zip tampered.cdx.json
+diff tampered.cdx.json requests_0.2.0.0.cdx.json
+26c26
+<           "content": "2e32254bbf780ae1de376734a16370be43b0de0bd2cc11cf9ceda6edad3a94f6"
+---
+>           "content": "62293889c33fe2ab3551336f50a6b0280f43bb3e97fda0eb4688990b923f21fc"
+33c33
+<           "value": "1205"
+---
+>           "value": "1204"
+echo "exit=$?"
+exit=1
+```
+
+and a regeneration claiming a different source commit:
+
+```
+SOURCE_COMMIT=bcee7a79feb7f31ae6e1d7441e9e20d4853dacc1 ... \
+  scripts/bill-of-materials.sh requests_0.2.0.0.zip wrong-commit.cdx.json
+diff wrong-commit.cdx.json requests_0.2.0.0.cdx.json
+44c44
+<           "comment": "built from commit bcee7a79feb7f31ae6e1d7441e9e20d4853dacc1"
+---
+>           "comment": "built from commit 60faf415328e88461656d4c245e093e357883983"
+echo "exit=$?"
+exit=1
+```
+
+The tampered run also differs on the archive's own name, because the name is a field
+of the document. That is worth knowing before somebody renames a download and reads
+the two name lines as a finding: compare a download under the name it was published
+under.
 
 `0.1.0.0-stable` was built before the bill of materials existed and carries no
-`.cdx.json`, so the second check has nothing to run against until the next release.
+`.cdx.json`, so the second check still has nothing to run against for that release
+and never will. A release's assets are not touched again on this route, and a
+document written by hand afterwards is the thing the first check exists instead of.
+The first check runs against it unchanged.
 
 ## What fails the run
 
