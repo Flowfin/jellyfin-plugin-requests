@@ -20,7 +20,7 @@ namespace Jellyfin.Plugin.Requests.Seam;
 /// does not own; a request is what this plugin makes of it, with an identifier of its own, a state,
 /// a history, and a place in a queue. Keeping the two types apart is what stops the contract's shape
 /// leaking into the model, and it is why the fields here are named the way the contract names them
-/// rather than the way <see cref="MediaRequest"/> does.
+/// rather than the way the plugin's own request record does.
 /// </para>
 /// <para>
 /// <b>Nothing here is stored as it stands.</b> The title and the year become the display snapshot
@@ -36,8 +36,8 @@ public sealed record HandedOverWant
     /// Gets which version of the contract this field set was built against.
     /// <para>
     /// Required, and read before anything else in the record. What happens where this side does not
-    /// know the version is <see cref="WantHandover.KnownContractVersion"/> and the rule is in
-    /// <c>docs/seam.md</c>.
+    /// know the version is <c>WantHandover.KnownContractVersion</c> in the plugin assembly, and the
+    /// rule is in <c>docs/seam.md</c>.
     /// </para>
     /// </summary>
     public required int ContractVersion { get; init; }
@@ -84,8 +84,8 @@ public sealed record HandedOverWant
     /// <para>
     /// These are what the identity rule compares, so a want carrying none reaches no existing
     /// request and is joined by none: it has no identity, which makes it different from everything
-    /// including another copy of itself. That is <see cref="RequestIdentity"/>'s answer rather than
-    /// anything this seam decides.
+    /// including another copy of itself. That is <c>RequestIdentity</c>'s answer in the plugin
+    /// assembly rather than anything this seam decides.
     /// </para>
     /// </summary>
     public IReadOnlyDictionary<string, string> ProviderIds

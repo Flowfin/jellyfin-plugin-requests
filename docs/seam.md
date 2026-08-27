@@ -105,10 +105,40 @@ side has written against a type declared in this assembly, moving it is a migrat
 boards rather than a choice on one.
 
 What it costs, stated rather than implied. It is another artefact with its own version and its own
-publishing route, on a board that does not yet publish a manifest for the plugin itself, so the
-package's release path has to be settled as part of building this and not assumed to follow the
-plugin's. It is versioned independently and changed rarely: a contract package that moves often is
-two plugins that have to be upgraded together, which is the thing a shared type was meant to avoid.
+publishing route. It is versioned independently and changed rarely: a contract package that moves
+often is two plugins that have to be upgraded together, which is the thing a shared type was meant to
+avoid. `Jellyfin.Plugin.Requests.Contract` carries its own version properties for exactly that
+reason, so a plugin release does not move it:
+
+    git grep -n 'ContractVersion' -- Jellyfin.Plugin.Requests.Contract/Jellyfin.Plugin.Requests.Contract.csproj
+
+WHERE THE OTHER SIDE OBTAINS IT was the open half of that cost and was answered on #117 on
+2026-08-24: the organisation's GitHub Packages feed, `nuget.pkg.github.com/Flowfin`, which is a
+resolvable permanent address that adds no infrastructure. THE PUBLISH STEP IS NOT BUILT AND NOTHING
+HERE CLAIMS IT IS. What exists in this tree is the project, the one shipped copy and the measurement;
+what pushes the package to that feed hangs off the release workflow and is named as outstanding under
+"What is still not done" below.
+
+WHAT THE PACKAGE HOLDS, AND THE ONE ENTRY THAT IS NOT A SEAM TYPE. The interface, the field set that
+crosses, and the enumeration that field set names:
+
+    git ls-tree -r --name-only HEAD -- Jellyfin.Plugin.Requests.Contract/Seam Jellyfin.Plugin.Requests.Contract/Model
+
+`RequestedItemKind` is in there because `HandedOverWant.Kind` is of that type, and the alternative was
+for the want to carry something else - a string, or an enumeration of the contract's own - which puts
+two vocabularies in the tree that have to be kept in step. That is the defect class the mapping table
+in M10 exists against, and it is worse than the cost of moving the enumeration, which is that an
+ordinary property of this plugin becomes part of an agreement with another board: adding a third kind
+of thing a person can ask for is now a contract change rather than a plugin change. The move costs
+nothing at the call sites, because a namespace is not an assembly and this one did not move with the
+file.
+
+`HandoverRefusal` IS NOT IN THE PACKAGE, AND THAT IS DELIBERATE RATHER THAN AN OVERSIGHT. The note on
+#117 of 2026-08-25 lists it among the types a contract package would hold. It never crosses: the
+contract lets this side answer one thing, which is whether the handover was accepted, and the refusal
+is this side's own reason, written to this server's log. A type the other side can never see is not
+part of an agreement with it, and putting it in the package would version this plugin's internal
+vocabulary against another board.
 
 ### The two that were rejected
 
@@ -159,53 +189,76 @@ were available. They are not both results any more. The choice above rests on th
 lines gave, so a run that comes back with the other one is a defect and a run that prints it and
 passes tells nobody.
 
-`scripts/read-seam-probe-answer.sh` reads the one line the probe writes as a verdict and refuses four
-answers, each for its own reason: no assembly of that name loaded, more than one of them, a contract
-type a second plugin cannot reach, and a container that handed back nothing. The last of those is the
-silence #117's fourth condition is about, and it is refused here rather than printed.
+`scripts/read-seam-probe-answer.sh` reads the one line the probe writes as a verdict and refuses
+seven answers, each for its own reason. Four are about the lookup by name: no assembly of that name
+loaded, more than one of them, a contract type a second plugin cannot reach, and a container that
+handed back nothing. Three are about the compile-time reference, which is the shape a sibling
+actually ships in: a reference the runtime would not bind, a reference bound to a different type of
+the same full name, and a container that answered the reflected lookup and not that one. The last of
+each group is the silence #117's fourth condition is about, and both are refused here rather than
+printed.
 
-What made this worth doing before the package exists is that moving the type is what breaks it. The
-probe names the contract by string:
+What made that worth doing before the package existed was that moving the type is what breaks it.
+The move has happened and the constants moved with it, which is the case that rule was written for
+arriving rather than a hypothetical:
 
     git grep -n 'OtherAssembly = \|Contract = ' -- tools/seam-probe/ContainerReport.cs
-    tools/seam-probe/ContainerReport.cs:38:    private const string OtherAssembly = "Jellyfin.Plugin.Requests";
-    tools/seam-probe/ContainerReport.cs:39:    private const string Contract = "Jellyfin.Plugin.Requests.Seam.IWantHandover";
 
-so the day the contract moves into the package neither string names anything that declares it, and
-under the old rule the job stayed green about an assembly that no longer held the type. It now reds
-and names the two constants. The trigger carries the same reasoning: `Jellyfin.Plugin.Requests/Seam/`
+The trigger carries the same reasoning: the contract project's whole directory, the plugin's `Seam/`
 and the service registrator are in the paths that start the job, because the change that breaks the
-measurement arrives through them rather than through the probe's own files. A rename of the assembly
-lives in the project file and is still not covered.
+measurement arrives through them rather than through the probe's own files. What that no longer
+leaves uncovered is a rename of the contract ASSEMBLY, which now lives in a project file inside a
+listed directory. A rename of the plugin assembly is outside it, and the probe no longer names that
+one.
 
 Every refusal above is watched biting in `scripts/prove-seam-probe-refusals.sh`, over one log per
 answer, with the answer both lines gave beside them as the case that has to pass. It needs no
 container and no server, so the reader that decides a probe run is checked on machines that cannot
 run one.
 
-### What the tree does today is not yet the choice above
+### What the tree holds today, which is now the choice above
 
-The type the sibling would name is declared in this plugin's own assembly, and this project
-references no contract package:
+THIS SECTION SAID THE TREE WAS NOT IN THE CHOSEN SHAPE AND IT IS. What stood here read the plugin's
+project file, found two references and both of them the host's, and said the decision was a thing to
+build rather than a description of what ships. It is built. The type the sibling names is declared in
+an assembly of its own, and the plugin references it:
 
-    git grep -n 'public interface IWantHandover' -- Jellyfin.Plugin.Requests/Seam/IWantHandover.cs
-    Jellyfin.Plugin.Requests/Seam/IWantHandover.cs:30:public interface IWantHandover
+    git grep -n 'public interface IWantHandover' -- Jellyfin.Plugin.Requests.Contract/Seam/IWantHandover.cs
+    git grep -n 'ProjectReference' -- Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj
 
-    git grep -n 'PackageReference Include\|ProjectReference' -- Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj
-    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:23:    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)">
-    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:26:    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)">
+EXACTLY ONE COPY SHIPS, AND WHICH SIDE SHIPS IT IS THE WHOLE ARRANGEMENT. The plugin's reference
+carries no `ExcludeAssets`, so the assembly lands in the plugin's own directory and `build.yaml` names
+it in the artifact list beside the plugin's assembly; the Package check compares that list against a
+publish in both directions, so a package that left it out is refused rather than installed. A
+consumer of the contract does the opposite - compile against it, ship nothing - which is what the
+probe's own reference says:
 
-Two references and both are the host's. So the registration landed before the question was decided,
-and the decision above is a thing to build rather than a description of what ships. Reading this
-section as the arrangement being in place is the one misreading it could produce, which is why the
-commands are here.
+    git grep -n -A3 'ProjectReference' -- tools/seam-probe/SeamProbe.csproj
+    git grep -n 'artifacts:' -A3 -- build.yaml
 
-**Two things #117 asks for are still not done, and neither is softened by the choice being
-taken.** Nothing proves that the sibling's container lookup finds this plugin's implementation in
-the shape that will actually ship, on either line; what the suite resolves is this assembly's own
-registration and what the probe resolves it finds by name, and neither of those is a contract
-package. And nothing separates a container that found no implementation from one that found none
-because the type did not match, so an operator meeting either one meets the same silence.
+WHAT REFUSES A RETURN TO THE OLD SHAPE. Copying the three types back into the plugin assembly
+compiles, ships one assembly again, and breaks nothing this repository builds - what it breaks is a
+sibling nobody here compiles. `TheSharedTypesAreDeclaredInTheContractAssembly` reads the assembly each
+of them is declared in and refuses that, `TheContractReferencesNothingButTheFramework` refuses a host
+assembly being put on the surface the other side inherits, and the exact reference list refuses the
+contract arriving under a neighbouring name.
+
+    git grep -n 'public void TheSharedTypesAreDeclaredInTheContractAssembly\|public void TheContractReferencesNothingButTheFramework' -- Jellyfin.Plugin.Requests.Tests/SiblingIndependenceTests.cs
+
+### What is still not done
+
+**The publish step.** The address is decided and nothing pushes to it. A sibling on another board
+cannot resolve `Jellyfin.Plugin.Requests.Contract` from `nuget.pkg.github.com/Flowfin` until the
+release workflow gains a step that puts it there, and no workflow in this tree packs or pushes it:
+
+    git grep -rn 'nuget push\|dotnet pack' -- .github/workflows/
+
+**The fourth condition of #117, which is the silent case.** With one shipped copy there is no second
+type to be a different type, so a sibling built against a contract version this plugin does not ship
+fails to bind rather than resolving nothing. The reader refuses that answer by name, and what has not
+been done is producing it: nothing in this tree builds a consumer against a divergent contract,
+installs it, and watches an operator being able to tell that from a sibling that was never installed
+at all. Until that exists, the refusal is a rule nobody has watched bite on a server.
 
 ### What the package actually contains, read out of the package
 

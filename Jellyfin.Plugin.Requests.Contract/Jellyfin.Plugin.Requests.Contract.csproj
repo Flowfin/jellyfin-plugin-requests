@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- The types the sibling discover plugin compiles against, and nothing else. It is a separate
+         assembly rather than three files inside the plugin because implementing an interface means
+         having the type: a sibling that cannot obtain it copies it, and two assemblies of one simple
+         name in one process declare two different types with the same full name, at which point the
+         container returns nothing and it looks exactly like the sibling not being installed. #117
+         chose one shipped copy that both sides name, and this project is that copy. -->
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <!-- The namespaces are the plugin's and do not move with the files. An assembly name and a
+         namespace are different things, and keeping the namespaces means the twenty-odd files that
+         name RequestedItemKind are unchanged by the type moving out of the plugin assembly. -->
+    <RootNamespace>Jellyfin.Plugin.Requests</RootNamespace>
+    <AssemblyName>Jellyfin.Plugin.Requests.Contract</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- VERSIONED INDEPENDENTLY OF THE PLUGIN, WHICH IS WHY THESE FOUR ARE SET HERE. The repository
+         root sets Version, AssemblyVersion and FileVersion from PluginVersion, and a contract that
+         moved with the plugin would be two plugins that have to be upgraded together - the thing a
+         shared type was meant to avoid. #117 says it changes rarely, so it starts at 1.0.0.0 and a
+         change to it is a deliberate change to an agreement with another board rather than a side
+         effect of a plugin release. -->
+    <ContractVersion>1.0.0.0</ContractVersion>
+    <Version>$(ContractVersion)</Version>
+    <AssemblyVersion>$(ContractVersion)</AssemblyVersion>
+    <FileVersion>$(ContractVersion)</FileVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- What the other side resolves this from, decided on #117 on 2026-08-24: the organisation's
+         GitHub Packages feed. The publish step lives in the release workflow; nothing here pushes.
+         PackageId is the assembly name, so a reader who has the dll can find the package. -->
+    <PackageId>Jellyfin.Plugin.Requests.Contract</PackageId>
+    <Authors>Flowfin</Authors>
+    <Description>The types the Jellyfin Requests plugin and a sibling browsing plugin share across the in-process handover seam: the interface the sibling calls, the field set it hands over, and the kinds of thing a want can name.</Description>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/Flowfin/jellyfin-plugin-requests</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NOTHING OF THE HOST IS REFERENCED HERE, AND THAT IS A PROPERTY RATHER THAN AN ACCIDENT. The
+         three types use System alone, so this assembly is the same bytes on either server line and
+         carries no Jellyfin API surface that an ABI floor would have to be argued about. A reference
+         added here would be one the sibling inherits by compiling against the contract. -->
+  </ItemGroup>
+
+</Project>

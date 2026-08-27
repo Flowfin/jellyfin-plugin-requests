@@ -38,8 +38,8 @@ log() {
     local file=$1 result=$2
     {
         printf '[2026-08-26 21:00:00.000 +00:00] [INF] [1] Main: Jellyfin version: 10.11.11\n'
-        printf '[2026-08-26 21:00:01.000 +00:00] [WRN] [9] Jellyfin.Plugin.SeamProbe.ContainerReport: SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests: 1\n'
-        printf '[2026-08-26 21:00:01.000 +00:00] [WRN] [9] Jellyfin.Plugin.SeamProbe.ContainerReport: SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.dll\n'
+        printf '[2026-08-26 21:00:01.000 +00:00] [WRN] [9] Jellyfin.Plugin.SeamProbe.ContainerReport: SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests.Contract: 1\n'
+        printf '[2026-08-26 21:00:01.000 +00:00] [WRN] [9] Jellyfin.Plugin.SeamProbe.ContainerReport: SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.Contract.dll\n'
         if [ -n "$result" ]; then
             printf '[2026-08-26 21:00:01.000 +00:00] [WRN] [9] Jellyfin.Plugin.SeamProbe.ContainerReport: %s\n' "$result"
         fi
@@ -75,7 +75,7 @@ refuses() {
 }
 
 printf '\n== the answer both claimed lines gave on 2026-08-22 passes\n'
-log clean.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=1'
+log clean.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=1 binding=bound bound-implementations=1 same-type=yes'
 if out=$("$reader" "$work/clean.log" 2>&1); then
     printf '%s\n' "$out" | sed 's/^/  /'
 else
@@ -86,22 +86,22 @@ fi
 
 # The trap this reader exists for. The probe ran, said the type was not reachable, and every line it
 # wrote carries the marker the old run grepped for, so this log used to be a green job.
-log missing.log 'SEAM-PROBE result assemblies=1 contract=missing implementations=0'
+log missing.log 'SEAM-PROBE result assemblies=1 contract=missing implementations=0 binding=unbound bound-implementations=0 same-type=no'
 refuses "the contract type is not reachable, which used to pass" \
     "the contract type is not reachable from a second plugin" \
     -- "$reader" "$work/missing.log"
 
-log two.log 'SEAM-PROBE result assemblies=2 contract=reachable implementations=1'
+log two.log 'SEAM-PROBE result assemblies=2 contract=reachable implementations=1 binding=bound bound-implementations=1 same-type=yes'
 refuses "two assemblies of one name in one process" \
     "Two copies of one contract assembly in one process is the failure this seam exists to avoid" \
     -- "$reader" "$work/two.log"
 
-log none.log 'SEAM-PROBE result assemblies=0 contract=missing implementations=0'
+log none.log 'SEAM-PROBE result assemblies=0 contract=missing implementations=0 binding=unbound bound-implementations=0 same-type=no'
 refuses "the plugin under test was not loaded at all" \
     "no assembly named Jellyfin.Plugin.Requests was loaded" \
     -- "$reader" "$work/none.log"
 
-log unanswered.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=0'
+log unanswered.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=0 binding=bound bound-implementations=0 same-type=yes'
 refuses "the container handed back nothing, which is the silence an operator meets" \
     "the container returned no implementation of the contract" \
     -- "$reader" "$work/unanswered.log"
@@ -114,18 +114,48 @@ refuses "the probe failed before it had an answer" \
     "the probe wrote no result line, so this run measured nothing" \
     -- "$reader" "$work/threw.log"
 
-log shape.log 'SEAM-PROBE result contract=reachable assemblies=1 implementations=1'
+log shape.log 'SEAM-PROBE result contract=reachable assemblies=1 implementations=1 binding=bound bound-implementations=1 same-type=yes'
 refuses "a result line whose fields this reader does not know" \
     "does not have the shape this reader knows" \
     -- "$reader" "$work/shape.log"
 
 # The near-miss: `head` where the reader has `tail`. The server restarted its hosted services, the
 # first answer was the good one and the process that is actually running gave the second.
-log restarted.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=1'
-printf '[2026-08-26 21:00:30.000 +00:00] [WRN] [9] Jellyfin.Plugin.SeamProbe.ContainerReport: SEAM-PROBE result assemblies=2 contract=reachable implementations=1\n' >> "$work/restarted.log"
+log restarted.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=1 binding=bound bound-implementations=1 same-type=yes'
+printf '[2026-08-26 21:00:30.000 +00:00] [WRN] [9] Jellyfin.Plugin.SeamProbe.ContainerReport: SEAM-PROBE result assemblies=2 contract=reachable implementations=1 binding=bound bound-implementations=1 same-type=yes\n' >> "$work/restarted.log"
 refuses "a restart whose second answer is the bad one" \
     "Two copies of one contract assembly in one process is the failure this seam exists to avoid" \
     -- "$reader" "$work/restarted.log"
+
+# THE THREE BELOW ARE WHAT THE CONTRACT PACKAGE MADE ASKABLE, and none of them could be produced
+# before it. Until the type moved out of the plugin assembly the probe had nothing to compile
+# against, so every answer it could give was a reflection answer; a sibling never reflects. What
+# these three refuse is the compile-time reference behaving differently from the name lookup, which
+# is the gap the second half of the result line exists to close.
+
+# The reference did not bind at all. The name lookup found the type and answered, so the first half
+# of the line is the good answer, and a reader that stopped there would pass a run in which a real
+# sibling would not have started.
+log unbound.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=1 binding=unbound bound-implementations=0 same-type=no'
+refuses "the compile-time reference did not bind, while the name lookup answered" \
+    "did not bind" \
+    -- "$reader" "$work/unbound.log"
+
+# It bound, and to something else. One full name, two types, one process: the failure #117 exists
+# against, reached through the binding rather than through a second file on disk. Every count on the
+# line is the count of a working seam.
+log othertype.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=1 binding=bound bound-implementations=1 same-type=no'
+refuses "the reference bound to a different type of the same name" \
+    "is not the type found by name in the loaded contract assembly" \
+    -- "$reader" "$work/othertype.log"
+
+# It bound to the right type and the container had nothing for it. This is the silence an operator
+# meets, arriving on the lookup a sibling actually makes rather than on the reflected one, so the
+# earlier refusal over `implementations` does not reach it.
+log boundzero.log 'SEAM-PROBE result assemblies=1 contract=reachable implementations=1 binding=bound bound-implementations=0 same-type=yes'
+refuses "the container answered the name lookup and not the compile-time one" \
+    "no implementation for the type the second plugin named at compile time" \
+    -- "$reader" "$work/boundzero.log"
 
 refuses "a log that was never written" \
     "does not exist" \

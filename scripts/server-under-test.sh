@@ -33,6 +33,13 @@
 # The assembly and the name the server lists it under. Both are read by every caller.
 ASSEMBLY=Jellyfin.Plugin.Requests
 PLUGIN_NAME=Requests
+# The second assembly the install needs, and the reason it is named rather than globbed. #117 chose
+# one shipped copy of the shared contract, so the types the sibling discover plugin compiles against
+# are declared here and ship inside this plugin's directory; a server that gets the plugin assembly
+# alone loads a plugin whose seam types are missing, which fails at the first handover rather than at
+# start-up. `build.yaml` names the same two files in its artifact list and the Package check compares
+# that list against a publish in both directions, so the pair is derived there and repeated here.
+CONTRACT_ASSEMBLY=Jellyfin.Plugin.Requests.Contract
 
 # Git Bash rewrites an argument that looks like an absolute path, which turns a container path into
 # a Windows one. Turning that off for the whole script would break dotnet, which wants the native
@@ -61,7 +68,7 @@ server_start() {
     CONTAINER="$name"
     BASE="http://127.0.0.1:$port"
 
-    local repo_root project publish_dir host_dll host_dir plugin_dir
+    local repo_root project publish_dir host_dll host_contract_dll host_dir plugin_dir
     repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
     project="$repo_root/$ASSEMBLY/$ASSEMBLY.csproj"
     plugin_dir="/config/plugins/$ASSEMBLY"
@@ -93,6 +100,7 @@ server_start() {
         ls -1 "$publish_dir"
     fi
     host_dll=$(cygpath --windows "$publish_dir/$ASSEMBLY.dll" 2>/dev/null || printf '%s' "$publish_dir/$ASSEMBLY.dll")
+    host_contract_dll=$(cygpath --windows "$publish_dir/$CONTRACT_ASSEMBLY.dll" 2>/dev/null || printf '%s' "$publish_dir/$CONTRACT_ASSEMBLY.dll")
 
     step "start a server from $image"
     dk rm --force "$CONTAINER" >/dev/null 2>&1 || true
@@ -115,9 +123,13 @@ server_start() {
         host_dir=$(cygpath --windows "$publish_dir" 2>/dev/null || printf '%s' "$publish_dir")
         dk cp "$host_dir/." "$CONTAINER:$plugin_dir"
     else
-        # Only the assembly. The rest of the publish output is a symbol file and a documentation file,
-        # and a package shipping those would be shipping what a server has no use for.
+        # The two assemblies the package names and nothing else. The rest of the publish output is a
+        # symbol file and a documentation file, and a package shipping those would be shipping what a
+        # server has no use for. The second one is the contract, whose one shipped copy is what #117
+        # chose; copying only the first would install a plugin that is missing the types its seam is
+        # declared in.
         dk cp "$host_dll" "$CONTAINER:$plugin_dir/$ASSEMBLY.dll"
+        dk cp "$host_contract_dll" "$CONTAINER:$plugin_dir/$CONTRACT_ASSEMBLY.dll"
     fi
     # A SECOND PLUGIN IN THE SAME PROCESS, WHERE A CALLER ASKS FOR ONE. Two plugins share a route
     # table, a task list and whatever the host does about loading assemblies, and none of that is

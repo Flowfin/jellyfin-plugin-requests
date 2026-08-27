@@ -23,4 +23,29 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- THE SHAPE THAT WILL ACTUALLY SHIP, WHICH IS WHAT #117's THIRD CONDITION ASKS ABOUT. The
+         sibling compiles against the contract and ships no copy of it; the plugin under test ships
+         the one copy. That is what these two attributes are: `ExcludeAssets=runtime` and
+         `Private=false` together mean compile against it and copy nothing, so the probe's own
+         directory on the server holds its assembly alone and the type it names at compile time can
+         only come from the plugin's directory.
+
+         Here it is a project reference and on the sibling's board it is a package reference to the
+         same assembly out of the feed named on #117. The two produce the same compile-time
+         reference, so what the runtime does with it is the same question; what a project reference
+         cannot stand in for is the feed being reachable, which is that board's problem rather than a
+         property of the loader.
+
+         THE REFLECTION LOOKUP IN ContainerReport IS NOT REPLACED BY THIS. A probe that only had the
+         compile-time reference could not report a negative: the type would fail to resolve before
+         any line was written, on exactly the servers where the answer is interesting. Both lookups
+         run, and the one that can crash is held inside a method of its own so that its failure is an
+         answer rather than a silence. -->
+    <ProjectReference Include="..\..\Jellyfin.Plugin.Requests.Contract\Jellyfin.Plugin.Requests.Contract.csproj">
+      <ExcludeAssets>runtime</ExcludeAssets>
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
 </Project>

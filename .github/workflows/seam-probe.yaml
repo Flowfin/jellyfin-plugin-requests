@@ -29,6 +29,7 @@ on:
       - 'scripts/server-under-test.sh'
       - 'scripts/server-image-for.sh'
       - 'scripts/server-lines.tsv'
+      - 'Jellyfin.Plugin.Requests.Contract/**'
       - 'Jellyfin.Plugin.Requests/Seam/**'
       - 'Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs'
       - '.github/workflows/seam-probe.yaml'
@@ -36,12 +37,16 @@ on:
     # The files the measurement is made of. A change to any of them makes the recorded answer a
     # claim about a procedure that has moved, so the answer is taken again.
     #
-    # THE LAST TWO ARE WHAT THE PROBE IS ABOUT RATHER THAN WHAT IT IS MADE OF, and they are here
-    # because the failure this job now refuses arrives through them. The probe names the contract
-    # type by string, so moving that type into the contract package leaves the two constants in
+    # THE LAST THREE ARE WHAT THE PROBE IS ABOUT RATHER THAN WHAT IT IS MADE OF, and they are here
+    # because the failures this job refuses arrive through them. The probe names the contract
+    # assembly and the contract type by string, so a change to either leaves the two constants in
     # `tools/seam-probe/ContainerReport.cs` naming nothing, and a trigger listing only the probe's
-    # own files would not start the job on the change that broke it. What is still not covered is a
-    # rename of the assembly itself, which lives in the project file rather than under `Seam/`.
+    # own files would not start the job on the change that broke it.
+    #
+    # THE GAP THIS NOTE USED TO NAME IS CLOSED. It said a rename of the assembly was not covered,
+    # because that lives in a project file rather than under `Seam/`. The contract now has a project
+    # of its own and its whole directory is listed, so its `AssemblyName` is inside the trigger. What
+    # is still outside it is a rename of the PLUGIN assembly, which the probe no longer names.
     paths:
       - 'tools/seam-probe/**'
       - 'scripts/read-seam-probe-answer.sh'
@@ -50,6 +55,7 @@ on:
       - 'scripts/server-under-test.sh'
       - 'scripts/server-image-for.sh'
       - 'scripts/server-lines.tsv'
+      - 'Jellyfin.Plugin.Requests.Contract/**'
       - 'Jellyfin.Plugin.Requests/Seam/**'
       - 'Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs'
       - '.github/workflows/seam-probe.yaml'

@@ -29,6 +29,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- THE ONE SHIPPED COPY OF THE CONTRACT, WHICH IS WHAT #117 CHOSE. The sibling discover plugin
+         compiles against this same assembly and ships no copy of it, so there is one type rather
+         than two with one name, and a lookup from the other plugin is answered instead of silently
+         returning nothing. This reference carries no ExcludeAssets: unlike the host's packages,
+         nothing on the server provides this assembly, so the plugin package is where it comes from
+         and build.yaml names it in the artifact list. -->
+    <ProjectReference Include="..\Jellyfin.Plugin.Requests.Contract\Jellyfin.Plugin.Requests.Contract.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Configuration\configPage.html" />
     <EmbeddedResource Include="Configuration\configPage.html" />
     <!-- The queue page and the two files both pages share. Each is reachable only under a name the

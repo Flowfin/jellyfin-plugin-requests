@@ -23,6 +23,14 @@ namespace Jellyfin.Plugin.Requests.Tests;
 public class SiblingIndependenceTests
 {
     /// <summary>
+    /// This plugin's own contract assembly, named once. It is the one assembly under the
+    /// `Jellyfin.Plugin.` prefix that this plugin may reference, and it is excused by its exact name
+    /// rather than by a prefix of its own: a sibling arriving as `Jellyfin.Plugin.RequestsBridge`
+    /// would pass a prefix test and is refused by this one.
+    /// </summary>
+    private const string ContractAssembly = "Jellyfin.Plugin.Requests.Contract";
+
+    /// <summary>
     /// Every assembly the plugin references, written out. An addition fails this test, which is the
     /// whole point: a reference arrives by somebody writing a `using`, and nothing else in the tree
     /// would say so. Adding a line here is the deliberate act, and the commit that adds it is where
@@ -51,6 +59,16 @@ public class SiblingIndependenceTests
         // than an identifier, so the record is handed straight to it. Nothing reads a field on it
         // either way.
         "Jellyfin.Database.Implementations",
+
+        // THE ONE ENTRY HERE THAT SHIPS RATHER THAN BEING EXCLUDED FROM THE INSTALL, AND THE
+        // DIFFERENCE IS THE WHOLE REASON IT IS SAFE. Every other name above and below arrives with
+        // the server and is kept out of the package by ExcludeAssets, so a server that does not have
+        // it is a server this plugin does not run on. This one is this plugin's own contract
+        // assembly: #117 chose one shipped copy of the shared types, the plugin package is where
+        // that copy comes from, and build.yaml names it in the artifact list beside the plugin's own
+        // assembly. It is not a sibling and it is not a dependency on a sibling - a server with no
+        // discover plugin installed carries it and never loads a type out of it.
+        "Jellyfin.Plugin.Requests.Contract",
         "MediaBrowser.Common",
         "MediaBrowser.Controller",
         "MediaBrowser.Model",
@@ -155,9 +173,63 @@ public class SiblingIndependenceTests
     {
         var siblings = ReferencedAssemblyNames()
             .Where(name => name.StartsWith("Jellyfin.Plugin.", StringComparison.Ordinal))
+            .Where(name => !string.Equals(name, ContractAssembly, StringComparison.Ordinal))
             .ToArray();
 
         Assert.Empty(siblings);
+    }
+
+    /// <summary>
+    /// The contract assembly references nothing but the framework, so a sibling compiling against it
+    /// inherits nothing.
+    /// <para>
+    /// This is the reference rule pointed at the other side of the seam. A package the sibling
+    /// compiles against hands that sibling every reference it carries, so a Jellyfin assembly added
+    /// here would put the host's API surface into an agreement between two boards, and a package
+    /// added here would be one the other side has to resolve before it can build. The three types in
+    /// it use `System` alone today, which is what makes the same bytes correct on both claimed
+    /// lines.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheContractReferencesNothingButTheFramework()
+    {
+        var carried = typeof(global::Jellyfin.Plugin.Requests.Seam.IWantHandover).Assembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name ?? string.Empty)
+            .Where(name => !name.StartsWith("System.", StringComparison.Ordinal))
+            .Where(name => !string.Equals(name, "System", StringComparison.Ordinal))
+            .Where(name => !string.Equals(name, "netstandard", StringComparison.Ordinal))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(carried);
+    }
+
+    /// <summary>
+    /// The shared types are declared in the contract assembly and not in the plugin's own.
+    /// <para>
+    /// #117's failure is two assemblies of one simple name declaring two types with one full name,
+    /// and the shape chosen against it is one shipped copy that both sides name. A type moved back
+    /// into the plugin assembly - or copied there - restores exactly the position the choice was
+    /// made against, and nothing else in this tree would say so: the plugin would build, the suite
+    /// would pass, and what would fail is a sibling nobody here compiles.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheSharedTypesAreDeclaredInTheContractAssembly()
+    {
+        var declaringAssemblies = new[]
+        {
+            typeof(global::Jellyfin.Plugin.Requests.Seam.IWantHandover),
+            typeof(global::Jellyfin.Plugin.Requests.Seam.HandedOverWant),
+            typeof(global::Jellyfin.Plugin.Requests.Model.RequestedItemKind)
+        }
+            .Select(type => type.Assembly.GetName().Name ?? string.Empty)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal([ContractAssembly], declaringAssemblies);
     }
 
     /// <summary>

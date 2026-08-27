@@ -77,6 +77,10 @@ rules:
     paths:
       include:
         - "Jellyfin.Plugin.Requests/Model/**/*.cs"
+        # The contract package's own Model/ directory, so the rule keeps the whole population it
+        # had. RequestedItemKind moved there when the shared types became an assembly of their own,
+        # and a rule whose include list still named one directory would have shrunk in silence.
+        - "Jellyfin.Plugin.Requests.Contract/Model/**/*.cs"
         - "tools/opengrep/fixtures/model/**/*.cs"
 
   # Invariant (time, #34): the plugin reads the time through the injected IClock

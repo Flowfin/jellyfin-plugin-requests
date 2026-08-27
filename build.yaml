@@ -18,5 +18,6 @@ category: "General"
 owner: "Flowfin"
 artifacts:
 - "Jellyfin.Plugin.Requests.dll"
+- "Jellyfin.Plugin.Requests.Contract.dll"
 changelog: >
   changelog

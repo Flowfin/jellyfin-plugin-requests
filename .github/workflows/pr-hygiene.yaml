@@ -252,15 +252,23 @@ jobs:
             // Advisory. A comment pass, a documentation change inside a source
             // file or a pure refactor legitimately moves no test, and failing
             // those is the false positive that makes a check worthless.
+            // BOTH SOURCE ROOTS, because the second one arrived after this check did. The
+            // contract project holds the types the sibling board compiles against, so a change
+            // there is the most consequential kind this repository has, and a prefix ending in a
+            // slash does not match it.
             const codeChanged = changed.some(
-              (n) => n.startsWith('Jellyfin.Plugin.Requests/') && n.endsWith('.cs'),
+              (n) =>
+                (n.startsWith('Jellyfin.Plugin.Requests/') ||
+                  n.startsWith('Jellyfin.Plugin.Requests.Contract/')) &&
+                n.endsWith('.cs'),
             );
             const testsChanged = changed.some((n) =>
               n.startsWith('Jellyfin.Plugin.Requests.Tests/'),
             );
             if (codeChanged && !testsChanged) {
               warnings.push(
-                'A .cs file under Jellyfin.Plugin.Requests/ changed and nothing ' +
+                'A .cs file under Jellyfin.Plugin.Requests/ or ' +
+                  'Jellyfin.Plugin.Requests.Contract/ changed and nothing ' +
                   'under Jellyfin.Plugin.Requests.Tests/ did. Either the change ' +
                   'is genuinely untestable, which is worth saying in the body, ' +
                   'or a test is missing.',

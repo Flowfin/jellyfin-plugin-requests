@@ -372,6 +372,13 @@
         "type": "Project",
         "dependencies": {
           "Jellyfin.Controller": "[12.0.0-rc4, )",
+          "Jellyfin.Model": "[12.0.0-rc4, )",
+          "Jellyfin.Plugin.Requests.Contract": "[1.0.0, )"
+        }
+      },
+      "jellyfin.plugin.requests.contract": {
+        "type": "Project",
+        "dependencies": {
           "Jellyfin.Model": "[12.0.0-rc4, )"
         }
       }
@@ -742,6 +749,13 @@
         "type": "Project",
         "dependencies": {
           "Jellyfin.Controller": "[10.11.11, )",
+          "Jellyfin.Model": "[10.11.11, )",
+          "Jellyfin.Plugin.Requests.Contract": "[1.0.0, )"
+        }
+      },
+      "jellyfin.plugin.requests.contract": {
+        "type": "Project",
+        "dependencies": {
           "Jellyfin.Model": "[10.11.11, )"
         }
       }

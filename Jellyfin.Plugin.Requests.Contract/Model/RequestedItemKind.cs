@@ -18,8 +18,8 @@ public enum RequestedItemKind
     Movie = 0,
 
     /// <summary>
-    /// A series. Which seasons were asked for is on the request rather than here, in
-    /// <see cref="MediaRequest.Seasons"/>, where empty means the whole series.
+    /// A series. Which seasons were asked for is on the request rather than here, in the request
+    /// record's <c>Seasons</c>, where empty means the whole series.
     /// </summary>
     Series = 1
 }
