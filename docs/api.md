@@ -406,6 +406,24 @@ seasons it covered and the reason, and never the person who asked for it or the 
 it. The count is a number and not a list. What a user may learn about another user's request is
 unchanged by any of it and is still nothing: this endpoint is administrators only.
 
+**`StateChangedByUserId` says who last moved the request, and a caller resolving it themselves can
+conclude less from it than this plugin's own queue page can.** It is the identifier of whoever made
+the current move and it is absent where no person has made one, which is every request nobody has
+answered yet. It is an identifier and never a name: this endpoint resolves nothing against the
+server's user list, and this plugin holds no copy of anybody's name.
+
+Three things follow for a caller, and the third is the one worth writing down:
+
+- **Absent means nobody moved it.** It does not mean the mover is unknown, and it is not a value that
+  was cleared. A request whose mover's account has since been deleted keeps the identifier it had -
+  decided on #49 and built in #308 - because clearing it would say that no person moved the request.
+- **Present means a person made this move**, whether or not that person still has an account here.
+- **A lookup against the server's user list that comes back with nothing is two different states, and
+  this answer does not separate them.** The account may have been deleted, or the call may not have
+  answered. Nothing on this row says which, so a caller that reports one of them is reporting its own
+  guess. The queue page separates them by recording whether it was given a user list at all, and a
+  caller that needs the distinction has to do the same on its own side.
+
 ## Asking whether the plugin is working
 
     GET MediaRequests/v1/Health
