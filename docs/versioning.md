@@ -78,15 +78,19 @@ promised from then on is #105.
 
 ## Where the number starts
 
-`0.1.0.0`. The template's `1.0.0.0` claimed a released first version, and
-nothing has been released:
+`0.1.0.0`, and the reading that chose it does not reproduce any more. On the day
+the number was picked the template's `1.0.0.0` claimed a released first version
+and nothing had been released. One release exists now, so the command returns a
+different number and is written here as the current reading rather than as the
+one that decided anything:
 
-    $ gh release list --repo iderex/jellyfin-plugin-requests --json tagName --jq 'length'
-    0
+    $ gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName --jq 'length'
+    1
 
-A version that says 1.0 to a catalogue, to a dashboard and to an operator, for a
-plugin with no request API and no store behind it, is a claim this tree cannot
-back.
+A version that said 1.0 to a catalogue, to a dashboard and to an operator, for a
+tree that then held no request API and no store behind it, was a claim it could
+not back. Where the number goes from here is the scheme above, and the weaker
+promise below `1.0.0.0` holds until the first `1.0.0.0`.
 
 ## What a bump does to an installed server, and what is not measured here
 
