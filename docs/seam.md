@@ -213,13 +213,57 @@ that leaves is not settled here and is #117's to take: the deduplicating option'
 thing to measure and the run that measures it is described below, and reflection by name remains what
 it always was, immune to this class and paying for it with the fourth condition.
 
-**What is being measured next, so a reader knows what this page is waiting for.** The probe now ships
-its own copy of the contract, which is what a package reference gives a sibling by default rather than
-a shape anybody has to construct. Two answers are possible and they decide between the two remaining
-options. One assembly loaded, with the bound type the same type the plugin registered, means the host
-merges the copies and the second option works. Two assemblies, with the bound type a different type of
-the same full name, means no compile-time contract can be shared here at all and reflection is what is
-left. Neither is written down as expected.
+### The other premise was measured in the same hour, and it does not hold either
+
+The probe was made to ship its own copy of the contract, which is what a package reference gives a
+sibling by default rather than a shape anybody has to construct. That is the first rejected option -
+both sides ship, the loader deduplicating - and its premise has been unmeasured since it was rejected.
+
+    gh api --allow-escape-sequences repos/Flowfin/jellyfin-plugin-requests/actions/jobs/98704350874/logs \
+      | sed 's/\x1b\[[0-9;]*m//g' | grep -a "SEAM-PROBE" | sed -E 's/.*ContainerReport: //' | sort -u
+    SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests.Contract: 2
+    SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.Contract.dll
+    SEAM-PROBE one of them is at /config/plugins/SeamProbe/Jellyfin.Plugin.Requests.Contract.dll
+    SEAM-PROBE the compile-time reference to Jellyfin.Plugin.Requests.Seam.IWantHandover bound and the container returned 0 implementation(s) for it
+    SEAM-PROBE the container returned 1 implementation(s) of it
+    SEAM-PROBE the type it bound to and the type found by name are two different types
+    SEAM-PROBE the type Jellyfin.Plugin.Requests.Seam.IWantHandover is reachable from this plugin
+    SEAM-PROBE result assemblies=2 contract=reachable implementations=1 binding=bound bound-implementations=0 same-type=no
+
+That job is the 10.11 line; the 12.0 line is job `98704350837` in the same run and its verdict is
+identical.
+
+**The loader does not merge them.** Two assemblies are loaded, the second plugin's reference binds to
+its own copy, that copy declares a different type of the same full name, and the container hands that
+second plugin nothing. This is not a near-miss of the failure this seam exists against. It is that
+failure, produced on a running server of each claimed line, with the same silence an operator would
+meet.
+
+### So two of the three options are measured unavailable, and the third is not this page's to take
+
+- **A contract-only package with exactly one shipped copy.** The other side cannot resolve the
+  assembly at all. Measured 2026-08-27, both lines.
+- **A contract-only package both ship, with the loader deduplicating it.** The loader does not
+  deduplicate; the other side gets its own type and an empty container. Measured 2026-08-27, both
+  lines.
+- **No shared type, with the handover taken by name through reflection.** The only one of the three
+  that answered. In both runs above the reflected lookup found the type across plugin directories and
+  the container returned the registration: `contract=reachable implementations=1`, whatever the
+  compile-time reference did beside it.
+
+**Why the first two fail for one reason.** A plugin gets a load context of its own, so resolving an
+assembly by name looks in that plugin's directory and in what the host provides, and never in another
+plugin's. Ship the contract once and the reference is unresolvable; ship it twice and each side
+resolves its own, which is two types with one full name. Enumerating what the process has loaded is
+the one thing that crosses, and that is reflection.
+
+**What this page does not do is choose.** #117 took the first option on 2026-08-21 with its reasons
+written down, and a decision taken with reasons is re-taken by whoever took it rather than by a
+measurement that arrived afterwards. What the measurement settles is that the option chosen is not
+available, and that the fallback the same decision named - reflection, called the honest fallback if
+the package turns out to be impractical - is the one that answered. The price it names is unchanged
+and is the fourth condition: a mismatch stops being a compile error, so "no sibling installed" and
+"sibling installed, type did not match" have to be told apart some other way.
 
 ### That answer is refused rather than reported, since 2026-08-26
 
@@ -273,13 +317,18 @@ publish in both directions, so a package that left it out is refused rather than
 
     git grep -n 'artifacts:' -A3 -- build.yaml
 
-WHAT THE CONSUMER SIDE SHIPS IS THE OPEN HALF. The probe carried `ExcludeAssets` and `Private=false`
-so that it compiled against the contract and shipped nothing, which is the arrangement the choice
-names, and that is the arrangement the run above found unresolvable. It now ships its own copy, which
-is what a package reference does by default, so that the remaining question is measured rather than
-assumed:
+WHAT THE CONSUMER SIDE SHIPS WAS THE OPEN HALF AND BOTH ANSWERS ARE NOW TAKEN. The probe carried
+`ExcludeAssets` and `Private=false` so that it compiled against the contract and shipped nothing,
+which is the arrangement the choice names, and that arrangement was found unresolvable. It ships its
+own copy now, which is what a package reference does by default, and that one produces two types and
+an empty container. Both readings are above.
 
     git grep -n -A3 'ProjectReference' -- tools/seam-probe/SeamProbe.csproj
+
+**So this project is a thing whose reason has to be re-taken rather than a thing that works.** It is
+correct as an artefact - the types are declared once, nothing of the host is on its surface, and the
+plugin ships it - and no compile-time consumer on another plugin can use it on this host. Which is
+why the branch carrying it is not merged.
 
 WHAT REFUSES A RETURN TO THE OLD SHAPE. Copying the three types back into the plugin assembly
 compiles, ships one assembly again, and breaks nothing this repository builds - what it breaks is a
@@ -298,11 +347,10 @@ release workflow gains a step that puts it there, and no workflow in this tree p
 
     git grep -rn 'nuget push\|dotnet pack' -- .github/workflows/
 
-**The third condition of #117, which the measurement above turned from an assumption into an open
-question.** Nothing here proves that a sibling's container lookup finds this implementation through
-the reference a sibling actually holds, because the arrangement that was chosen for it does not
-resolve on either line. What exists is the measurement that says so and the run that decides between
-what is left.
+**The third condition of #117, which the measurements above turned from an assumption into a
+decision nobody has taken.** Nothing here proves that a sibling's container lookup finds this
+implementation through the reference a sibling actually holds, because neither arrangement that would
+give it one works on this host. What exists is the pair of measurements that says so.
 
 **The fourth condition of #117, which is the silent case.** A sibling built against a contract version
 this plugin does not ship fails to bind rather than resolving nothing, and the reader refuses that
