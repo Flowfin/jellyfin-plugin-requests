@@ -371,7 +371,7 @@ public sealed class CreateRequestTests
         var entry = Assert.Single(made.History);
 
         Assert.Equal(RequestArrival.Endpoint, entry.Arrival);
-        Assert.Equal(Asker, entry.ByUserId);
+        Assert.Equal(RequestActor.Requester, entry.By);
         Assert.Equal(made.RequestedAt, entry.At);
         Assert.Equal(made.State, entry.From);
         Assert.Equal(made.State, entry.To);
@@ -401,7 +401,7 @@ public sealed class CreateRequestTests
         var made = Assert.Single(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true)).Request;
 
         Assert.Equal([SecondPerson], made.JoinedByUserIds);
-        Assert.Equal(Asker, Assert.Single(made.History).ByUserId);
+        Assert.Equal(RequestActor.Requester, Assert.Single(made.History).By);
     }
 
     /// <summary>

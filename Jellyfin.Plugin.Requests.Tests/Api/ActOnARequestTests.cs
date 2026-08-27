@@ -62,7 +62,7 @@ public sealed class ActOnARequestTests
         var entry = Assert.Single(held.Request.History);
         Assert.Equal(RequestState.Open, entry.From);
         Assert.Equal(RequestState.Approved, entry.To);
-        Assert.Equal(Operator, entry.ByUserId);
+        Assert.Equal(RequestActor.Administrator, entry.By);
         Assert.Equal(Started, entry.At);
     }
 

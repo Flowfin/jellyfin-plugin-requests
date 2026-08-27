@@ -13,7 +13,17 @@ not need an entry; the git history is where that is read.
 
 ## Unreleased
 
-Nothing has landed since the entries below were collected under `0.2.0.0`.
+- Deleting a Jellyfin user now takes their requests with them. A request they asked for is removed,
+  a request somebody else asked for that they had joined stays with them off its list, and the
+  switch they may have set about being told is set back to the shipping value. Until now nothing in
+  this plugin was told that an account had gone, so a request record naming a person outlived the
+  account it named until the retention period reached it.
+- A history entry says what kind of caller made a move instead of naming the person who made it.
+  An entry now reads as the requester, an administrator or the plugin itself. A queue file written
+  by an earlier version is migrated as it is read and the file is not changed until the next write.
+  **This costs something and it is permanent:** past decisions can no longer be attributed to an
+  individual, in exchange for this plugin not holding identifiers for people who have left the
+  server.
 
 ## 0.2.0.0
 

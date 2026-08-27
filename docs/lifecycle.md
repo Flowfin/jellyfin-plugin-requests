@@ -126,12 +126,22 @@ rather than the move.
 
 Every move appends one entry to `History`, oldest first, and both methods above go through the one
 private helper that appends, so one entry per move is a property of the code's shape rather than
-something two call sites remember. An entry holds the pair of states, when it happened, who did it
-or nothing where the plugin did, and the reason and note a decline was made with.
+something two call sites remember. An entry holds the pair of states, when it happened, what kind of
+caller made the move, and the reason and note a decline was made with.
+
+**What kind of caller, and never which person.** An entry says `Requester`, `Administrator` or
+`Plugin`, taken from the same set the permission check compared against, so an entry can never claim
+a role the table did not admit for the move it records. The reason it is a role is that a history
+outlives the accounts it names: an entry holding an identifier for somebody whose account has been
+deleted keeps a person on this server who asked to be gone, and an append-only store is a design
+choice rather than an answer to that. What it costs is that nothing here can attribute a past
+decision to an individual, which is the trade taken on #49 and is permanent.
 
 `StateChangedAt` and `StateChangedByUserId` on the record stay what they were: the current move only.
 Where they and the last entry disagree, the entry is the one to trust, because it was written when
-the move happened and they are overwritten by the next one.
+the move happened and they are overwritten by the next one. `StateChangedByUserId` is still an
+identifier, deliberately, and what happens to it when that account is deleted is in
+[personal-data.md](personal-data.md).
 
 Nothing edits or removes an entry. The lint rule `history-is-only-appended-to` refuses an assignment
 to `History` anywhere in the plugin except the one place that appends, and it carries a fixture, so
@@ -139,5 +149,4 @@ the rule going quiet reds the gate rather than passing. What it does not reach i
 and anything outside this repository.
 
 A request that survives a restart with its history intact is not shown by any of this, and that is
-the third condition on #43. There is no store on a disk yet, so there is nothing to restart and no
-schema to migrate.
+the third condition on #43.

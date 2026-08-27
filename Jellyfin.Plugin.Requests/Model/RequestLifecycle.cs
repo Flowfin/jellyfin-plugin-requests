@@ -344,7 +344,11 @@ public static class RequestLifecycle
             From = cell.From,
             To = cell.To,
             At = at,
-            ByUserId = by.UserId,
+
+            // What the caller is on this request rather than who they are. The set is the same one
+            // the permission check above compared against, so an entry can never say a role the
+            // table did not admit for the move it records.
+            By = by.RolesOn(request),
             Reason = reason,
             Note = note
         };

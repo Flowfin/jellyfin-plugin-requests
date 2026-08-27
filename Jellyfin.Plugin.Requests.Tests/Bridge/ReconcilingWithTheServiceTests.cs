@@ -63,7 +63,7 @@ public sealed class ReconcilingWithTheServiceTests
         Assert.Equal(RequestState.Failed, held.Request.State);
         Assert.Equal(RequestState.Approved, entry.From);
         Assert.Equal(RequestState.Failed, entry.To);
-        Assert.Null(entry.ByUserId);
+        Assert.Equal(RequestActor.Plugin, entry.By);
         Assert.Equal(Later, entry.At);
         Assert.Single(journal.Written);
     }

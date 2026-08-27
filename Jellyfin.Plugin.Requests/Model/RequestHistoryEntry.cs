@@ -43,11 +43,30 @@ public sealed record RequestHistoryEntry
     public required DateTimeOffset At { get; init; }
 
     /// <summary>
-    /// Gets the Jellyfin user who made the move, or <see langword="null"/> where the plugin made it
-    /// on its own after looking at the library. The distinction matters in a complaint: an operator
-    /// should not have to answer for a decision nobody took.
+    /// Gets what the mover was, and never which person they were.
+    /// <para>
+    /// <b>It says a role because a history outlives the accounts it names.</b> An entry naming an
+    /// account that has since been deleted keeps an identifier for somebody who asked to be gone,
+    /// and an append-only store is a design choice rather than an answer to that. A role keeps every
+    /// fact this history exists for, that a decision was taken and when and by what kind of caller,
+    /// while the identifier goes: the decision survives, the person does not have to.
+    /// </para>
+    /// <para>
+    /// <b>What that costs is real and permanent, and is not softened here.</b> Nothing in this tree
+    /// can attribute a past decision to an individual any more. That is the trade taken deliberately
+    /// on #49, in exchange for not holding identifiers this plugin has no right to keep.
+    /// <see cref="MediaRequest.StateChangedByUserId"/> is not a substitute for it: it is the current
+    /// mover only, it is overwritten by the next move, and what it means after a deletion is decided
+    /// separately.
+    /// </para>
+    /// <para>
+    /// <b><see cref="RequestActor.Plugin"/> is a real answer rather than an absent one.</b> A move
+    /// the plugin made on its own after looking at the library reads as the plugin having made it,
+    /// which is the distinction that matters in a complaint: an operator should not have to answer
+    /// for a decision nobody took.
+    /// </para>
     /// </summary>
-    public Guid? ByUserId { get; init; }
+    public required RequestActor By { get; init; }
 
     /// <summary>
     /// Gets the reason the move was made with, where it was a decline, and <see langword="null"/>
@@ -110,10 +129,10 @@ public sealed record RequestHistoryEntry
             To = request.State,
             At = request.RequestedAt,
 
-            // The person the request is filed against, which on the seam is whoever the calling
-            // plugin said asked for it. Nobody else has touched the request yet, so an entry naming
-            // anybody else here would be naming somebody who was not there.
-            ByUserId = request.RequestedByUserId,
+            // An arrival is the ask, and the only caller an ask can have come from is the person it
+            // is filed against. Nobody else has touched the request yet, so an entry saying anything
+            // else here would be saying something that was not so.
+            By = RequestActor.Requester,
             Arrival = over
         };
     }

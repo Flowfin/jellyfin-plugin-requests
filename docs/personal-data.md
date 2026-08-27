@@ -19,17 +19,15 @@ identifiers are derived rather than listed from memory:
     Jellyfin.Plugin.Requests/Model/MediaRequest.cs:145:    public IReadOnlyList<Guid> JoinedByUserIds { get; init; } = [];
     Jellyfin.Plugin.Requests/Model/MediaRequest.cs:166:    public IReadOnlyList<Guid> WantIds
     Jellyfin.Plugin.Requests/Model/MediaRequest.cs:190:    public Guid? StateChangedByUserId { get; init; }
-    Jellyfin.Plugin.Requests/Model/RequestCaller.cs:52:    public Guid? UserId { get; }
-    Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs:50:    public Guid? ByUserId { get; init; }
+    Jellyfin.Plugin.Requests/Model/RequestCaller.cs:53:    public Guid? UserId { get; }
 
-Four of those seven name a person. What each one is, and what it is for:
+Three of those six name a person. What each one is, and what it is for:
 
-| Field                               | Who it names                                                         | Where it is written |
-| ----------------------------------- | -------------------------------------------------------------------- | ------------------- |
-| `MediaRequest.RequestedByUserId`    | the person who asked                                                 | the queue file      |
-| `MediaRequest.JoinedByUserIds`      | everybody else who asked for the same title                          | the queue file      |
-| `MediaRequest.StateChangedByUserId` | whoever last moved it, usually an operator                           | the queue file      |
-| `RequestHistoryEntry.ByUserId`      | the person who asked, on the arrival row, and whoever moved it after | the queue file      |
+| Field                               | Who it names                                | Where it is written |
+| ----------------------------------- | ------------------------------------------- | ------------------- |
+| `MediaRequest.RequestedByUserId`    | the person who asked                        | the queue file      |
+| `MediaRequest.JoinedByUserIds`      | everybody else who asked for the same title | the queue file      |
+| `MediaRequest.StateChangedByUserId` | whoever last moved it, usually an operator  | the queue file      |
 
 One more identifier is held outside the record, so the derivation above does not reach it and it is
 named here rather than left to be found:
@@ -52,12 +50,18 @@ store writes that record whole.
     git grep -n 'public MediaRequest? Request' -- Jellyfin.Plugin.Requests/Storage/PersistedRequest.cs
     Jellyfin.Plugin.Requests/Storage/PersistedRequest.cs:29:    public MediaRequest? Request { get; init; }
 
-**Every request carries one of those history rows from the moment it is made.** The first entry on a
-request is not a move: it says how the ask reached this server, and it names the person it is filed
-against, so `RequestHistoryEntry.ByUserId` is written for every request rather than only for those
-somebody has decided on. It is the same identifier as `MediaRequest.RequestedByUserId` on the same
-record, so it names nobody the file did not already name, and what it adds is provenance rather than
-a person.
+**The history names nobody, and it used to.** Every request carries a row from the moment it is made
+and gains one on every move, and each row says what kind of caller made it rather than which person:
+
+    git grep -n 'public required RequestActor By' -- Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs
+    Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs:69:    public required RequestActor By { get; init; }
+
+The first on-disk shape wrote an identifier there. The second writes the role, and a file in the older
+shape is migrated as it is read, so an install upgrading from it stops holding those identifiers at
+the next write rather than at some sweep somebody has to remember. What that costs is stated here as
+well as at the field: nothing in this plugin can attribute a past decision to an individual any more,
+which is the trade taken deliberately on #49 in exchange for not keeping identifiers for people who
+have gone.
 
     git grep -n 'public RequestArrival? Arrival' -- Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs
 
@@ -186,37 +190,49 @@ account goes, which is the section below.
 
 ## What happens when a Jellyfin user is deleted
 
-**Nothing.** No part of this plugin is told that a user was removed, and nothing looks:
+**Their records go, and the plugin is told rather than asked to notice.** The server raises an event
+when an account is deleted and this plugin consumes it:
 
-    git grep -n 'IUserManager' -- Jellyfin.Plugin.Requests/
-    Jellyfin.Plugin.Requests/Seam/ServerKnownUsers.cs:15:    private readonly IUserManager _users;
-    Jellyfin.Plugin.Requests/Seam/ServerKnownUsers.cs:22:    public ServerKnownUsers(IUserManager users)
+    git grep -n 'IEventConsumer<UserDeletedEventArgs>' -- Jellyfin.Plugin.Requests/
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:232:        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
 
-That one reference asks whether a user exists when a want arrives over the seam. It is a question
-about the present, not a subscription to a deletion, and nothing in this plugin acts on an account
-going away.
+There are two rules and they are not the same rule.
 
-So a request record outlives the account it names. The identifier stays in the file, in up to four
-places for one deleted person: their own requests, requests they joined that somebody else asked for,
-and every decision they made as an operator, which is written into the record and into its history.
+**A request they asked for is theirs and is removed.** Record and history together, not stripped of
+its requester: a row that has lost the person who asked still says a title was asked for on this
+server on that date, which is half a record going and reads as deletion in a document without being
+one in the file.
 
-**And there is now a fifth place, in the other file.** Somebody who turned their own notices off is
-an identifier in the notices file, and a deleted account leaves it there exactly as it leaves the
-four above. It is the least revealing of the five - it says that a person on this server once said
-no and nothing more - and it is still an identifier for somebody who is gone. #49 is where the rule
-for all of them is decided, and this one is deliberately not answered ahead of the other four: a
-plugin that swept one file on a deletion it is not told about would be describing a behaviour it does
-not have.
+**A request somebody else asked for that they had joined stays, and they come off its list.** The
+request is not theirs, and taking a third party's request away because somebody else deleted their
+account is a worse answer to a narrower problem.
 
-**What the rule should be is open, and it is open for a reason rather than by neglect.** The history
-a decision is written into is append-only and a lint rule refuses any other writer, so stripping an
-identifier out of past entries is not a small change to make while implementing a sweep. #49 holds
-the question and states the three answers that are available, each of which leaves something
-different behind. This page cannot state a behaviour that has not been decided, and describing the
-current absence as a retention choice would be exactly that.
+**The switch in the notices file goes with them.** Somebody who turned their own notices off is an
+identifier in that file, and it is set back to the shipping value, which is what takes the identifier
+out of the list. It is the least revealing thing either file holds and it is still an identifier for
+somebody who is gone.
 
-The retention period above is not that rule and does not stand in for it. It reaches a record when
-the record is old, whoever it names, and a deleted person's identifier sits in the file until then.
+**One identifier is deliberately left standing, and it is the one to read carefully.**
+`MediaRequest.StateChangedByUserId` on a request that stays keeps whatever it held, including a
+deleted administrator's identifier. Clearing it would say something false rather than nothing: an
+empty value there means no person moved the request, so a cleared field would read as this plugin
+having decided somebody else's request on its own. That was answered on #49 on 27 August, and the
+answer is that the value stays and the queue is what shows an identifier nothing resolves as a person
+who is gone. **That rendering is #307 and is not built yet.** Until it is, an administrator reading the queue for
+such a request sees a raw identifier rather than a name, which is what the field always was and is
+not new; what is new is that nothing on the server can turn it into a name any more.
+
+**What the sweep cannot promise, said as a negative.** A request that keeps being decided on while the
+removal runs is retried a bounded number of times and then left as it is, with a line in the log at a
+level an operator sees. Nothing looks at such a record again on its own, because the account it names
+no longer exists for anything to start a search from.
+
+**And no server has been watched doing any of this.** What is measured is the sweep against the store
+this plugin ships and the registration the server would resolve, on both claimed target frameworks. No
+Jellyfin was running where that was measured.
+
+The retention period above is a different rule and does not stand in for this one. It reaches a record
+when the record is old, whoever it names.
 
 ## What leaves the server
 
