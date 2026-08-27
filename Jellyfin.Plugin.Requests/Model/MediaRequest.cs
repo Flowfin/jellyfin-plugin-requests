@@ -220,8 +220,8 @@ public sealed record MediaRequest
     /// <para>
     /// It is cleared when a request leaves <see cref="RequestState.Declined"/>, because a reason
     /// standing on an approved request is a sentence that is no longer true. What the request used
-    /// to say is the append-only history in #43, and until that exists the earlier reason is gone
-    /// rather than kept somewhere else.
+    /// to say is in <see cref="History"/>, where the entry carries the reason the move was made
+    /// with, so clearing this field loses the current value and not the record of it.
     /// </para>
     /// </summary>
     public DeclineReason? DeclineReason { get; init; }
