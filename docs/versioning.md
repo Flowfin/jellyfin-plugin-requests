@@ -101,12 +101,15 @@ compares the version in a manifest entry against the installed one and offers
 the higher of the two is a claim taken from how the catalogue is used, not from
 a run recorded here, and the run that would settle it belongs with #110.
 
-One of the promises above is now refused by something rather than only written
-here. A stored file whose version this plugin does not know is refused by the
-store, which leaves the bytes as they are and says so in the log; that landed
-with #47 and what it does in both directions is in `docs/compatibility.md`. The
-other half is not built: configuration carried between plugin versions is #97,
-so a `MAJOR` bump still promises about settings what nothing refuses.
+Both halves of one promise above are now held by something rather than only
+written here. A stored file whose version this plugin does not know is refused by
+the store, which leaves the bytes as they are and says so in the log; that landed
+with #47 and what it does in both directions is in `docs/compatibility.md`. And
+the settings an older shipped version left are read back by
+`UpgradeFromAShippedVersionTests`, so a change that made an upgrade come up on
+values nobody chose reds the suite instead of reaching a server. What that test
+covers is the one hop that exists, from `0.1.0.0-stable`, and it is a statement
+about two versions rather than about every future pair.
 
 ## The changelog
 

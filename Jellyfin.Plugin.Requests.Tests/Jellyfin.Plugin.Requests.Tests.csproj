@@ -95,6 +95,10 @@
          produced. A migration test that builds its own starting bytes agrees with the migration by
          construction, so these are files rather than string literals in a test. -->
     <None Include="Storage/Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The settings shape the first shipped version left on a disk, for the same reason: the hop
+         between two shipped plugin versions is tested from what the older one wrote rather than
+         from a document written here to look like it. -->
+    <None Include="Configuration/Fixtures/*.xml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
