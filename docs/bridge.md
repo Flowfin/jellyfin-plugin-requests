@@ -12,6 +12,13 @@ server without a service runs is
 over is below, and what happens when the service misbehaves is a separate question this page does not
 answer. Where a credential lives is answered at the end of it.
 
+**There is no adapter in this tree, and no issue on this board asks for one.** #82 closed as
+completed on 2026-08-23 having built the submission path behind the interface, and it did not produce
+a client that speaks to a service: the only implementation of the interface is still the one for a
+server without one. Whether such an adapter is written on this board at all is an open call, recorded
+on #113. So every sentence below that says something arrives with the adapter is waiting on that
+call, and not on an issue somebody can pick up.
+
 ## The mapping
 
 The table is data, in
@@ -140,9 +147,9 @@ under the service's own account, so the service is told that a request was made 
 Attribution is turned on one person at a time, by writing a row, and writing the row is what says
 that person's account name may leave.
 
-Where the table is kept and how it is edited arrives with the adapter that reads it, in #82. Nothing
-on this side reads it today, so a settings field for it now would be somewhere to type something
-nothing uses.
+Where the table is kept and how it is edited arrives with the adapter that reads it, and no issue on
+this board asks for that adapter. Nothing on this side reads the table today, so a settings field for
+it now would be somewhere to type something nothing uses.
 
 ### What leaves the server when a bridge is configured
 
@@ -248,8 +255,8 @@ a second implementation arriving in the plugin assembly unnamed for the same rea
 **There is no credential today and nothing here holds one.** The only implementation of the bridge in
 this tree is the one for a server that has no service, it makes no call, and the configuration
 carries no field for an address or for a secret. Everything below is what will be true the day the
-adapter in #82 adds one, written now so that it is a position rather than a description written
-afterwards to fit whatever was built.
+adapter adds one, written now so that it is a position rather than a description written afterwards
+to fit whatever was built.
 
 ### Where it goes
 
@@ -314,7 +321,7 @@ service the operator configured.
 **None of the four is enforced, because there is nothing yet to enforce them over.** The lint rule
 that would refuse a log or a diagnostics call reaching it, and the test that would assert it does not
 appear in a log written during a bridge failure, are the other two conditions of #85, and both
-quantify over a value that does not exist. They land with the adapter in #82 and not before.
+quantify over a value that does not exist. They land with the adapter and not before.
 
 ## Where the list of words came from
 
@@ -324,6 +331,6 @@ in this tree can read one.** No fixture here was captured from a service, no sch
 the suite makes no outbound call.
 
 So the list is this board's own statement of the vocabulary rather than a measurement of it, and the
-rule for an unseen word is what stands between that and a wrong answer. Whoever writes the adapter in
-#82 is the first person in a position to compare the two, and a word that arrives from a real service
-and is not here is a row this table is missing rather than a fault in the service.
+rule for an unseen word is what stands between that and a wrong answer. Whoever writes the adapter is
+the first person in a position to compare the two, and a word that arrives from a real service and is
+not here is a row this table is missing rather than a fault in the service.
