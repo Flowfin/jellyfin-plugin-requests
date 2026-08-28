@@ -219,6 +219,47 @@ public class DashboardPagesTests
     }
 
     /// <summary>
+    /// The settings page never puts the stored outbound notice address into an element.
+    /// <para>
+    /// The field is write-only, decided on #113 as the answer to #100, and the failure this
+    /// exists against is the shape the page had before: a value the page fetched sat in the markup
+    /// of an administrator's screen, in whatever they photographed of it, and was sent back on
+    /// every save made for any other setting. Both halves are removed by the same change, and this
+    /// holds the first of them.
+    /// </para>
+    /// <para>
+    /// What it reads is every assignment into a <c>value</c> on the page, and what it refuses is
+    /// one that reaches the address. The bound: an assignment written across two lines is invisible
+    /// to it, and so is a value put into an element some other way. It catches the write somebody
+    /// makes when the field comes back, which is the one that happened.
+    /// </para>
+    /// <para>
+    /// It also asserts the page still writes the setting, so a page that dropped the field
+    /// altogether cannot pass by carrying nothing to refuse.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheSettingsPageNeverDrawsTheStoredOutboundAddress()
+    {
+        using var host = new PluginHost();
+
+        var page = Text(host.Plugin
+            .GetPages()
+            .Single(entry => string.Equals(entry.Name, host.Plugin.Name, StringComparison.Ordinal))
+            .EmbeddedResourcePath);
+
+        var drawn = page
+            .Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.Contains(".value =", StringComparison.Ordinal))
+            .Where(line => line.Contains("OutboundNoticeAddress", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.Contains("config.OutboundNoticeAddress =", page, StringComparison.Ordinal);
+        Assert.Empty(drawn);
+    }
+
+    /// <summary>
     /// One embedded file, as text.
     /// </summary>
     /// <param name="resource">The manifest resource name.</param>

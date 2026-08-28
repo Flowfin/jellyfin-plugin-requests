@@ -140,6 +140,22 @@ public class PluginConfigurationTests
 
         var page = SettingsPage();
 
+        // The one setting whose reachability has a different shape, because it is write-only:
+        // decided on #113 as the answer to #100. There is no element carrying its value and no
+        // entry in the map that reads one back, so what makes it reachable is the box a new
+        // address is typed into, the checkbox that removes the stored one, and the two writes on
+        // save. TheSettingsPageNeverDrawsTheStoredOutboundAddress holds the other half, that
+        // nothing puts the stored value on the screen.
+        if (string.Equals(setting, "OutboundNoticeAddress", StringComparison.Ordinal))
+        {
+            Assert.Contains("id=\"RequestsOutboundNoticeAddressEntry\"", page, StringComparison.Ordinal);
+            Assert.Contains("id=\"RequestsOutboundNoticeAddressRemove\"", page, StringComparison.Ordinal);
+            Assert.Contains("config.OutboundNoticeAddress = typed;", page, StringComparison.Ordinal);
+            Assert.Contains("config.OutboundNoticeAddress = \"\";", page, StringComparison.Ordinal);
+
+            return;
+        }
+
         Assert.Contains(string.Concat("id=\"Requests", setting, "\""), page, StringComparison.Ordinal);
         Assert.Contains(string.Concat(setting, ": \"#Requests", setting, "\""), page, StringComparison.Ordinal);
     }
