@@ -6,9 +6,30 @@ A release is published by pushing a tag. Nothing is created by hand.
 
 The tag has the form `X.Y.Z-stable` or `X.Y.Z.W-stable`, for example `1.4.0-stable`
 or `0.1.0.0-stable`. The numeric part is the plugin version that Jellyfin installs,
-and it must be exactly the `version` in `build.yaml`, written the same way, with the
-same number of parts. The `-stable` suffix lives only in the tag and in the release
-name.
+and it must be exactly the `version` in the packaging file the tag selects, written
+the same way, with the same number of parts. The `-stable` suffix lives only in the
+tag and in the release name.
+
+### One tag per server line, and the number is the same on both
+
+Decided on #110 on 2026-08-28. The number is the release and the suffix is the line:
+`0.3.0.0-stable` and `0.3.0.0-jf12-stable` are the same version of the same plugin
+packaged for two lines, and neither of `MAJOR`, `MINOR` or `PATCH` is spent on saying
+which line a package is for.
+
+| Tag                     | Packaging file      | What is published        |
+| ----------------------- | ------------------- | ------------------------ |
+| `X.Y.Z.W-stable`        | `build.yaml`        | the line that file names |
+| `X.Y.Z.W-<line>-stable` | `build-<line>.yaml` | that line                |
+
+The marker is not a list in this document or in the workflow. What sits between the
+number and `-stable` names a packaging file, the run refuses a tag whose file does not
+exist and prints the files that do, and adding a line is adding a packaging file. Both
+lines are released by pushing both tags, one at a time.
+
+Each release still carries exactly one archive, which is what a catalogue generator
+requires to pair an archive with its checksum without breaking a tie it did not choose,
+and it is why two lines are two releases rather than one release with two packages.
 
 ## Cutting a release
 
@@ -238,13 +259,15 @@ The first check runs against it unchanged.
 
 - The tag does not end in `-stable`, or the workflow was started from something
   other than a tag.
-- The numeric part of the tag differs from `version` in `build.yaml`.
-- `build.yaml` is missing a required field, or `version`, `targetAbi`, `framework`
-  or `guid` has the wrong shape.
-- `framework` in `build.yaml` names a target the plugin project is not built for.
+- The tag names a server line with no packaging file, so there is nothing to publish
+  for it.
+- The numeric part of the tag differs from `version` in the packaging file it selects.
+- That file is missing a required field, or `version`, `targetAbi`, `framework` or
+  `guid` has the wrong shape.
+- `framework` in that file names a target the plugin project is not built for.
 - A packaging manifest that shadows `build.yaml` is present, such as `jprm.yaml` or
   `meta.yaml`.
-- `build.yaml` declares an `image` file that is not in the repository.
+- That file declares an `image` file that is not in the repository.
 - The tagged commit is not contained in a release branch, or the tag was moved after
   the run started.
 - There is no `packages.lock.json` next to the plugin project, so the release build
