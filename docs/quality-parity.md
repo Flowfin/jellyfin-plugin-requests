@@ -277,16 +277,20 @@ merge.
   a job name of its own.
 - `DCO sign-off`, `dependency-review`, `Reject Trojan Source Unicode` and
   `Audit workflows (zizmor)` are the same name on both boards.
-- Signed commits are required by **both** rulesets today, so this is parity and
-  not a difference. This line said neither required them and that this set asked
-  for them here as a difference from there; both halves have since stopped being
-  true, and the line carried no command, which is why it could go stale in
-  silence. The other board's rules are read on `main`, which is its default
-  branch, and asking for `master` there returns an empty list rather than an
-  error:
+- Signed commits are required by **both** rulesets today, so this is parity
+  rather than a difference. This line said neither required them and that this
+  set asked for them here as a difference from there, and both halves have since
+  stopped being true. It carried no command, which is why it could go stale in
+  silence, and the command is below rather than in the line because the list is
+  one line per difference.
 
-      $ gh api repos/iderex/jellyfin-plugin-sso/rules/branches/main --jq '[.[].type]'
-      ["deletion","non_fast_forward","required_status_checks","pull_request","required_signatures"]
+The reading behind that last line, which is the only one here that needed one.
+The other board's rules are read on `main` because that is its default branch;
+asking for `master` there returns an empty list rather than an error, which is a
+way to read "no rules" off a board that has them:
+
+    $ gh api repos/iderex/jellyfin-plugin-sso/rules/branches/main --jq '[.[].type]'
+    ["deletion","non_fast_forward","required_status_checks","pull_request","required_signatures"]
 
 ## One row per workflow on the other board
 
