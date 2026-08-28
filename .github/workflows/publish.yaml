@@ -4,18 +4,32 @@ name: Publish Release
 # is published. CI builds the plugin from the tagged commit, creates the GitHub release
 # for that tag and uploads the assets. No release is ever created by hand.
 #
-# The numeric part of the tag is the plugin version Jellyfin installs. It must equal
-# build.yaml's `version`, and the gate job below fails the run if it does not.
+# THE NUMBER IS THE RELEASE AND THE SUFFIX IS THE LINE, decided on #110 on 2026-08-28.
+# A tag is `X.Y.Z.W-stable` for the line `build.yaml` names, and `X.Y.Z.W-<line>-stable`
+# for any other, whose metadata is `build-<line>.yaml`. Both lines of one release carry
+# the same version, because no position of the number is spent on encoding a line, and
+# the catalogue holds one entry per line rather than one manifest per line.
 #
-# What this workflow publishes is one package for the one server line build.yaml names
-# in `framework` and `targetAbi`. A repository that ships two server lines needs a
-# second manifest and a second route; this file does not provide one, and the checks
-# below refuse to guess.
+# So this workflow still publishes ONE package per release, and which one is derived
+# from the tag rather than written here. That keeps every release to a single archive,
+# which is what the catalogue generator requires of one. Adding a server line is adding
+# a packaging file and pushing a tag that names it; a tag naming a line with no such
+# file is refused by the gate below rather than guessed at.
+#
+# The numeric part of the tag is the plugin version Jellyfin installs. It must equal
+# the `version` of the packaging file the tag selects, and the gate job fails the run
+# if it does not.
 on:
   push:
     tags:
       - "[0-9]+.[0-9]+.[0-9]+-stable"
       - "[0-9]+.[0-9]+.[0-9]+.[0-9]+-stable"
+      # One shape rather than one pattern per line, because the line a marker names is
+      # checked against a packaging file that has to exist. A pattern per line here
+      # would be a second list of the lines this repository claims, and the packaging
+      # files at the root are already that list.
+      - "[0-9]+.[0-9]+.[0-9]+-*-stable"
+      - "[0-9]+.[0-9]+.[0-9]+.[0-9]+-*-stable"
 
 # Deny by default. Each job opts into the smallest scope it needs.
 permissions: {}
@@ -39,6 +53,8 @@ jobs:
       contents: read
     outputs:
       version: ${{ steps.metadata.outputs.version }}
+      metadata: ${{ steps.metadata.outputs.metadata }}
+      framework: ${{ steps.metadata.outputs.framework }}
     steps:
       - name: Check out the tagged commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,12 +103,11 @@ jobs:
           }
           AWK
 
-      - name: Check the tag and build.yaml agree
+      - name: Check the tag and the packaging file it names agree
         id: metadata
         env:
           # Space separated list of branches a release may be cut from.
           RELEASE_REFS: "master"
-          EXPECTED_FRAMEWORK: "net9.0"
         run: |
           set -euo pipefail
 
@@ -114,15 +129,29 @@ jobs:
 
           tag="${GITHUB_REF_NAME}"
           case "${tag}" in
-            *-stable) numeric="${tag%-stable}" ;;
+            *-stable) rest="${tag%-stable}" ;;
             *)
               echo "::error::Tag ${tag} does not end in -stable."
               exit 1
               ;;
           esac
 
-          if [ ! -f build.yaml ]; then
-            echo "::error::build.yaml is missing from the repository root. The packaging step reads all plugin metadata from it."
+          # What sits between the number and -stable is the server line. Nothing there
+          # is the line build.yaml names, which is why every tag pushed before this rule
+          # existed still selects exactly what it selected then.
+          case "${rest}" in
+            *-*) numeric="${rest%%-*}" ; line="${rest#*-}" ;;
+            *)   numeric="${rest}"     ; line="" ;;
+          esac
+
+          if [ -n "${line}" ]; then
+            metadata="build-${line}.yaml"
+          else
+            metadata="build.yaml"
+          fi
+
+          if [ ! -f "${metadata}" ]; then
+            echo "::error::Tag ${tag} names a server line whose packaging metadata would be ${metadata}, and there is no such file. The packaging files at the root are the list of lines this repository claims: $(ls build*.yaml 2>/dev/null | tr '\n' ' ')"
             exit 1
           fi
 
@@ -141,7 +170,7 @@ jobs:
           fi
 
           read_scalar() {
-            awk -v key="$1" -f "${RUNNER_TEMP}/manifest/read_scalar.awk" build.yaml
+            awk -v key="$1" -f "${RUNNER_TEMP}/manifest/read_scalar.awk" "${metadata}"
           }
 
           # changelog is in this list because the packaging tool reads build_cfg
@@ -150,8 +179,8 @@ jobs:
           # far past the point where the tag is spent.
           missing=0
           for key in name guid version targetAbi framework owner overview description category artifacts changelog; do
-            if ! grep -Eq "^${key}:" build.yaml; then
-              echo "::error::build.yaml has no top level '${key}' field. A catalog entry built from this package would be incomplete."
+            if ! grep -Eq "^${key}:" "${metadata}"; then
+              echo "::error::${metadata} has no top level '${key}' field. A catalog entry built from this package would be incomplete."
               missing=1
             fi
           done
@@ -161,40 +190,45 @@ jobs:
 
           # `image` names a file that is copied into the archive. The packaging tool
           # exits on a missing one, again after the build.
-          if grep -Eq "^image:" build.yaml; then
+          if grep -Eq "^image:" "${metadata}"; then
             image="$(read_scalar image)"
             if [ ! -f "${image}" ]; then
-              echo "::error::build.yaml declares image '${image}', which is not in the repository. The packaging step copies that file into the archive and fails without it."
+              echo "::error::${metadata} declares image '${image}', which is not in the repository. The packaging step copies that file into the archive and fails without it."
               exit 1
             fi
           fi
 
           version="$(read_scalar version)"
           if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-            echo "::error::build.yaml version '${version}' is not three or four numeric parts (X.Y.Z or X.Y.Z.W)."
+            echo "::error::${metadata} version '${version}' is not three or four numeric parts (X.Y.Z or X.Y.Z.W)."
             exit 1
           fi
 
           if [ "${version}" != "${numeric}" ]; then
-            echo "::error::Tag ${tag} carries version ${numeric} but build.yaml declares ${version}. Bump build.yaml, or tag the version that is in it."
+            echo "::error::Tag ${tag} carries version ${numeric} but ${metadata} declares ${version}. Bump ${metadata}, or tag the version that is in it."
             exit 1
           fi
 
           abi="$(read_scalar targetAbi)"
           if [[ ! "${abi}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::build.yaml targetAbi '${abi}' is not four numeric parts (A.B.C.D). Jellyfin compares this value to decide whether to offer the plugin at all."
+            echo "::error::${metadata} targetAbi '${abi}' is not four numeric parts (A.B.C.D). Jellyfin compares this value to decide whether to offer the plugin at all."
             exit 1
           fi
 
+          # The runtime is read out of the packaging file rather than compared against a
+          # constant. The constant said which line this workflow was filled in for, and
+          # the tag says that now. What is left to refuse here is a value nothing could
+          # build; whether the project is compiled for it is asked of MSBuild in the
+          # build job, which is a question this job cannot answer without a toolchain.
           framework="$(read_scalar framework)"
-          if [ "${framework}" != "${EXPECTED_FRAMEWORK}" ]; then
-            echo "::error::build.yaml framework '${framework}' does not match the target this workflow builds (${EXPECTED_FRAMEWORK}). Either the manifest names a runtime the project is not compiled for, or the workflow was filled in for a different server line."
+          if [[ ! "${framework}" =~ ^net[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::${metadata} framework '${framework}' is not a target framework moniker of the form netX.Y, so there is nothing to publish it for."
             exit 1
           fi
 
           guid="$(read_scalar guid)"
           if [[ ! "${guid}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
-            echo "::error::build.yaml guid '${guid}' is not a UUID. It must be the plugin's own, permanent id."
+            echo "::error::${metadata} guid '${guid}' is not a UUID. It must be the plugin's own, permanent id."
             exit 1
           fi
 
@@ -217,7 +251,9 @@ jobs:
           fi
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "Publishing version ${version} from tag ${tag}."
+          echo "metadata=${metadata}" >> "$GITHUB_OUTPUT"
+          echo "framework=${framework}" >> "$GITHUB_OUTPUT"
+          echo "Publishing version ${version} for targetAbi ${abi} on ${framework}, from tag ${tag} and ${metadata}."
 
   build:
     name: Build package
@@ -241,13 +277,33 @@ jobs:
       - name: Set up .NET
         # No dependency cache in the publish path. A cache entry written by another
         # run must never be able to reach the bytes that get released.
+        #
+        # Both SDKs, because which one this run needs is decided by the packaging file
+        # the tag selected and not by this file. The same reasoning is already in
+        # package.yaml, which packages every line on a pull request.
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: "9.0.x"
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Put this line's metadata where the packaging tool reads it
+        env:
+          METADATA: ${{ needs.gate.outputs.metadata }}
+        # The packaging tool takes the first file name it recognises and build.yaml is
+        # last in that list, so a line that is not the one build.yaml carries is
+        # published by putting its file there. The gate proved the file exists and that
+        # its version equals the tag; this is the copy and nothing else.
+        run: |
+          set -euo pipefail
+          if [ "${METADATA}" != "build.yaml" ]; then
+            cp "${METADATA}" build.yaml
+          fi
+          sed -n 's/^\(name\|version\|targetAbi\|framework\):.*/&/p' build.yaml
 
       - name: Check the project is built for the target in the manifest
         env:
-          EXPECTED_FRAMEWORK: "net9.0"
+          EXPECTED_FRAMEWORK: ${{ needs.gate.outputs.framework }}
         # Asked of MSBuild rather than read out of the project file, because the target
         # frameworks are often set in Directory.Build.props or behind a property. The
         # packaging step runs `dotnet publish -f <target>`, and a target the project
@@ -269,11 +325,11 @@ jobs:
             fi
           done
           if [ "${found}" -ne 1 ]; then
-            echo "::error::Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj is built for '${declared}', which does not include ${EXPECTED_FRAMEWORK}. build.yaml and the project disagree about which server line this is. Bring them into line before tagging."
+            echo "::error::Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj is built for '${declared}', which does not include ${EXPECTED_FRAMEWORK}. The packaging file the tag names and the project disagree about which runtime this line has. Bring them into line before tagging."
             exit 1
           fi
           if [ "${#frameworks[@]}" -gt 1 ]; then
-            echo "::notice::The project is built for ${declared}. This run publishes only ${EXPECTED_FRAMEWORK}, the line build.yaml names. The other lines are not published by this workflow."
+            echo "::notice::The project is built for ${declared}. This run publishes only ${EXPECTED_FRAMEWORK}, the line the tag names. The other lines are published by their own tags."
           fi
 
       - name: Restore against the committed lock file
@@ -297,7 +353,7 @@ jobs:
       - name: Check the assembly version matches the manifest
         env:
           MANIFEST_VERSION: ${{ needs.gate.outputs.version }}
-          EXPECTED_FRAMEWORK: "net9.0"
+          EXPECTED_FRAMEWORK: ${{ needs.gate.outputs.framework }}
         # The gate proved the tag and the manifest agree. Nothing so far has looked at
         # the number that ends up inside the DLL, and a project that sets AssemblyVersion
         # by hand can ship a plugin whose assembly says one thing while the catalog entry
@@ -332,7 +388,7 @@ jobs:
         # gate job has already proven that value equals the tag.
         uses: oddstr13/jellyfin-plugin-repository-manager@9497a0a499416cc572ed2e07a391d9f943a37b4d # v1.1.1
         with:
-          dotnet-target: "net9.0"
+          dotnet-target: ${{ needs.gate.outputs.framework }}
 
       - name: Write the bill of materials
         id: bom
