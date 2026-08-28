@@ -479,13 +479,73 @@ server once when the plugin is registered rather than per person, so there is no
 them against and no catalogue entry could reach them. What a language file changes is everything
 inside the pages, not the entry in the dashboard's own menu.
 
+## What #66 asked for, and where each of its three conditions stands
+
+#66 is closed and replaced by #316, which states the same goal against the two surfaces that exist
+rather than against the one it was written for. A replacement makes the older issue's conditions
+somebody's to answer rather than nobody's, so they are answered here one at a time. Re-planned is
+not a disposition; met and deliberately dropped are.
+
+**Grouped by state, on a client this project has never touched. The client half is dropped, and the
+state half is met as a column rather than as groups.** The channel is what that condition was
+written for, and since #67 it answers one folder to every caller and never reads who is asking:
+
+    grep -n 'answers the same single folder to every caller\|public bool IsEnabledFor' Jellyfin.Plugin.Requests/Surface/RequestsChannel.cs
+    37:/// answers the same single folder to every caller, it never asks who is browsing, and it never
+    91:    public bool IsEnabledFor(string userId) => true;
+
+So no surface here puts a person's own list in front of an unmodified television client, and the
+reach matrix above is where that stands rather than being softened by this section. What is dropped
+is the client, and what is left is why: a per-person channel was the thing #67 measured being handed
+to the wrong person on a running server of each line.
+
+The state half is met on both surfaces. The endpoint carries where each request stands, and the page
+draws it beside the sentence for what happens next:
+
+    grep -n 'public required RequestState State' Jellyfin.Plugin.Requests/Api/MyRequest.cs
+    58:    public required RequestState State { get; init; }
+
+    grep -n 'mine.column.state"\|named("mine.state"' Jellyfin.Plugin.Requests/Web/mine.html
+    87:                        <th scope="col" data-i18n="mine.column.state"></th>
+    297:                        cell(row, named("mine.state", request.State));
+
+A column and not groups, and that is the shape rather than an approximation of one: a person reading
+their own handful of asks reads the whole table, and grouping it would repeat the same heading over
+one row each.
+
+**A declined request shows its reason where one was given. Met.** The row carries the closed-list
+reason, and the sentence an operator wrote beside it where they wrote one:
+
+    grep -n 'public DeclineReason? DeclineReason\|public string? DeclineNote' Jellyfin.Plugin.Requests/Api/MyRequest.cs
+    88:    public DeclineReason? DeclineReason { get; init; }
+    94:    public string? DeclineNote { get; init; }
+
+**The view is empty and harmless for a user who has never asked for anything. Met.** No matches
+draws the sentence saying so, rather than an empty table a person has to interpret:
+
+    grep -n 'MatchCount === 0' -A 3 Jellyfin.Plugin.Requests/Web/mine.html
+    310:                    if (answer.MatchCount === 0) {
+    311-                        summary.textContent = word("mine.empty");
+    312-                        return;
+    313-                    }
+
+Harmless is the other half of that word and is the endpoint's rather than the page's: a caller with
+no requests reads their own list and nothing wider, because the narrowing is the store lookup rather
+than a filter over a wider read, which `WhatAPersonIsToldTests` and `ListRequestsTests` hold.
+
+**None of this was read on a running server or in a browser.** The commands above read this
+repository. What a client draws is outside what the suite can see, which is the headless rule in
+[testing.md](testing.md), and the reach matrix above still has no cell checked against a real
+client.
+
 ## What the rest of this milestone follows from
 
 Every issue after #65 in milestone 8 is read against the decision above.
 
 - #66, the user's view of their own requests on a client this project has never touched, was the
-  channel rendering. It was built and then taken out by #67, so what that issue asks for is not
-  reachable through this surface and the issue wants re-planning rather than finishing.
+  channel rendering. It was built and then taken out by #67, and the issue is closed and replaced
+  by #316. Where each of its three conditions stands is the section above rather than a word here,
+  because two of them are met and only one is dropped.
 - #67, proving one user cannot see another's requests through the surface, was measured on a
   running server of each claimed line and could not be shown. Its third condition is what this
   channel now is.
