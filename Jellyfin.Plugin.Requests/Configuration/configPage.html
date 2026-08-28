@@ -43,9 +43,18 @@
                         </div>
 
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="RequestsOutboundNoticeAddress" data-i18n="config.outboundNoticeAddress.label"></label>
-                            <input is="emby-input" type="url" id="RequestsOutboundNoticeAddress" />
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsOutboundNoticeAddressEntry" data-i18n="config.outboundNoticeAddress.label"></label>
+                            <input is="emby-input" type="url" id="RequestsOutboundNoticeAddressEntry" autocomplete="off" />
+                            <div class="fieldDescription" id="RequestsOutboundNoticeAddressState"></div>
                             <div class="fieldDescription" data-i18n="config.outboundNoticeAddress.description"></div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="RequestsOutboundNoticeAddressRemove" />
+                                <span data-i18n="config.outboundNoticeAddress.remove.label"></span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription" data-i18n="config.outboundNoticeAddress.remove.description"></div>
                         </div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
@@ -131,13 +140,25 @@
                         TellsAdministratorsAboutArrivals: "#RequestsTellsAdministratorsAboutArrivals",
                     };
 
-                    // Read and written as typed, with no trimming and no default put in its place.
-                    // The server refuses an address it cannot post to and says which field, and a
-                    // page that quietly repaired the value would be a page disagreeing with the
-                    // file about what this install is set to.
-                    var texts = {
-                        OutboundNoticeAddress: "#RequestsOutboundNoticeAddress",
-                    };
+                    // The outbound address is write-only on this page, decided on #113 as the
+                    // answer to #100. It is never put into an element: what is drawn is whether
+                    // one is set, the entry box is empty on every load, and the stored value is
+                    // replaced only by an address somebody typed here.
+                    //
+                    // What that costs, stated rather than implied: an operator can no longer read
+                    // back the address this install is set to, only whether there is one. The
+                    // price is accepted because the box's other behaviour was worse - a value the
+                    // page fetched sits in the markup of an administrator's screen, in whatever
+                    // they photograph of it, and is sent back on every save made for any other
+                    // setting.
+                    //
+                    // What it does NOT do, because no page can: the server serves this plugin's
+                    // whole configuration on its own endpoint, which is where this page fetches
+                    // it from, so the address still leaves the server to anybody who may read that
+                    // endpoint. `docs/configuration.md` carries that bound.
+                    var entry = "#RequestsOutboundNoticeAddressEntry";
+                    var removal = "#RequestsOutboundNoticeAddressRemove";
+                    var state = "#RequestsOutboundNoticeAddressState";
 
                     function show(config) {
                         Object.keys(numbers).forEach(function (setting) {
@@ -148,9 +169,12 @@
                             page.querySelector(switches[setting]).checked = config[setting];
                         });
 
-                        Object.keys(texts).forEach(function (setting) {
-                            page.querySelector(texts[setting]).value = config[setting] || "";
-                        });
+                        // Presence, never the value. An empty entry box on every load is what
+                        // makes "sent only when newly entered" readable to somebody using the
+                        // page: there is nothing in it to leave alone by accident.
+                        page.querySelector(entry).value = "";
+                        page.querySelector(removal).checked = false;
+                        page.querySelector(state).textContent = config.OutboundNoticeAddress ? RequestsShell.word("config.outboundNoticeAddress.set") : RequestsShell.word("config.outboundNoticeAddress.notSet");
                     }
 
                     function read(config) {
@@ -162,9 +186,22 @@
                             config[setting] = page.querySelector(switches[setting]).checked;
                         });
 
-                        Object.keys(texts).forEach(function (setting) {
-                            config[setting] = page.querySelector(texts[setting]).value;
-                        });
+                        // Three cases and they are ordered, because removal has to beat a value
+                        // left in the box: an operator who typed an address, changed their mind
+                        // and ticked the box gets the removal they asked for rather than the
+                        // address they abandoned.
+                        //
+                        // The untouched case leaves `config` exactly as the server answered, which
+                        // is why this function is handed a freshly fetched configuration rather
+                        // than an empty object. Writing an empty string here instead would delete
+                        // the address on every save made for any other setting.
+                        var typed = page.querySelector(entry).value;
+
+                        if (page.querySelector(removal).checked) {
+                            config.OutboundNoticeAddress = "";
+                        } else if (typed) {
+                            config.OutboundNoticeAddress = typed;
+                        }
 
                         return config;
                     }

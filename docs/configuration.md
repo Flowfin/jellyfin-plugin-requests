@@ -99,6 +99,32 @@ a request nothing.
 There is no second setting saying whether to use the address. Two ways to say off is one of them
 being wrong the day somebody sets the other, and an operator who wants it off empties the field.
 
+### The address is write-only on the settings page
+
+Decided on #113 as the answer to #100. The page shows whether an address is set and never the
+address: the box is empty on every load, what is stored is replaced only by an address somebody
+typed into it, and a checkbox beside it removes the stored one. Leaving the box empty keeps what is
+there, and the removal beats a value left in the box, so an operator who typed an address and then
+changed their mind gets the removal they asked for.
+
+What it costs is that an operator can no longer read back the address this install is set to, only
+whether there is one. That price is accepted rather than argued away, and what it buys is the two
+things the field did before: a value the page fetched sat in the markup of an administrator's
+screen and in whatever they photographed of it, and it was sent back to the server on every save
+made for any other setting.
+
+**IT DOES NOT STOP THE ADDRESS LEAVING THE SERVER, AND NO PAGE COULD.** The dashboard fetches a
+plugin's configuration from the server's own endpoint, which serialises the whole object, and this
+page fetches it from there like every other. So the address still reaches anybody who may read that
+endpoint, which is an administrator. What changed is that it is no longer drawn, and
+`TheSettingsPageNeverDrawsTheStoredOutboundAddress` in the suite is what holds it to that. The
+sentence a reader is owed is that this is a narrowing of where the value appears, not a promise
+that it stays on the machine.
+
+The two other ways it leaves today are unchanged by this and are #100's remaining halves: the
+refusal sentence for an address this plugin cannot post to quotes the value back, and the sink's
+failure path hands the platform's own exception to the logger, which carries the address inside it.
+
 **AnnouncesApprovals**, **AnnouncesDeclines** and **AnnouncesFulfilments** are on, and they are what
 narrows a sink that already has somewhere to send to rather than a second way of turning one off. An
 install with no address is silent whatever they say, which is why they are on: an operator who has
