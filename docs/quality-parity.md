@@ -102,14 +102,28 @@ There are no bypass actors, and none is to be added. A rule with a bypass is a
 rule that holds for whoever did not think to ask, which is the opposite of what
 this list is for.
 
-Commits are to be signed. The ruleset carries no signature rule today and every
-commit on the default branch is already signed, so the rule costs nothing to add
-and closes the case where one is not:
+Commits are to be signed, and **the ruleset carries the rule now**. This
+paragraph said it did not, which is the half of this page a reader trusts most
+because it is the half that describes a setting rather than a file:
+
+    $ gh api repos/iderex/jellyfin-plugin-requests/rules/branches/master         --jq '[.[].type]'
+    ["deletion","non_fast_forward","pull_request","required_status_checks","required_signatures"]
+
+The argument for adding it was that every commit on the default branch was
+already signed, so the rule cost nothing to add and closed the case where one is
+not. That reading was pasted here as `{"total":39,"unverified":0,"verified":39}`
+and no longer reproduces, because the branch has moved past what one page of the
+API returns. Re-run now, and read the total as the page size rather than as the
+history:
 
     $ gh api 'repos/iderex/jellyfin-plugin-requests/commits?sha=master&per_page=100'         --jq '[.[] | .commit.verification.verified]
               | {total: length, verified: (map(select(.)) | length),
                  unverified: (map(select(. == false)) | length)}'
-    {"total":39,"unverified":0,"verified":39}
+    {"total":100,"unverified":0,"verified":100}
+
+Unverified is still zero, so the rule refuses nothing that this board is
+currently doing, which is what makes it cheap rather than what makes it
+pointless: what it holds is the commit nobody has pushed yet.
 
 Three checks that ran here when this list was written are deliberately not in
 it, and the three paragraphs under this one are those three. What has arrived
@@ -210,10 +224,22 @@ command is right:
     Reject Trojan Source Unicode
     Audit workflows (zizmor)
     Check formatting
+    Deterministic pull request hygiene checks
 
-Five of the fifteen. The rest of the set above is not applied: a ruleset is a
-repository setting rather than a file in this tree, and nothing in this change
+Six of the fifteen. This paste read five until the reading above, and the sixth
+arrived without anything on this page or on #30 moving, which is the way every
+previous one arrived too. The rest of the set above is not applied: a ruleset is
+a repository setting rather than a file in this tree, and nothing in this change
 touches one.
+
+Nine are missing and nothing is required that this page has not declared, which
+is the direction worth checking rather than assuming, because a name required
+here and absent above would be a gate nobody wrote a line for:
+
+    $ comm -13 declared.txt live.txt
+
+returns nothing, against the same `declared.txt` the section above builds and a
+`live.txt` from the command in this one.
 #30 carries the application and the demonstration that a red check refuses a
 merge.
 
@@ -251,8 +277,16 @@ merge.
   a job name of its own.
 - `DCO sign-off`, `dependency-review`, `Reject Trojan Source Unicode` and
   `Audit workflows (zizmor)` are the same name on both boards.
-- Signed commits are required by neither ruleset today. This set asks for them
-  here, which is a difference from there rather than parity with it.
+- Signed commits are required by **both** rulesets today, so this is parity and
+  not a difference. This line said neither required them and that this set asked
+  for them here as a difference from there; both halves have since stopped being
+  true, and the line carried no command, which is why it could go stale in
+  silence. The other board's rules are read on `main`, which is its default
+  branch, and asking for `master` there returns an empty list rather than an
+  error:
+
+      $ gh api repos/iderex/jellyfin-plugin-sso/rules/branches/main --jq '[.[].type]'
+      ["deletion","non_fast_forward","required_status_checks","pull_request","required_signatures"]
 
 ## One row per workflow on the other board
 
