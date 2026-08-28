@@ -151,3 +151,70 @@ What it keeps is the repository, the release route already in [RELEASING.md](REL
 version numbers minted here rather than replaced by the timestamp the catalogue's build script
 writes over them. The two-line packaging problem in the table above stays this board's own, which it
 would have been under either answer.
+
+## The address an operator adds, and what it carries today
+
+    https://flowfin.dev/manifest.json
+
+That is the manifest the decision above distributes from. Until this section no file on this board
+named it: the decision said self-hosted under Flowfin's control and stopped there, so the one thing
+an operator has to type had nowhere to be read from, and the price accepted above -- that somebody
+reaches this plugin only by being told the URL -- was being paid without the URL being written down.
+
+Read back rather than asserted, on 2026-08-28:
+
+    curl -sS -o manifest.json -w '%{http_code}\n' https://flowfin.dev/manifest.json
+    200
+
+    jq -r '.[] | select(.name == "Requests") | .versions[] | [.version, .targetAbi] | @tsv' manifest.json
+    0.2.0.0 10.11.0.0
+    0.1.0.0 10.11.0.0
+
+### The checksums are the ones the packages hash to
+
+The one field of an entry that describes bytes rather than metadata, checked against the archives
+the entries name rather than against the `.md5` published beside them:
+
+    curl -sSL -O https://github.com/Flowfin/jellyfin-plugin-requests/releases/download/0.1.0.0-stable/requests_0.1.0.0.zip
+    curl -sSL -O https://github.com/Flowfin/jellyfin-plugin-requests/releases/download/0.2.0.0-stable/requests_0.2.0.0.zip
+    md5sum requests_0.1.0.0.zip requests_0.2.0.0.zip
+    1167d5e454c800bc024d98a6899cdb4c *requests_0.1.0.0.zip
+    76c0a82e31d04228e7daf1f67383182d *requests_0.2.0.0.zip
+
+Both equal the `checksum` of their entry, so a server that downloads either one and hashes it gets
+the value the manifest promised.
+
+### Both entries claim the 10.11 line, and the 12.0 line has none
+
+The scheme is one entry per server line, each carrying its line's `targetAbi`. What is published is
+two entries for one line. This board claims two:
+
+    grep -nE '^(version|targetAbi|framework):' build.yaml build-jf12.yaml
+    build.yaml:5:version: "0.2.0.0"
+    build.yaml:10:targetAbi: "10.11.0.0"
+    build.yaml:11:framework: "net9.0"
+    build-jf12.yaml:13:version: "0.2.0.0"
+    build-jf12.yaml:15:targetAbi: "12.0.0.0"
+    build-jf12.yaml:16:framework: "net10.0"
+
+and the release route builds the one `build.yaml` names, which is why there is no second package for
+an entry to point at. `publish.yaml` says so about itself in its own header and refuses a `framework`
+that is not the one it builds.
+
+**So a server on the 12.0 line is offered the `net9.0` build.** A server keeps every entry whose
+`targetAbi` is at or below its own version and then takes the highest version number of what is
+left, read at the 10.11 line's own source on 2026-08-28:
+
+    gh api "repos/jellyfin/jellyfin/contents/Emby.Server.Implementations/Updates/InstallationManager.cs?ref=release-10.11.z" \
+      -H "Accept: application/vnd.github.raw" \
+      | grep -nE 'Version.Parse\(x.TargetAbi\) <= appVer|OrderByDescending\(x => x.VersionNumber\)'
+    266:                .Where(x => string.IsNullOrEmpty(x.TargetAbi) || Version.Parse(x.TargetAbi) <= appVer);
+    277:            foreach (var v in availableVersions.OrderByDescending(x => x.VersionNumber))
+
+`10.11.0.0` is at or below `12.0.0.0`, so the filter keeps it and there is nothing else for the
+ordering to prefer.
+
+**Nothing here was installed into a server.** The address was fetched and the archives were hashed;
+no Jellyfin was started, no repository was added to one, and no install was attempted on either
+line. What the paragraph above describes is the comparison the server's source makes, not an install
+anybody watched take the wrong package.
