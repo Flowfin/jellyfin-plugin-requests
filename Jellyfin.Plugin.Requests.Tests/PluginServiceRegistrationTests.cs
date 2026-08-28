@@ -7,6 +7,7 @@ using Jellyfin.Plugin.Requests.Bridge;
 using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Identity;
 using Jellyfin.Plugin.Requests.Model;
+using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.People;
 using Jellyfin.Plugin.Requests.Seam;
 using Jellyfin.Plugin.Requests.Storage;
@@ -24,6 +25,19 @@ namespace Jellyfin.Plugin.Requests.Tests;
 /// server is told which implementation to use, so a registration that was dropped or pointed at the
 /// wrong type would leave the plugin resolving nothing on a real server while every test that hands
 /// its own doubles in went on passing.
+/// <para>
+/// RUN THIS CLASS ON ITS OWN AFTER CHANGING IT, because a whole-suite run cannot tell you what it
+/// covers here. Several registrations resolve <c>Plugin.Instance</c>, a static the host sets while
+/// loading and no test sets, and another collection running first leaves an instance in it often
+/// enough that the graph resolves anyway. So a test here that reaches the static passes in the
+/// suite and fails alone, which is how one of them stood from the day it landed until it reddened
+/// one target framework out of two on the mainline. The gate runs the whole suite and nothing in
+/// it runs this class by itself, so what catches the next one is the run below rather than the gate.
+/// </para>
+/// <para>
+/// <c>dotnet test Jellyfin.Plugin.Requests.sln --configuration Release --filter
+/// "FullyQualifiedName~PluginServiceRegistrationTests"</c>.
+/// </para>
 /// </summary>
 [SuppressMessage(
     "Design",
@@ -190,16 +204,24 @@ public class PluginServiceRegistrationTests
     }
 
     /// <summary>
-    /// The registration as it ships, with the five things behind it that only a running server has.
+    /// The registration as it ships, with the six things behind it that only a running server has.
     /// <para>
-    /// Each of the five is stood in for because reaching the real one from a test would read
-    /// something other than the registration. The logger factory, the user manager and the session
-    /// manager come from the server's own container and are not in this collection at all. The store
-    /// and the settings both reach the plugin instance, which is a static the host sets while loading
-    /// and which any test running beside this one replaces, so a test resolving them would fail for a
-    /// reason nobody caused; <c>ServerInstallSettings</c> says so about itself where it takes its
-    /// second constructor. What is left over the five is the seam's own registration, which is what
-    /// these tests are about.
+    /// Each of the six is stood in for because reaching the real one from a test would read something
+    /// other than the registration. The logger factory, the user manager and the session manager come
+    /// from the server's own container and are not in this collection at all. The store, the settings
+    /// and the notice preferences all reach the plugin instance, which is a static the host sets while
+    /// loading and which any test running beside this one replaces, so a test resolving them would
+    /// fail for a reason nobody caused; <c>ServerInstallSettings</c> says so about itself where it
+    /// takes its second constructor, and the registration of <c>FileNoticePreferences</c> throws by
+    /// name when the static is empty. What is left over the six is the seam's own registration, which
+    /// is what these tests are about.
+    /// </para>
+    /// <para>
+    /// THOSE THREE ARE THE WHOLE POPULATION AS THIS IS WRITTEN, and what says so is the static rather
+    /// than this list, which drifts: <c>git grep -n "Plugin.Instance" --
+    /// Jellyfin.Plugin.Requests/</c> returns the settings, the store's directory and the notice
+    /// preferences' directory and nothing else. A registration added to that set and not to this
+    /// helper resolves here only while another collection has run first.
     /// </para>
     /// <para>
     /// The session manager arrived with the arrival notice the seam announces through. It is the
@@ -221,6 +243,7 @@ public class PluginServiceRegistrationTests
         services.AddSingleton<IInstallSettings>(new FakeInstallSettings());
         services.AddSingleton<IKnownUsers>(new FakeKnownUsers(Asker));
         services.AddSingleton<ISessionManager>(new ASessionManagerThatOnlyDelivers());
+        services.AddSingleton<INoticePreferences>(new InMemoryNoticePreferences());
 
         return services.BuildServiceProvider();
     }
