@@ -229,7 +229,8 @@ it. Being refused is the answer being measured; a request being made is not.
 That reading was taken at `a90529d`, in run `33244878101`, job `99080522638` for the 10.11 line and
 job `99080522583` for 12.0. The two are identical line for line:
 
-    gh api --allow-escape-sequences repos/Flowfin/jellyfin-plugin-requests/actions/jobs/99080522638/logs       | sed 's/\[[0-9;]*m//g' | grep -a "SEAM-PROBE" | sed -E 's/.*ContainerReport: //' | sort -u
+    gh api --allow-escape-sequences repos/Flowfin/jellyfin-plugin-requests/actions/jobs/99080522638/logs \
+      | sed 's/\x1b\[[0-9;]*m//g' | grep -a "SEAM-PROBE" | sed -E 's/.*ContainerReport: //' | sort -u
     SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests: 1
     SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.dll
     SEAM-PROBE result assemblies=1 contract=reachable implementations=1 call=answered
