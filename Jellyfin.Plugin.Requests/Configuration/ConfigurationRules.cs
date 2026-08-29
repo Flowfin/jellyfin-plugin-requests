@@ -93,11 +93,15 @@ public static class ConfigurationRules
         {
             problems.Add(new ConfigurationProblem
             {
+                // The value is deliberately not quoted back. This sentence becomes the message of
+                // the exception thrown out of Plugin.UpdateConfiguration and out of every read of a
+                // stored configuration, and where that message then goes is the host's business
+                // rather than this repository's - a log an operator pastes into a tracker among
+                // them. The setting is marked a secret, so what an operator is told is which field
+                // is wrong and what it has to be, which is what they need to fix it; the value is
+                // in the box they just typed it into. #100.
                 Setting = nameof(PluginConfiguration.OutboundNoticeAddress),
-                Why = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "OutboundNoticeAddress is \"{0}\", which is not a complete http or https address. It has to be one a notice can be posted to, scheme included, or empty to send nothing at all.",
-                    configuration.OutboundNoticeAddress)
+                Why = "OutboundNoticeAddress is not a complete http or https address. It has to be one a notice can be posted to, scheme included, or empty to send nothing at all."
             });
         }
 

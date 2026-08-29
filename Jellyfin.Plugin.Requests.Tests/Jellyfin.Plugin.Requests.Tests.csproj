@@ -71,6 +71,11 @@
     <None Include="../scripts/verify-plugin-loads.sh" Link="scripts/verify-plugin-loads.sh" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../scripts/verify-user-isolation.sh" Link="scripts/verify-user-isolation.sh" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../scripts/verify-full-disk.sh" Link="scripts/verify-full-disk.sh" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The invariant lint's rule set, so the mark on a configuration property and the rule pointed
+         at it can be read against each other. The mark lives on the property and the name it
+         refuses lives in that file, neither can see the other, and a suite that opens both is what
+         stops the two drifting apart. -->
+    <None Include="../tools/opengrep/rules.yaml" Link="tools/opengrep/rules.yaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

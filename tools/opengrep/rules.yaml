@@ -763,3 +763,80 @@ rules:
         - "**/*.xml"
         - "**/*.yaml"
         - "**/*.yml"
+
+  # Invariant (configuration, #100): a setting marked `[Secret]` in
+  # PluginConfiguration may not be read into anything this plugin writes for
+  # somebody else to read. Operators paste logs into issue trackers, and since
+  # #318 the settings page cannot show the outbound address back at all, so a
+  # log line would be the only place it could be read.
+  #
+  # WHAT SEPARATES A READ FROM A MENTION is one spelling. A message legitimately
+  # NAMES the setting, and a problem record legitimately carries
+  # `nameof(PluginConfiguration.OutboundNoticeAddress)`, because an operator has
+  # to be told which box is wrong; what is refused is the VALUE. So the
+  # expression below refuses the member access anywhere inside a composed
+  # message and excepts exactly that one spelling of the mention, rather than
+  # trying to tell an instance from a type by its capital letter - which would
+  # miss `_settings.Current.OutboundNoticeAddress`, the spelling the one reader
+  # of this value in the tree actually uses.
+  #
+  # THE NAME IS IN THIS FILE AND ALSO ON THE PROPERTY, AND THE SUITE REFUSES THE
+  # TWO DRIFTING APART. `SecretsStayOutOfTheLogTests` reads the marked
+  # properties off the type by reflection and requires each one to appear here,
+  # so a second mark added with no rule reds the suite rather than being a rule
+  # nobody wrote. That is the whole of what keeps the two homes in step, and it
+  # is a test rather than a mechanism in this file.
+  - id: no-marked-setting-in-a-message
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not read a setting marked `[Secret]` into a message. The value ends up
+      in a log an operator pastes into a tracker, and the settings page cannot
+      show it back, so this would be the only place it can be read. Name the
+      setting if the reader needs to know which one is wrong, and leave the
+      value out (#100).
+    patterns:
+      - pattern-either:
+          - pattern-regex: '(?s)(string\.Format|\.Log[A-Z][A-Za-z]*)\([^;]{0,800}?(?<!nameof\(PluginConfiguration)\.OutboundNoticeAddress'
+          - pattern-regex: '\$"[^"]*\{[^}"]*(?<!nameof\(PluginConfiguration)\.OutboundNoticeAddress'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/**/*.cs"
+        - "tools/opengrep/fixtures/secrets/**/*.cs"
+
+  # Invariant (configuration, #100), the half the rule above cannot see. The
+  # outbound sink posts to a marked address, and the platform writes the
+  # destination it could not reach into the message of the exception it raises -
+  # `HttpRequestException` names the host and the port. So a failure path that
+  # hands that object to the logger writes the address into the log without any
+  # sentence in this tree naming it, which is exactly the leak a rule over what
+  # a message says cannot reach. What is logged instead is the class of the
+  # failure, which is what an operator acts on.
+  #
+  # THE FIRST ARGUMENT IS THE TEST. Every ILogger extension that takes an
+  # exception takes it first, and a message template is always a literal, so a
+  # first argument that opens with neither a quotation mark nor the dollar of an
+  # interpolated one is an exception being handed over.
+  #
+  # WHAT IT DOES NOT REACH, said here rather than discovered: the subject is the
+  # one file in this tree that makes an outbound call with a marked address. A
+  # second such caller - the adapter #315 asks for is the next one - is outside
+  # this rule until its path is added below, and nothing refuses forgetting to
+  # add it. The alternative is refusing an exception reaching the logger
+  # everywhere, which would refuse the store, the seam and the library watcher,
+  # where the exception carries a local path and no marked value and is the
+  # whole diagnostic.
+  - id: an-outbound-failure-is-logged-by-class
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Do not hand the exception from an outbound send to the logger. The
+      platform puts the address it could not reach into that exception's own
+      message, and the address is a marked secret, so no wording of the sentence
+      beside it can keep the value out. Log the failure's type name (#100).
+    patterns:
+      - pattern-regex: '\.Log[A-Z][A-Za-z]*\(\s*[^"$\s]'
+    paths:
+      include:
+        - "Jellyfin.Plugin.Requests/Notify/OutboundSink.cs"
+        - "tools/opengrep/fixtures/secrets/**/*.cs"

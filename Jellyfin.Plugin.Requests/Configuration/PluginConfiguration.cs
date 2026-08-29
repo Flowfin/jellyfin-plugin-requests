@@ -139,7 +139,16 @@ public class PluginConfiguration : BasePluginConfiguration
     /// in this plugin's configuration file, in the settings page's markup and in every log line that
     /// ever prints the address.
     /// </para>
+    /// <para>
+    /// <b>It is marked as a secret, so it may not appear in anything this plugin writes for
+    /// somebody else to read.</b> An operator pastes a log into a tracker, and the host and port of
+    /// the place their server posts to is exactly the kind of thing that then sits in a public
+    /// issue. Since #318 the settings page cannot show the value back either, so a log line would
+    /// be the only place it could be read at all. <see cref="SecretAttribute"/> says what the mark
+    /// binds and what refuses a breach of it.
+    /// </para>
     /// </summary>
+    [Secret]
     public string OutboundNoticeAddress { get; set; } = string.Empty;
 
     /// <summary>
