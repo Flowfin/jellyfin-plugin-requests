@@ -217,13 +217,34 @@ a conclusion of its own, and what a ruleset makes of that conclusion is a rule
 nobody on this board has read. A job that runs and does nothing reports
 `success`, which has one reading.
 
-**What this does not show.** No markdown-only head has been through the new
-route. The change that carries it touches workflows, scripts and this page, so
-its own run is the full-price one, and that the six report green on a
-documentation head is a claim until the first such pull request produces them.
-Applying the ruleset remains a repository setting rather than a file in this
-tree, and #30 still carries the application and the demonstration that a red
-required check refuses a merge.
+**A markdown-only head has been through it, and the six reported.** The paragraph
+here said this was a claim until the first such pull request produced them,
+because the change that landed the route touches workflows, scripts and this
+page, so its own run was the full-price one. `605ed46` is a head that changed one
+markdown file and nothing else:
+
+    $ git show --name-only --format='' 605ed46
+    docs/operating.md
+
+    $ gh api repos/Flowfin/jellyfin-plugin-requests/commits/605ed46/check-runs \
+        --jq '[.check_runs[]
+               | select(.name == "lines" or (.name | startswith("floor ")) or (.name | startswith("Analyze")))
+               | [.conclusion, .name, .started_at, .completed_at]] | unique | .[] | @tsv'
+    success	Analyze (actions, none)	2026-08-29T14:11:58Z	2026-08-29T14:12:07Z
+    success	Analyze (csharp, manual)	2026-08-29T14:11:58Z	2026-08-29T14:12:05Z
+    success	Analyze (javascript-typescript, none)	2026-08-29T14:11:58Z	2026-08-29T14:12:06Z
+    success	floor 10.11.0.0	2026-08-29T14:12:08Z	2026-08-29T14:12:14Z
+    success	floor 12.0.0.0	2026-08-29T14:12:08Z	2026-08-29T14:12:13Z
+    success	lines	2026-08-29T14:11:59Z	2026-08-29T14:12:05Z
+
+Six contexts, six greens, and the times are the second half of the reading: the
+C# analysis finished in seven seconds and each floor job in six, which is the
+checkout and the reading rather than a CodeQL database and two ABI builds. That
+is the third repair doing both of the things it was chosen for.
+
+**What this still does not show.** Requiring those six is a repository setting
+rather than a file in this tree, and nothing here applies one. #30 carries the
+application and the demonstration that a red required check refuses a merge.
 
 ### What has arrived since this list was written
 
