@@ -226,6 +226,27 @@ it. Being refused is the answer being measured; a request being made is not.
 
     git grep -n 'private async Task<string> CallAsync' -- tools/seam-probe/ContainerReport.cs
 
+That reading was taken at `a90529d`, in run `33244878101`, job `99080522638` for the 10.11 line and
+job `99080522583` for 12.0. The two are identical line for line:
+
+    gh api --allow-escape-sequences repos/Flowfin/jellyfin-plugin-requests/actions/jobs/99080522638/logs       | sed 's/\[[0-9;]*m//g' | grep -a "SEAM-PROBE" | sed -E 's/.*ContainerReport: //' | sort -u
+    SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests: 1
+    SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.dll
+    SEAM-PROBE result assemblies=1 contract=reachable implementations=1 call=answered
+    SEAM-PROBE the call crossed the boundary and answered False
+    SEAM-PROBE the container returned 1 implementation(s) of it
+    SEAM-PROBE the member is System.Threading.Tasks.Task`1[System.Boolean] AcceptAsync(Jellyfin.Plugin.Requests.Seam.HandedOverWant, System.Threading.CancellationToken)
+    SEAM-PROBE the seam version this side declares, read out of Jellyfin.Plugin.Requests.Seam.WantHandover.KnownContractVersion: 1
+    SEAM-PROBE the type Jellyfin.Plugin.Requests.Seam.IWantHandover is reachable from this plugin
+
+Every step a sibling takes is in those eight lines: a second plugin that compiles against nothing of
+this one reaches the type, is handed the registration by the container, reads the seam version off
+the constant, finds the member with the signature the surface test pins, and makes the call.
+`answered False` is the want being refused for naming no user, which is this side's own path running
+to its own conclusion. **What is measured is that the call crossed and came back carrying the answer
+the contract says it carries.** That a request was made is not measured and is not claimed; the probe
+deliberately hands over a want this side turns down.
+
 ### That answer is refused rather than reported, since 2026-08-26
 
 The run that took the first measurement refused one thing only: a probe that wrote nothing. Every
