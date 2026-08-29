@@ -110,11 +110,17 @@ by writing a row, and writing that row is what says that person's account name m
 Matching people by name is refused rather than built and switched off, because it is wrong in the
 direction that credits one person with another's request.
 
-**What each failure looks like.** This is the part no document can answer yet. The service being
-unreachable, refusing the credential, running a version the adapter does not know, and being asked
-about a title it has never heard of each need a decided behaviour, and none of them has one, because
-there is nothing here that could fail. Until that lands, an operator has nothing to read here, and a
-sequence written now would be an account of intentions rather than of behaviour.
+**What each failure looks like.** This is the part no document can answer yet, and the reason moved
+on 2026-08-28. The four failures now have decided behaviours: unreachable is temporary and retried
+with a bound, a refused credential stops the bridge and tells the operator rather than being retried
+until somebody notices, a service version the adapter does not know is surfaced as an incompatibility
+and not retried either, and a title the service has never heard of is a fact about one request and
+never stops the rest. Those are the ruling on issue #86 and they are written here as an address
+rather than as a sequence, because nothing implements them: the only bridge that ships is still the
+one for a server with no service, so none of the four can occur. Issue #315 is the adapter that makes
+them real, and this section is written against what it does on the day it lands. A sequence written
+before then would be an account of intentions rather than of behaviour, which is the one thing
+somebody reading a page like this under pressure cannot afford.
 
 ## When requests stop moving
 
