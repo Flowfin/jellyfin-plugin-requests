@@ -147,28 +147,15 @@ can read. The jobs behind those two, the three `Analyze` legs and
 `Audit workflows (zizmor)`, are in the list instead, and they are the ones that
 go red for a reason this repository wrote.
 
-### Six of these fifteen cannot report on a change that is only markdown
+### Six of these fifteen could not report on a change that is only markdown
 
-This is the `Scorecard analysis` failure above arriving from a second direction,
-and the list was written without it. `abi-floor.yaml` and `scan-codeql.yaml` both
-decline a change that touches nothing but markdown:
-
-    $ git grep -n -A 1 "^    paths-ignore:" origin/master -- .github/workflows/abi-floor.yaml .github/workflows/scan-codeql.yaml
-    origin/master:.github/workflows/abi-floor.yaml:35:    paths-ignore:
-    origin/master:.github/workflows/abi-floor.yaml-36-      - '**/*.md'
-    --
-    origin/master:.github/workflows/abi-floor.yaml:39:    paths-ignore:
-    origin/master:.github/workflows/abi-floor.yaml-40-      - '**/*.md'
-    --
-    origin/master:.github/workflows/scan-codeql.yaml:24:    paths-ignore:
-    origin/master:.github/workflows/scan-codeql.yaml-25-      - '**/*.md'
-    --
-    origin/master:.github/workflows/scan-codeql.yaml:28:    paths-ignore:
-    origin/master:.github/workflows/scan-codeql.yaml-29-      - '**/*.md'
-
-So the six contexts those two produce never appear on such a head. Measured at
-`36eccab`, the head of a pull request that changed one markdown file and nothing
-else, against the list above read out of this page rather than retyped:
+**This section described a live obstacle and now describes how it was removed.**
+It was the `Scorecard analysis` failure above arriving from a second direction,
+and the list was written without it: `abi-floor.yaml` and `scan-codeql.yaml` both
+declined a change that touched nothing but markdown, so the six contexts those
+two produce never appeared on such a head. Measured at `36eccab`, the head of a
+pull request that changed one markdown file and nothing else, against the list
+above read out of this page rather than retyped:
 
     $ git show origin/master:docs/quality-parity.md \
         | sed -n '/^Fifteen contexts/,/^There are no bypass actors/p' \
@@ -184,11 +171,59 @@ else, against the list above read out of this page rather than retyped:
     lines
 
 A required context that does not report leaves a pull request pending rather than
-failing it, so requiring those six as they stand would hold every markdown-only
-change on this board open. Two repairs exist and this page takes neither: drop
-the six from the set, or take the `paths-ignore` off those two workflows and pay
-their runtime on every change. That is #30's to decide, and nothing here applies
-either of them.
+failing it, so requiring those six as they stood would have held every
+markdown-only change on this board open, with no red check to point at and
+nothing on the page that looks wrong to the person waiting.
+
+Three repairs were available and the third is the one taken. Dropping the six
+from the set weakens the parity this page exists for, because an ABI floor that
+reds on a head that changed code would then stop nothing. Taking the filter off
+and leaving it there buys the six contexts at the price of a full code scan and
+two floor builds re-measuring an unchanged tree on every documentation head. The
+third keeps both halves: the filter comes off, so the jobs report on every head,
+and each job asks first whether the head changed anything it could read.
+
+    $ git grep -n "^    paths-ignore:" -- .github/workflows/abi-floor.yaml .github/workflows/scan-codeql.yaml ; echo "exit=$?"
+    exit=1
+
+The anchor is the same one the paste above used, and it is what separates the two
+filters that share a name: the one under `on:` decided whether a run happened at
+all, and the one CodeQL is handed under `init:` decides what it reads inside a
+run. The second is untouched and is still there.
+
+    $ git grep -l 'head-changes-only-documentation.sh' -- .github/workflows/
+    .github/workflows/abi-floor.yaml
+    .github/workflows/scan-codeql.yaml
+
+**One reader with one home, and every answer it gives is watched being given.**
+Both workflows ask the same script and neither carries a copy of the rule, which
+would become a second rule the first time either was edited. What it answers
+decides whether an ABI floor build and a full code scan happen at all, and it is
+green on an ordinary head either way, so the proof drives it over a repository
+built for each case: a suffix in the other case, markdown in the middle of a
+name, a path a default listing would quote, a base the clone does not hold, and
+a documentation branch whose base moved on underneath it. That last one is the
+one it exists for, because a two-dot comparison reports the code such a branch
+does not have as a change the branch makes.
+
+    $ git grep -c 'prove-documentation-only-decisions.sh' -- .github/workflows/abi-floor.yaml
+    .github/workflows/abi-floor.yaml:1
+
+It runs in `lines`, which runs on every head, including the documentation heads
+whose floor jobs it is the warrant for.
+
+**The steps are guarded rather than the jobs.** A job skipped by an `if:` reports
+a conclusion of its own, and what a ruleset makes of that conclusion is a rule
+nobody on this board has read. A job that runs and does nothing reports
+`success`, which has one reading.
+
+**What this does not show.** No markdown-only head has been through the new
+route. The change that carries it touches workflows, scripts and this page, so
+its own run is the full-price one, and that the six report green on a
+documentation head is a claim until the first such pull request produces them.
+Applying the ruleset remains a repository setting rather than a file in this
+tree, and #30 still carries the application and the demonstration that a red
+required check refuses a merge.
 
 ### What has arrived since this list was written
 
