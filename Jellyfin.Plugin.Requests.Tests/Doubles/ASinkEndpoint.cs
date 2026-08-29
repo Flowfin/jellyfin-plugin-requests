@@ -100,7 +100,15 @@ internal sealed class ASinkEndpoint : HttpMessageHandler
 
         if (_answers is not HttpStatusCode answer)
         {
-            throw new HttpRequestException("There is nothing listening at that address.");
+            // The message names the host and the port, because that is what the platform puts into
+            // this exception when a connection is refused - measured on #100 against a loopback port
+            // nothing answers on, in a program outside this repository, so nothing was sent
+            // anywhere. A double whose refusal carried no address would let a leg asserting that no
+            // address reaches the log pass over code that writes one, which is the whole thing that
+            // leg is for.
+            throw new HttpRequestException(
+                FormattableString.Invariant(
+                    $"There is nothing listening at that address. ({request.RequestUri?.Host}:{request.RequestUri?.Port})"));
         }
 
         return new HttpResponseMessage(answer);

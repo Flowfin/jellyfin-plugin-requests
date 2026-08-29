@@ -194,10 +194,23 @@ public sealed class OutboundSink : IOutboundSink, IDisposable
             // request is unaffected. Catching by name instead would leave whichever exception nobody
             // listed to surface out of a task nothing observes, and the failure this sink exists to
             // avoid is exactly a notification path deciding what happens to a request.
+            //
+            // WHAT IS LOGGED IS THE CLASS OF THE FAILURE AND NEVER THE EXCEPTION ITSELF. The
+            // platform puts the destination of a request into the message of the exception it
+            // raises for it - `HttpRequestException` names the host and the port it could not reach
+            // - and the address is a marked secret, so handing the object to the logger writes it
+            // into a log an operator pastes into a tracker. Nothing in this method composes that
+            // sentence, so it cannot be fixed by writing a more careful one; what stops it is not
+            // passing the object. #100.
+            //
+            // WHAT THAT COSTS IS THE STACK AND THE PLATFORM'S OWN WORDING, and the type name is
+            // what an operator actually acts on: a refused connection, a name that does not
+            // resolve, a timeout and a certificate that did not verify are four different type
+            // names and four different things to go and look at.
             _logger.LogError(
-                reason,
-                "The notification sink could not deliver the notice about request {RequestId}. The request is unaffected and nothing will be retried.",
-                notice.RequestId);
+                "The notification sink could not deliver the notice about request {RequestId}: {Failure}. The request is unaffected and nothing will be retried. The failure is named by class rather than reported in full, because the address it was posted to is a secret and the platform writes it into the exception.",
+                notice.RequestId,
+                reason.GetType().Name);
         }
     }
 
