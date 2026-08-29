@@ -680,7 +680,7 @@ arrived after that head, so their green runs are their own and carry their own h
 | `seam-probe.yaml`             | 32625777966, `throwaway/66-what-the-server-said`, both lines red at `Ask a second plugin what it can see` with no answer produced at all              | 32555794613, at `5b96f57` |
 | `sibling-set.yaml`            | 32624752477, `surface/66-a-view-of-your-own-requests`, both lines red at `Alone, then with the set`, on the alone half rather than the collision half | 32603611260               |
 | `user-isolation.yaml`         | 32560880189, `proof/67-the-queue-is-not-closed-to-everybody`, both lines red at the queue step                                                        | 32603611273               |
-| `manifest-freshness.yaml`     | none of this kind, below                                                                                                                              | pending, below            |
+| `manifest-freshness.yaml`     | none of this kind, below                                                                                                                              | 33246667212, at `12182bf` |
 | `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                       | 32623457801, at `d154ab3` |
 
 The job and step of each red run are read off the run rather than off a log:
@@ -700,7 +700,8 @@ everybody who has added this repository, so there is no red run of the kind this
 there is not going to be one. What stands in its place is the `prove` job, which hands the reader
 every answer it refuses over files rather than over a fetch, and which has itself been watched
 failing: with the reader replaced by a script that exits zero it reports `12 of the rules above did
-not bite` and reds. The green cell is filled once the first run of it on the mainline has one.
+not bite` and reds. The green cell is the first run of it on the mainline, which fetched the live
+document and compared it rather than only proving the reader.
 
 ### The two cells that were wrong
 
