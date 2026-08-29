@@ -300,7 +300,16 @@ public sealed class WantHandover : IWantHandover
         // decided on #118, and a value read off anything else would be the sender saying who they
         // are. What this side knows is that no session stood behind the person named, and that is
         // what the entry says.
-        incoming = RequestLifecycle.Arriving(incoming, RequestArrival.Seam);
+        //
+        // Which of the two seam values it is comes from the marker the other side sends and from
+        // nothing inferred here. A replay and a live gesture cross on this same call, and an
+        // operator meeting a queue that filled up overnight has no other way to tell them apart:
+        // the moment on the entry is when the replay ran, because that is the only moment this side
+        // ever sees. Anything that is not the marker set is a want being expressed now, which is
+        // what absence means on the contract and what every build from before it sends.
+        incoming = RequestLifecycle.Arriving(
+            incoming,
+            want.Replay == true ? RequestArrival.SeamReplay : RequestArrival.Seam);
 
         Answer<IntakeResult> intake;
 
