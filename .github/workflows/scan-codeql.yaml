@@ -16,17 +16,30 @@
 # The query suite is security-extended. The default suite trades recall for
 # precision, and the finding this is meant to catch is the one nobody was
 # looking for.
+#
+# IT RUNS ON EVERY HEAD, INCLUDING ONE THAT CHANGES ONLY MARKDOWN, and that is
+# what makes the three `Analyze` contexts requirable at all. A `paths-ignore`
+# filter stood under `on:` and declined such a head, so no check run appeared for
+# it, and a required context that never reports leaves a pull request pending
+# rather than failing it - no red check to point at and nothing on the page that
+# looks wrong to the person waiting. Rather than drop those contexts from the set
+# `docs/quality-parity.md` declares, or pay a full scan on every typo fix, the
+# job reports on every head and asks
+# `scripts/head-changes-only-documentation.sh` whether there is anything to
+# analyse. A markdown-only head changes no source a query could read, so the
+# analysis it would produce is the analysis already uploaded; every other head
+# costs what it always did.
+#
+# THE `paths-ignore` UNDER `init:` IS A DIFFERENT ONE and stays. That filters what
+# CodeQL reads inside a run; the one that was removed decided whether a run
+# happened at all.
 name: '🔬 Run CodeQL'
 
 on:
   push:
     branches: ['**']
-    paths-ignore:
-      - '**/*.md'
   pull_request:
     branches: ['**']
-    paths-ignore:
-      - '**/*.md'
   schedule:
     - cron: '24 2 * * 4'
   workflow_dispatch:
@@ -62,13 +75,44 @@ jobs:
           - language: actions
             build-mode: none
 
+    # The steps below are guarded rather than the job. A job skipped by an `if:`
+    # reports a conclusion of its own, and what a ruleset makes of that
+    # conclusion is a rule nobody on this board has read; a job that runs and
+    # does nothing reports `success`, which has one reading.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # No step pushes via git, so do not persist the GITHUB_TOKEN in .git/config.
           persist-credentials: false
+          # The whole history, because the step below compares two commits, and a
+          # shallow clone holds neither their merge base nor, on a branch that
+          # was cut a while ago, the base itself.
+          fetch-depth: 0
 
-      - if: matrix.language == 'csharp'
+      - name: Decide whether this head changes anything to analyse
+        id: scope
+        env:
+          # Out of the event rather than off the checkout. A pull request is
+          # built at a merge commit this repository never held, so the pair the
+          # event names is the only honest one to compare, and a push says what
+          # it moved from. A schedule and a manual run name neither, which leaves
+          # both empty, and the reader answers that case by analysing.
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          answer=$(./scripts/head-changes-only-documentation.sh "$BASE_SHA" "$HEAD_SHA")
+          echo "documentation_only=$answer"
+          echo "documentation_only=$answer" >> "$GITHUB_OUTPUT"
+
+      - name: Say that this head has nothing for this language to read
+        if: steps.scope.outputs.documentation_only == 'true'
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          echo "::notice::This head changes nothing but markdown, so the $LANGUAGE analysis would read the same sources as the one already uploaded. The change was read rather than a filter deciding it, and every other head is analysed in full."
+
+      - if: steps.scope.outputs.documentation_only != 'true' && matrix.language == 'csharp'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           # Both claimed lines, so the analysis sees the same code the gate
@@ -78,16 +122,18 @@ jobs:
             10.0.x
 
       - name: Initialise CodeQL
+        if: steps.scope.outputs.documentation_only != 'true'
         uses: github/codeql-action/init@18420e3271f74589575af831a523c833acda327f # codeql-bundle-v2.26.2
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
-          # Path filtering for the ANALYSIS. The paths-ignore under `on:` above
-          # decides when this workflow runs, not what CodeQL reads, so without
-          # this block the generated sources under obj/ are analysed too. They
-          # are not in the tree, nobody can change them, and the source
-          # generator that writes them does not follow these rules.
+          # Path filtering for the ANALYSIS, which is a different question from
+          # whether this workflow runs at all - that one is the step above, and
+          # it used to be a `paths-ignore` under `on:`. Without this block the
+          # generated sources under obj/ are analysed too. They are not in the
+          # tree, nobody can change them, and the source generator that writes
+          # them does not follow these rules.
           config: |
             paths-ignore:
               - "**/obj/**"
@@ -97,12 +143,13 @@ jobs:
         # Manual rather than autobuild, so the analysis is over what this
         # repository's own gate builds: every claimed target framework, restored
         # from the committed lockfiles.
-        if: matrix.language == 'csharp'
+        if: steps.scope.outputs.documentation_only != 'true' && matrix.language == 'csharp'
         run: |
           dotnet restore Jellyfin.Plugin.Requests.sln --locked-mode
           dotnet build Jellyfin.Plugin.Requests.sln --configuration Release --no-restore
 
       - name: Analyze
+        if: steps.scope.outputs.documentation_only != 'true'
         uses: github/codeql-action/analyze@18420e3271f74589575af831a523c833acda327f # codeql-bundle-v2.26.2
         with:
           category: /language:${{ matrix.language }}
