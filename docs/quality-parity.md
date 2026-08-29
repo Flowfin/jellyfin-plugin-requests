@@ -306,7 +306,7 @@ produce several.
 | `dotnet.yml`                | adopted, landed | It carries the build, test and floor legs there; here they are `gate.yaml` and `abi-floor.yaml`, because the shared workflows know nothing about this tree's multi-targeting.                                                                                                                             |
 | `e2e-login.yml`             | adopted, landed | There is no authentication flow here to drive end to end. Its shape is adopted for a different subject in `activity-entries.yaml`: a real server of each line, this plugin installed, and something read back out of the server that no double can answer for.                                            |
 | `fuzz.yml`                  | declined        | The untrusted input here is authenticated JSON from the server's own API rather than an anonymous credential, and round-trip tests over the persisted schema in #47 cover it.                                                                                                                             |
-| `manifest-freshness.yml`    | adopted, #111   | A publish that reports success and leaves the manifest untouched ships nothing installable, and nothing else would notice.                                                                                                                                                                                |
+| `manifest-freshness.yml`    | adopted, landed | A publish that reports success and leaves the manifest untouched ships nothing installable, and nothing else would notice. `manifest-freshness.yaml` is it here, reading the document a server fetches against the releases that exist rather than asking the publish whether it worked.                                                                                                                                                                                |
 | `nightly-betas.yml`         | declined        | Nothing is shipping yet and a nightly channel before a first release is a channel with nothing in it; nothing covers that risk here because there is no risk to cover yet.                                                                                                                                |
 | `opengrep.yml`              | adopted, landed | Some rules here are patterns a compiler cannot refuse and a document can only ask for; `invariant-lint.yaml` refuses them, and fails unless every rule fired on a fixture written to be refused.                                                                                                          |
 | `perf-baseline.yml`         | declined        | Its subject is login latency and there is no login here to time. What it stands for, a cost watched rather than assumed, is held in the ordinary suite by `FileRequestStoreQueryCostTests`, which bounds each query path at a size worth caring about, so declining the harness leaves nothing uncovered. |
@@ -366,6 +366,7 @@ longer tracks it.
 | `user-isolation.yaml`   | adopted, landed   | Two ordinary accounts on a real server of each line, each asking for something and reading back what they are given, with the queue asked as somebody who is not an administrator. The server's own evaluation of a policy is the half no double here reaches. #67.          |
 | `full-disk.yaml`        | adopted, landed   | What a caller sees when the volume the store writes to runs out of room, on a mount with a hard size, on the runtime of each line. The suite cannot ask it: filling a filesystem needs one to fill, and the headless rule refuses a test that needs a container engine. #46. |
 | `manifest.yaml`         | adopted, landed   | The manifest generator watched refusing what it says it refuses, over one manifest per defect, with a clean pair of packages beside them. A generator that has never said no writes a manifest for a clean pair, which is also what a generator with no rules does. #110.    |
+| `manifest-freshness.yaml` | adopted, landed   | The document a server fetches, read back against the releases that exist, once a day and on its own files. It is not the publish checking itself: the incident behind #111 is a publish whose manifest write failed while the run stayed green, so the step that failed would have been the step reporting it. A claimed line with no release is reported rather than passed over. It raises nothing an operator sees, which is #111's third condition and waits on the fleet sweep. #111. |
 | `changelog.yaml`        | declined, deleted | It drafts a release changelog against a version scheme this repository has not fixed, and nothing covers that risk here because there is nothing to release yet; #107.                                                                                                       |
 | `command-dispatch.yaml` | declined, deleted | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                                                                                                                  |
 | `command-rebase.yaml`   | declined, deleted | Same comment-driven surface, the half that rewrites pull request branches on command, and the same absence.                                                                                                                                                                  |
@@ -679,6 +680,7 @@ arrived after that head, so their green runs are their own and carry their own h
 | `seam-probe.yaml`             | 32625777966, `throwaway/66-what-the-server-said`, both lines red at `Ask a second plugin what it can see` with no answer produced at all              | 32555794613, at `5b96f57` |
 | `sibling-set.yaml`            | 32624752477, `surface/66-a-view-of-your-own-requests`, both lines red at `Alone, then with the set`, on the alone half rather than the collision half | 32603611260               |
 | `user-isolation.yaml`         | 32560880189, `proof/67-the-queue-is-not-closed-to-everybody`, both lines red at the queue step                                                        | 32603611273               |
+| `manifest-freshness.yaml`     | none of this kind, below                                                                                                                              | pending, below            |
 | `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                       | 32623457801, at `d154ab3` |
 
 The job and step of each red run are read off the run rather than off a log:
@@ -690,6 +692,15 @@ The job and step of each red run are read off the run rather than off a log:
 
 `user-isolation.yaml` is the one whose log has been read, and `docs/testing.md` carries the two lines
 of it rather than this page holding a second copy.
+
+**`manifest-freshness.yaml` has neither cell filled the way the rest do, and both reasons are the
+workflow's own shape.** Its `compare` job reds when the published manifest disagrees with the
+releases that exist, and arranging that on purpose means publishing a manifest that is wrong for
+everybody who has added this repository, so there is no red run of the kind this column holds and
+there is not going to be one. What stands in its place is the `prove` job, which hands the reader
+every answer it refuses over files rather than over a fetch, and which has itself been watched
+failing: with the reader replaced by a script that exits zero it reports `12 of the rules above did
+not bite` and reds. The green cell is filled once the first run of it on the mainline has one.
 
 ### The two cells that were wrong
 
