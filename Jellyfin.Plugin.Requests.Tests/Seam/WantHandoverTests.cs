@@ -783,6 +783,112 @@ public class WantHandoverTests
     }
 
     /// <summary>
+    /// A want the other side is replaying is recorded as a replay and not as a live handover.
+    /// <para>
+    /// This is what an operator has instead of the moment somebody asked. A replay lands the whole
+    /// of somebody's history at once, the entry can only carry the moment the replay ran, and
+    /// without this the queue that appeared overnight reads as a morning of people asking. Every
+    /// other field of the entry is asserted beside it, so the marker cannot arrive by something else
+    /// on the row having moved.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AReplayedWantIsRecordedAsAReplayRatherThanAsALiveHandover()
+    {
+        var store = new InMemoryRequestStore();
+
+        Assert.True(await Seam(store).AcceptAsync(Want() with { Replay = true }, CancellationToken.None));
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None)).Request;
+        var entry = Assert.Single(made.History);
+
+        Assert.Equal(RequestArrival.SeamReplay, entry.Arrival);
+        Assert.Equal(RequestActor.Requester, entry.By);
+        Assert.Equal(Noon, entry.At);
+        Assert.Equal(made.State, entry.From);
+        Assert.Equal(made.State, entry.To);
+        Assert.Null(entry.Reason);
+        Assert.Null(entry.Note);
+    }
+
+    /// <summary>
+    /// The whole of a replayed set is marked, and not only the first want in it.
+    /// <para>
+    /// The queue an operator meets is the set rather than one row, so a marker that reached one
+    /// request and not the rest would answer the question for a sample. Three requests come out of
+    /// these four wants, which is asserted so the comparison cannot pass on a run that made none.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AWholeReplayedSetIsMarkedAsAReplayThroughout()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+
+        foreach (var want in WhatTheSiblingRecordedBefore())
+        {
+            Assert.True(await handover.AcceptAsync(want with { Replay = true }, CancellationToken.None));
+        }
+
+        var held = await store.GetAllAsync(CancellationToken.None);
+
+        Assert.Equal(3, held.Count);
+        Assert.All(
+            held,
+            request => Assert.Equal(RequestArrival.SeamReplay, Assert.Single(request.Request.History).Arrival));
+    }
+
+    /// <summary>
+    /// A marker spelled <see langword="false"/> is read as a want being expressed now rather than
+    /// refused.
+    /// <para>
+    /// The sending type refuses that spelling and the reason it gives is that a false and an absence
+    /// are the same want. A receiver that then threw the want away would cost somebody their request
+    /// to make a point the sender has already conceded, so what this side does with anything that is
+    /// not the marker set is treat it as live.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AMarkerSpelledFalseIsReadAsLiveRatherThanRefused()
+    {
+        var store = new InMemoryRequestStore();
+
+        Assert.True(await Seam(store).AcceptAsync(Want() with { Replay = false }, CancellationToken.None));
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None)).Request;
+
+        Assert.Equal(RequestArrival.Seam, Assert.Single(made.History).Arrival);
+    }
+
+    /// <summary>
+    /// A want somebody expressed live and the other side later replays keeps the live arrival it
+    /// already had.
+    /// <para>
+    /// The history is append-only and the request already exists, so the replay writes nothing at
+    /// all - which is the same rule that makes a replay safe to run twice, read here for what it
+    /// says about the record. The alternative a reader might expect, a row saying the request
+    /// arrived a second time, would say a request arrived after it was made.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AReplayOfAWantSomebodyAlreadyExpressedLiveLeavesTheLiveArrivalStanding()
+    {
+        var store = new InMemoryRequestStore();
+        var handover = Seam(store);
+
+        Assert.True(await handover.AcceptAsync(Want(), CancellationToken.None));
+        Assert.True(await handover.AcceptAsync(Want() with { Replay = true }, CancellationToken.None));
+
+        var made = Assert.Single(await store.GetAllAsync(CancellationToken.None)).Request;
+
+        Assert.Equal(RequestArrival.Seam, Assert.Single(made.History).Arrival);
+    }
+
+    /// <summary>
     /// Somebody joining a request that is already here adds no second arrival. The request arrived
     /// once; what a later person did is join something already in the queue, and the entry is about
     /// the record rather than about each person waiting on it.

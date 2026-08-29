@@ -93,4 +93,29 @@ public sealed record HandedOverWant
         get => _providerIds;
         init => _providerIds = value ?? ReadOnlyDictionary<string, string>.Empty;
     }
+
+    /// <summary>
+    /// Gets <see langword="true"/> where the other side is replaying a want it recorded before this
+    /// plugin was installed, and nothing where somebody is expressing one now.
+    /// <para>
+    /// <b>Absence is live, and it is the value every older build sends.</b> The marker says the
+    /// unusual thing rather than the ordinary one, so a sibling built before the field existed hands
+    /// wants over without it and each of them reads as what it is. That is the contract's own
+    /// spelling and not a reading invented here.
+    /// </para>
+    /// <para>
+    /// <b><see langword="false"/> is read as live rather than refused.</b> The sending type refuses
+    /// it, and the reason it gives is that a false and an absence are the same want; a receiver that
+    /// then threw the want away over the redundant spelling would cost somebody their request to
+    /// make a point the sender has already conceded. So this side treats anything that is not
+    /// <see langword="true"/> as a want being expressed now.
+    /// </para>
+    /// <para>
+    /// <b>A field a receiver may ignore does not move the contract version.</b> This one arrived at
+    /// version one on the sibling's board rather than minting a second, which is that board's rule
+    /// applied on that board; <see cref="WantHandover.KnownContractVersion"/> is unchanged for it
+    /// and a want carrying the marker is read by the same version this side already knew.
+    /// </para>
+    /// </summary>
+    public bool? Replay { get; init; }
 }

@@ -86,6 +86,14 @@ public class SeamSurfaceTests
     /// the sibling's board, in the contract issue <c>docs/seam.md</c> points at, and neither this
     /// file nor that document restates it: #11's second condition is what that rule comes from.
     /// </para>
+    /// <para>
+    /// <b>The replay marker was added here without the seam version moving, and that is the
+    /// sibling's rule rather than a concession made on this side.</b> That contract counts breaking
+    /// changes only and says in as many words that a field a receiver may ignore does not raise the
+    /// number; the field arrived there at version one for that reason and because nothing has
+    /// shipped from that repository yet. Raising it here would refuse every want the sibling writes,
+    /// since a field set whose version this side does not know is refused whole.
+    /// </para>
     /// </summary>
     [Fact]
     public void TheWantCarriesExactlyThePropertiesWrittenDown()
@@ -97,6 +105,7 @@ public class SeamSurfaceTests
                 "System.Guid RequestedByUserId",
                 "System.Guid WantId",
                 "System.Int32 ContractVersion",
+                "System.Nullable`1[System.Boolean] Replay",
                 "System.Nullable`1[System.Int32] Year",
                 "System.String Title"),
             string.Join(" | ", SeamSurface.WantProperties),
