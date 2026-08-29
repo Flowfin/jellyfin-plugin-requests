@@ -534,16 +534,46 @@ somebody closed a browser, and a replay that can only be run once is one nobody 
 
     git grep -n 'TheWholeSetReplayedTwiceIsTheQueueItMadeTheFirstTime\|AReplayThatStoppedHalfwayIsSafeToRunAgainFromTheStart' -- Jellyfin.Plugin.Requests.Tests/Seam/WantHandoverTests.cs
 
-**What is not answered, and it is the rest of #93.** An adopted request is not distinguishable from
-one that arrived live. Both cross on the same call, so the entry a request now carries says the seam
-for either of them, and the moment on it is the moment the replay ran rather than the moment the
-person asked, because that is the only moment this side ever sees:
+**An adopted request is distinguishable from one that arrived live, and what separates them is a
+field the contract now carries.** Both still cross on the same call, so this side infers nothing: the
+sibling marks a want it is replaying, and a request made from a marked want records the arrival that
+says so.
+
+    git grep -n 'want.Replay == true ? RequestArrival.SeamReplay : RequestArrival.Seam' -- Jellyfin.Plugin.Requests/Seam/WantHandover.cs
+    git grep -n 'SeamReplay = 2' -- Jellyfin.Plugin.Requests/Model/RequestArrival.cs
+
+**Absence is live and the marker says the unusual thing, which is what makes an older sibling
+harmless rather than wrong.** A build from before the field existed hands every want over without it
+and each of them is recorded as a want somebody expressed now. The reverse spelling would have made
+every one of those read as a replay. A marker spelled `false` is read as live too rather than
+refused, because the sending side's own type refuses that spelling on the grounds that a false and an
+absence are the same want, and throwing the want away over the redundant spelling would cost somebody
+their request to make a point the sender has already conceded.
+
+    git grep -n 'AMarkerSpelledFalseIsReadAsLiveRatherThanRefused\|AReplayedWantIsRecordedAsAReplayRatherThanAsALiveHandover\|AWholeReplayedSetIsMarkedAsAReplayThroughout' -- Jellyfin.Plugin.Requests.Tests/Seam/WantHandoverTests.cs
+
+**The seam version did not move for it, and that is the sibling's rule rather than a concession made
+here.** That contract counts breaking changes only and says that a field a receiver may ignore does
+not raise the number; the field arrived there at version one for that reason and because nothing has
+shipped from that repository yet. Raising it on this side would refuse every want the sibling writes,
+because a field set whose version this side does not know is refused whole.
+
+**What the marker does not buy is the moment somebody asked.** The moment on the entry is when the
+replay ran, because that is the only moment this side ever sees and the contract carries no field for
+the other one:
 
     git grep -n 'At = request.RequestedAt' -- Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs
 
-So an operator who finds a sudden queue can see that it came over the seam and cannot see that it is
-a replay. Telling the two apart needs something the contract does not carry, which is #93's question
-rather than this section's. What a request does record about having arrived is the section below.
+So a queue that filled up at once still reads as a queue that filled up at once. What the operator
+gains is the account of why, which is what this condition was for. What a request records about
+having arrived is the section below.
+
+**A want somebody expressed live and the sibling later replays keeps the live arrival it already
+had.** The request exists, so the replay writes nothing at all - the same rule that makes a replay
+safe to run twice - and the history is append-only, so there is no second row to disagree with the
+first.
+
+    git grep -n 'AReplayOfAWantSomebodyAlreadyExpressedLiveLeavesTheLiveArrivalStanding' -- Jellyfin.Plugin.Requests.Tests/Seam/WantHandoverTests.cs
 
 ## What this side trusts, and what it checks anyway
 
@@ -604,7 +634,13 @@ plugin's own endpoint carries the other value and means the opposite: the server
 person it is filed against. An operator answering for a request can tell those two apart from the
 record now, which was not possible before this entry existed.
 
-    git grep -n '^    Seam = 0,\|^    Endpoint = 1' -- Jellyfin.Plugin.Requests/Model/RequestArrival.cs
+    git grep -n '^    Seam = 0,\|^    Endpoint = 1,\|^    SeamReplay = 2' -- Jellyfin.Plugin.Requests/Model/RequestArrival.cs
+
+**Three values over two surfaces.** The seam carries two of them, because a want the sibling recorded
+before this plugin was installed and one somebody is expressing now are different things to an
+operator meeting a queue that filled up overnight. Which of the two a request got comes from the
+marker the other side sends and from nothing this side infers, and the section above is where that
+is argued.
 
 **One arrival per request, not one per person.** A want naming something already in the queue joins
 the request that is there, and a want handed over a second time writes nothing at all, so neither
