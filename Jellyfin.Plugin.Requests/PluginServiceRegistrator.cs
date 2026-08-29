@@ -120,6 +120,14 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             provider.GetRequiredService<ILogger<WantHandover>>(),
             WantHandover.DefaultAnswerWithin));
 
+        // The one line an operator reads about the seam, written once at startup. A hosted service
+        // rather than something built when somebody first asks, because the server this exists for
+        // is the one where nobody ever asks: the handover is taken by name through reflection since
+        // #117, so a sibling naming something else is answered with nothing, exactly as a server
+        // with no sibling is, and the two states have to read differently somewhere.
+        serviceCollection.AddHostedService(provider => new SeamAnnouncement(
+            provider.GetRequiredService<ILogger<SeamAnnouncement>>()));
+
         // The record every move leaves behind, which is the server's own activity log rather than
         // anything this plugin keeps. Registered beside the sink below and not instead of it: the
         // sink is a courtesy that may be lost, and this is the line an operator reads afterwards in

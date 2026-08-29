@@ -65,7 +65,7 @@ all.
 means having the type, and whether a second plugin in one server process can name this one was the
 open half of #117. A second plugin installed beside this one, shipping no copy of anything this
 plugin declares, finds the type and is handed the registration by the container, on a server of each
-claimed line. The answer and the commands are under "Where the shared type comes from" below.
+claimed line. The answer and the commands are under "Where the seam type comes from" below.
 Resolving the sink from inside this assembly, which is what the suite does, is still a different
 claim and still says nothing about who else can ask for it.
 
@@ -91,7 +91,7 @@ Giving up is safe here for the same reason a repeat is safe. The want carries an
 other side hands it over again, and a request the abandoned call still managed to write is
 recognised as the repeat it is rather than made twice.
 
-## Where the shared type comes from
+## Where the seam type comes from
 
 Implementing somebody's interface means having the type, so the type has to arrive from somewhere,
 and where it arrives from is the whole of whether this seam works at all. The failure is quiet:
@@ -99,38 +99,111 @@ two assemblies of the same simple name in one process can declare two different 
 full name, nothing fails at build time, and what happens instead is that the container returns no
 implementations, which looks exactly like the sibling not being installed and is a supported state.
 
-**The choice is a contract-only package both sides compile against, with exactly one copy shipped.**
-Taken on #117 on 2026-08-21, and taken before the sibling writes its half, because once the other
-side has written against a type declared in this assembly, moving it is a migration across two
-boards rather than a choice on one.
+**The choice is that no type is shared at all. The sibling names this one by string and takes the
+handover through reflection.** Taken on #117 on 2026-08-28, and taken against the option this
+document carried until that day, because the two options that would have shared a type were both
+measured on a running server of each claimed line and neither of them works. The measurements are
+below, with the commands, before the argument that rests on them.
 
-What it costs, stated rather than implied. It is another artefact with its own version and its own
-publishing route, on a board that does not yet publish a manifest for the plugin itself, so the
-package's release path has to be settled as part of building this and not assumed to follow the
-plugin's. It is versioned independently and changed rarely: a contract package that moves often is
-two plugins that have to be upgraded together, which is the thing a shared type was meant to avoid.
+**Ugly is the fair word for it and immune is the one that matters.** There is no second assembly, so
+there is no second type of the same name, so the failure class this section opens with cannot arise.
+Nothing has to be published, versioned or upgraded in step across two boards, and a server that
+installs one plugin and not the other is unremarkable rather than a case somebody has to have
+thought about.
 
-### The two that were rejected
+**What it costs is the compiler, and the price is paid at runtime on somebody's server.** A sibling
+that names an assembly, a type, a member or a field this side does not declare compiles perfectly,
+installs perfectly, and is answered with nothing. So does this side after a rename nobody thought of
+as a breaking change. That is not a residual risk to be noted and left; it is the whole reason for
+the three paragraphs that follow, and for the two guards that stand behind them.
+
+### This page is the ABI, and a rename is a version
+
+Both boards read the names off this section and treat them as fixed. A change to any of them is a
+breaking change on both boards at once and moves the seam version with it; it is never discovered by
+an operator.
+
+The names are not written out here, because a list in a document drifts against the thing it
+describes and the thing it describes is one `git grep` away. They are derived:
+
+    git grep -n 'public static string AssemblyName\|public static string TypeName\|public static string MemberName\|public static string WantTypeName' -- Jellyfin.Plugin.Requests/Seam/SeamSurface.cs
+    git grep -n 'public const int KnownContractVersion' -- Jellyfin.Plugin.Requests/Seam/WantHandover.cs
+
+`SeamSurface` holds no literal of its own: every member reads its answer off a type, so a rename
+moves what it says instead of leaving it describing a seam that is no longer there. What refuses the
+rename is `SeamSurfaceTests`, which holds the literals and compares them against those types. That is
+the pin, and changing a name means changing that file, in the commit that raises the version and
+tells the other board.
+
+The field set the want carries is NOT fixed here and this document does not restate it. It is the
+sibling's, in the contract issue named at the top of this page, which is the rule #11's second
+condition imposes and which the choice above does not weaken. What the surface test pins is the set
+of NAMES a reflected lookup can miss, which is a different question from what any of them means:
+
+    git grep -n 'TheWantCarriesExactlyThePropertiesWrittenDown' -- Jellyfin.Plugin.Requests.Tests/Seam/SeamSurfaceTests.cs
+
+### The two that were rejected, and the run that killed each
+
+Both were rejected on evidence rather than on taste, and each had been an open option until the run
+that closed it. Both readings come from `.github/workflows/seam-probe.yaml` on
+`seam/117-the-contract-package`, which built a contract-only package for exactly this purpose and is
+not merged.
+
+**A contract-only package both sides compile against, with exactly one copy shipped.** This was the
+choice this document carried from 2026-08-21 until 2026-08-28, and the premise underneath it - that a
+compile-time reference resolves an assembly shipping in another plugin's directory - had never been
+measured. Run `33125497741`, job `98702538786` for the 10.11 line, job `98702538479` for 12.0,
+identical verdicts:
+
+    gh api --allow-escape-sequences repos/Flowfin/jellyfin-plugin-requests/actions/jobs/98702538786/logs \
+      | sed 's/\x1b\[[0-9;]*m//g' | grep -a "SEAM-PROBE" | sed -E 's/.*ContainerReport: //' | sort -u
+    SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests.Contract: 1
+    SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.Contract.dll
+    SEAM-PROBE the compile-time reference to Jellyfin.Plugin.Requests.Seam.IWantHandover did not bind: System.IO.FileNotFoundException: Could not load file or assembly 'Jellyfin.Plugin.Requests.Contract, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null'. The system cannot find the file specified.
+    SEAM-PROBE the container returned 1 implementation(s) of it
+    SEAM-PROBE the type Jellyfin.Plugin.Requests.Seam.IWantHandover is reachable from this plugin
+    SEAM-PROBE result assemblies=1 contract=reachable implementations=1 binding=unbound bound-implementations=0 same-type=no
+
+The type is visible to the second plugin and the reference to it is unresolvable, in one run, at the
+same moment. Neither half cancels the other, and the second half is the option gone: a sibling that
+ships no copy cannot bind what it compiled against.
 
 **A contract-only package both sides compile against and both ship, with the loader deduplicating
-it.** Rejected. It rests on the loader actually merging two copies, and that is the assumption the
-entire handover would then depend on. Nobody has measured it on either claimed line, so the cost of
-this option is an unmeasured premise underneath every call that crosses. One shipped copy removes
-the question instead of answering it.
+it.** Rejected on 2026-08-21 on the grounds that its premise was unmeasured, and the premise is false.
+It is also what a package reference gives a sibling by default, rather than a shape anybody has to
+construct, which is why it had to be measured rather than assumed away. Run `33126052099`, job
+`98704350874` for 10.11, job `98704350837` for 12.0, identical verdicts:
 
-**No shared type at all, with the handover taken by name through reflection.** Rejected, and it is
-the honest fallback if the package turns out to be impractical rather than a bad idea. It is immune
-to this whole error class, because there is no second type to be a different type. What it costs is
-the thing #117's fourth condition is about: a mismatch stops being a compile error and becomes a
-runtime one, so "no sibling installed" and "sibling installed, type did not match" collapse back
-into the same silence. A compile-time contract is what keeps those two states different.
+    SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests.Contract: 2
+    SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.Contract.dll
+    SEAM-PROBE one of them is at /config/plugins/SeamProbe/Jellyfin.Plugin.Requests.Contract.dll
+    SEAM-PROBE the compile-time reference to Jellyfin.Plugin.Requests.Seam.IWantHandover bound and the container returned 0 implementation(s) for it
+    SEAM-PROBE the container returned 1 implementation(s) of it
+    SEAM-PROBE the type it bound to and the type found by name are two different types
+    SEAM-PROBE result assemblies=2 contract=reachable implementations=1 binding=bound bound-implementations=0 same-type=no
+
+The loader does not merge them. The second plugin binds to its own copy, that copy declares a
+different type of the same full name, and the container hands it nothing. That is not a near-miss of
+the failure the top of this section describes. It is that failure, reproduced on a running server of
+each claimed line, with the same silence an operator meets.
+
+**One cause sits under both, which is why the third option is not a coin toss.** A plugin gets a load
+context of its own. Resolving an assembly by name looks in that plugin's own directory and in what
+the host provides, and never in another plugin's. Ship the contract once and the reference is
+unresolvable; ship it twice and each side resolves its own. Enumerating what the process has loaded
+reaches every plugin's assemblies whatever context they arrived in, which is why the reflected lookup
+answered in both runs and in every run before them.
+
+Whoever reopens this in a year: the experiment is `tools/seam-probe`, it is one job away, and both
+readings above came out of it in one evening. Re-run it rather than re-arguing it.
 
 ### What a server of each line actually does
 
-The choice above rests on a plugin being able to name a type whose assembly ships in another
-plugin's directory. That is a fact about the host rather than about either tree, and the two claimed
-lines are different major versions of it, so an answer taken from one is a claim about the other.
-Both were asked, at `5b96f57`, by `.github/workflows/seam-probe.yaml`:
+The choice above rests on a plugin being able to name a type declared in another plugin's assembly,
+and to call the member it finds. That is a fact about the host rather than about either tree, and the
+two claimed lines are different major versions of it, so an answer taken from one is a claim about
+the other. Both are asked by `.github/workflows/seam-probe.yaml`, on every change to the files the
+measurement is made of, and the reading is the last line each run writes:
 
     gh api repos/Flowfin/jellyfin-plugin-requests/actions/jobs/96989583236/logs | grep -a "SEAM-PROBE" | sed -E 's/.*ContainerReport: //' | sort -u
     SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests: 1
@@ -138,74 +211,102 @@ Both were asked, at `5b96f57`, by `.github/workflows/seam-probe.yaml`:
     SEAM-PROBE the container returned 1 implementation(s) of it
     SEAM-PROBE the type Jellyfin.Plugin.Requests.Seam.IWantHandover is reachable from this plugin
 
-That job is the 10.11 line. The 12.0 line is job `96989583387` and the same command returns the same
-four lines. Both servers held two plugins while answering, this one and the probe.
+That job is the 10.11 line, taken at `5b96f57`; job `96989583387` is 12.0 and returns the same four
+lines. Both servers held two plugins while answering, this one and the probe, and the probe ships no
+copy of anything this plugin declares.
 
-So one shipped copy is available on both lines. The assembly is loaded once, in a context a second
-plugin can see, and the container hands that second plugin the implementation this one registered.
+**The probe now goes as far as a sibling goes, and that is what the choice made necessary.** Finding
+the type and being handed an implementation says the lookup works. It says nothing about whether the
+call can be made, and under this shape the call is where the remaining risk sits: the member is found
+by name, the want is built out of this plugin's own type by reflection, its properties are set by
+name, and every one of those steps can fail at runtime with nothing failing at build time. So the
+probe makes the call, with a want that names no user - so the implementation runs its own path and
+writes nothing into the queue of a server it does not own - and the verdict carries what became of
+it. Being refused is the answer being measured; a request being made is not.
 
-What it does not say, because the distance between the two is where this would be misread. The probe
-finds the type by name through reflection, so what is measured is that the assembly is loaded once
-and that its type resolves and answers a lookup from elsewhere in the process. Whether the runtime
-binds a compile-time reference to that same loaded assembly is a further step and is not measured
-here. And nothing above installs two copies of one contract assembly, so the premise the first
-rejected option rests on is still unmeasured, which is what that option's own paragraph says.
+    git grep -n 'private async Task<string> CallAsync' -- tools/seam-probe/ContainerReport.cs
+
+That reading was taken at `a90529d`, in run `33244878101`, job `99080522638` for the 10.11 line and
+job `99080522583` for 12.0. The two are identical line for line:
+
+    gh api --allow-escape-sequences repos/Flowfin/jellyfin-plugin-requests/actions/jobs/99080522638/logs \
+      | sed 's/\x1b\[[0-9;]*m//g' | grep -a "SEAM-PROBE" | sed -E 's/.*ContainerReport: //' | sort -u
+    SEAM-PROBE assemblies loaded under the name Jellyfin.Plugin.Requests: 1
+    SEAM-PROBE one of them is at /config/plugins/Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.dll
+    SEAM-PROBE result assemblies=1 contract=reachable implementations=1 call=answered
+    SEAM-PROBE the call crossed the boundary and answered False
+    SEAM-PROBE the container returned 1 implementation(s) of it
+    SEAM-PROBE the member is System.Threading.Tasks.Task`1[System.Boolean] AcceptAsync(Jellyfin.Plugin.Requests.Seam.HandedOverWant, System.Threading.CancellationToken)
+    SEAM-PROBE the seam version this side declares, read out of Jellyfin.Plugin.Requests.Seam.WantHandover.KnownContractVersion: 1
+    SEAM-PROBE the type Jellyfin.Plugin.Requests.Seam.IWantHandover is reachable from this plugin
+
+Every step a sibling takes is in those eight lines: a second plugin that compiles against nothing of
+this one reaches the type, is handed the registration by the container, reads the seam version off
+the constant, finds the member with the signature the surface test pins, and makes the call.
+`answered False` is the want being refused for naming no user, which is this side's own path running
+to its own conclusion. **What is measured is that the call crossed and came back carrying the answer
+the contract says it carries.** That a request was made is not measured and is not claimed; the probe
+deliberately hands over a want this side turns down.
 
 ### That answer is refused rather than reported, since 2026-08-26
 
-The run that took the measurement above refused one thing only: a probe that wrote nothing. Both
-answers were results while the three options were open, because each of them decided which options
-were available. They are not both results any more. The choice above rests on the answer the two
-lines gave, so a run that comes back with the other one is a defect and a run that prints it and
-passes tells nobody.
+The run that took the first measurement refused one thing only: a probe that wrote nothing. Every
+answer was a result while the three options were open, because each of them decided which options
+were available. They are not results any more. The choice above rests on the answer the two lines
+give, so a run that comes back with another one is a defect and a run that prints it and passes tells
+nobody.
 
-`scripts/read-seam-probe-answer.sh` reads the one line the probe writes as a verdict and refuses four
-answers, each for its own reason: no assembly of that name loaded, more than one of them, a contract
-type a second plugin cannot reach, and a container that handed back nothing. The last of those is the
-silence #117's fourth condition is about, and it is refused here rather than printed.
+`scripts/read-seam-probe-answer.sh` reads the one line the probe writes as a verdict and refuses five
+answers, each for its own reason: no assembly of that name loaded, more than one of them, a seam type
+a second plugin cannot reach, a container that handed back nothing, and a lookup that worked with a
+call that did not. The fourth of those is the silence #117's fourth condition is about. The fifth
+arrived with this choice and is where a rename lands, in four spellings the reader names one by one.
 
-What made this worth doing before the package exists is that moving the type is what breaks it. The
-probe names the contract by string:
+Every refusal is watched biting in `scripts/prove-seam-probe-refusals.sh`, over one log per answer,
+with the answer the chosen shape produces beside them as the case that has to pass. Two of the
+fixtures are near-misses rather than plain wrong answers: a restart whose SECOND verdict is the bad
+one, which is what a reader using `head` where this one uses `tail` would pass, and the result line
+of the reader before this one, word for word, which is what a reader that matched the first three
+fields and stopped would pass as a working seam. It needs no container and no server, so the reader
+that decides a probe run is checked on machines that cannot run one.
 
-    git grep -n 'OtherAssembly = \|Contract = ' -- tools/seam-probe/ContainerReport.cs
-    tools/seam-probe/ContainerReport.cs:38:    private const string OtherAssembly = "Jellyfin.Plugin.Requests";
-    tools/seam-probe/ContainerReport.cs:39:    private const string Contract = "Jellyfin.Plugin.Requests.Seam.IWantHandover";
+### What the tree does today is the choice, and that is a change
 
-so the day the contract moves into the package neither string names anything that declares it, and
-under the old rule the job stayed green about an assembly that no longer held the type. It now reds
-and names the two constants. The trigger carries the same reasoning: `Jellyfin.Plugin.Requests/Seam/`
-and the service registrator are in the paths that start the job, because the change that breaks the
-measurement arrives through them rather than through the probe's own files. A rename of the assembly
-lives in the project file and is still not covered.
-
-Every refusal above is watched biting in `scripts/prove-seam-probe-refusals.sh`, over one log per
-answer, with the answer both lines gave beside them as the case that has to pass. It needs no
-container and no server, so the reader that decides a probe run is checked on machines that cannot
-run one.
-
-### What the tree does today is not yet the choice above
-
-The type the sibling would name is declared in this plugin's own assembly, and this project
-references no contract package:
+This section said the opposite until 2026-08-29, and said it deliberately: the registration had
+landed before the question was decided, and reading the paragraphs above as a description of what
+ships was the one misreading the document could produce. There is nothing left to build. The type the
+sibling names is declared in this plugin's own assembly, and this project references nothing but the
+host:
 
     git grep -n 'public interface IWantHandover' -- Jellyfin.Plugin.Requests/Seam/IWantHandover.cs
-    Jellyfin.Plugin.Requests/Seam/IWantHandover.cs:30:public interface IWantHandover
-
     git grep -n 'PackageReference Include\|ProjectReference' -- Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj
-    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:23:    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)">
-    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:26:    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)">
 
-Two references and both are the host's. So the registration landed before the question was decided,
-and the decision above is a thing to build rather than a description of what ships. Reading this
-section as the arrangement being in place is the one misreading it could produce, which is why the
-commands are here.
+What used to be the gap is closed rather than softened. The seam probe resolves this plugin's
+registration from another plugin's load context and calls it, on a running server of each claimed
+line, in the shape that ships - which is the shape, because under this choice there is no second
+shape a package would have introduced.
 
-**Two things #117 asks for are still not done, and neither is softened by the choice being
-taken.** Nothing proves that the sibling's container lookup finds this plugin's implementation in
-the shape that will actually ship, on either line; what the suite resolves is this assembly's own
-registration and what the probe resolves it finds by name, and neither of those is a contract
-package. And nothing separates a container that found no implementation from one that found none
-because the type did not match, so an operator meeting either one meets the same silence.
+### The silence an operator meets, and what is put beside it
+
+This is what the rejected options bought and this one does not, so it is stated as a cost rather than
+as a feature. Under a compile-time contract a sibling naming the wrong type fails to build. Under
+this one it is handed nothing by the container - and a server with no sibling installed is handed
+nothing too, because nobody asked. The container cannot tell those apart, because from where it
+stands there is no difference.
+
+What separates them is one line this plugin writes at startup, in `SeamAnnouncement`. It prints the
+names above, so an operator has the exact strings to compare against what the other plugin asks for,
+and it says whether any other Jellyfin plugin is loaded in this process at all. A server with no
+sibling is told there is nothing to expect. A server that has one is told which one, and that a name
+that does not match is answered with nothing rather than with an error.
+
+**It does not detect a mismatch and does not claim to.** Nothing on this side can see what another
+plugin asked the container for; there is no callback and no read back across this seam, for the
+reasons under "No read crosses back" below. What the line buys is that the two states read
+differently and that the operator holds the strings. That is what #117's fourth condition asks for
+and it is the whole of what is delivered.
+
+    git grep -n 'NoSiblingAndASiblingDoNotReadTheSame' -- Jellyfin.Plugin.Requests.Tests/Seam/SeamAnnouncementTests.cs
 
 ### What the package actually contains, read out of the package
 
@@ -226,9 +327,10 @@ Taken from the run of `037a664567acbd9eb0defa88118ddf6331ff3bed`:
        380928  2026-08-25 19:12   Jellyfin.Plugin.Requests.dll
 
 Two files on each claimed line: this plugin's own assembly and the metadata a server reads. Nothing
-of the other board ships, and nothing that could be a second copy of a shared type ships either,
-which is the baseline the choice above changes: when the contract package exists, exactly one side
-carries it and this listing is where that becomes visible.
+of the other board ships, and nothing that could be a second copy of a shared type ships either.
+That was a baseline about to change while the choice above was a package; since 2026-08-28 it is the
+permanent shape, and this listing is where a shared assembly appearing in the install would be seen.
+A second name in it is the failure the section above measured, not a step towards the seam working.
 
 That list is derived rather than asserted. The same job publishes the plugin and compares what the
 publish leaves behind against the `artifacts:` list in `build.yaml`, ending non-zero on a name in

@@ -9,18 +9,22 @@
 # lines are different major versions of the host, so an answer from one is a claim about the other.
 #
 # WHAT THE PROBE IS AND WHY IT REFERENCES NOTHING. `tools/seam-probe` is a plugin of its own that
-# names this plugin's assembly and its contract by string and compiles against the host alone. An
+# names this plugin's assembly, its seam type, its member and its want by string and compiles
+# against the host alone. That was a convenience while the shape was open and it is the shape itself
+# since 2026-08-28, so what the probe does IS what a sibling does. An
 # assembly reference would fail to resolve before anything could be reported on exactly the servers
 # where the answer is interesting, and a probe that cannot run is a probe that says nothing.
 #
 # THIS REFUSED ONLY SILENCE UNTIL 2026-08-26 AND NOW REFUSES THE ANSWER TOO. While #117 listed three
 # options for where the shared type comes from, a shared load context and a separate one were both
-# results, and each decided which of the three was available. #117 chose one of them on 2026-08-21 -
-# a contract-only package both sides compile against, with exactly one copy shipped - and
-# `docs/seam.md` says that choice rests on a plugin being able to name a type whose assembly ships in
-# another plugin's directory. Once a decision rests on an answer, the opposite answer is a defect and
-# not a result. `scripts/read-seam-probe-answer.sh` is what refuses it and carries the reasons one at
-# a time; `scripts/prove-seam-probe-refusals.sh` is where each of them is watched biting.
+# results, and each decided which of the three was available. #117 took the third option on
+# 2026-08-28 - no shared type at all, the handover taken by name through reflection - after runs of
+# this script measured the other two unavailable on both claimed lines, and `docs/seam.md` carries
+# the choice with both measurements. That choice rests on a plugin being able to name a type declared
+# in another plugin's assembly AND to call the member it finds there, which is what the probe now
+# asks. Once a decision rests on an answer, the opposite answer is a defect and not a result.
+# `scripts/read-seam-probe-answer.sh` is what refuses it and carries the reasons one at a time;
+# `scripts/prove-seam-probe-refusals.sh` is where each of them is watched biting.
 #
 # usage: scripts/verify-seam-probe.sh <image> <target-framework> [host-port]
 #   scripts/verify-seam-probe.sh jellyfin/jellyfin:10.11.11 net9.0  18098
