@@ -123,7 +123,7 @@ public sealed class SecretsStayOutOfTheLogTests
     }
 
     /// <summary>
-    /// Every property carrying the mark is named by a rule in the invariant lint.
+    /// Every property carrying the mark is named by a pattern in the invariant lint.
     /// <para>
     /// The mark lives on the property and the name it refuses lives in the rule file, which is two
     /// homes for one fact. Neither file can see the other, so this is what stops them drifting: a
@@ -133,6 +133,14 @@ public sealed class SecretsStayOutOfTheLogTests
     /// <para>
     /// It reads the marks off the type rather than out of the source, so a mark added by any route
     /// is in the population.
+    /// </para>
+    /// <para>
+    /// <b>It reads the patterns of that file and not the whole of it, and the difference was
+    /// measured rather than supposed.</b> Until #85 this leg searched the file as one string, and
+    /// with the entire <c>no-marked-setting-in-a-message</c> rule deleted it still passed, because
+    /// the prose above that rule spells the marked property twice. A guard satisfied by a comment
+    /// about a refusal is a guard that does not bite for the reason it names, and this is the
+    /// narrowing that makes it bite.
     /// </para>
     /// </summary>
     [Fact]
@@ -149,10 +157,37 @@ public sealed class SecretsStayOutOfTheLogTests
         var path = Path.Combine(AppContext.BaseDirectory, "tools", "opengrep", "rules.yaml");
         Assert.True(File.Exists(path), FormattableString.Invariant($"{path} was not copied next to the suite."));
 
-        var rules = File.ReadAllText(path);
+        var refusing = RefusingLines(File.ReadAllLines(path));
 
-        Assert.All(marked, name => Assert.Contains(name, rules, StringComparison.Ordinal));
+        Assert.All(
+            marked,
+            name => Assert.True(
+                refusing.Any(line => line.Contains(name, StringComparison.Ordinal)),
+                FormattableString.Invariant(
+                    $"{name} carries [Secret] and no pattern in tools/opengrep/rules.yaml names it. A comment naming it is not a refusal.")));
     }
+
+    /// <summary>
+    /// The lines of the rule file that decide what is refused.
+    /// <para>
+    /// A comment is not a refusal, so it is not in the population a marked setting has to be named
+    /// by. What is left is the pattern entries, which are the lines opengrep matches source against.
+    /// </para>
+    /// <para>
+    /// <b>The bound, written rather than discovered.</b> It reads a line at a time, so a pattern
+    /// broken across lines would hide a name from it. Nothing in that file is written that way
+    /// today, and a rule that was would fail this leg loudly rather than passing it quietly, which
+    /// is the direction to fail in.
+    /// </para>
+    /// </summary>
+    /// <param name="lines">The rule file, line by line.</param>
+    /// <returns>The pattern lines, with their leading space removed.</returns>
+    private static List<string> RefusingLines(IEnumerable<string> lines)
+        => lines
+            .Select(line => line.TrimStart())
+            .Where(line => line.StartsWith("pattern", StringComparison.Ordinal)
+                || line.StartsWith("- pattern", StringComparison.Ordinal))
+            .ToList();
 
     /// <summary>
     /// Everything one line of the log carries that a reader would end up with.
