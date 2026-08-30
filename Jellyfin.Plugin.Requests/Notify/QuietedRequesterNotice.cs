@@ -26,6 +26,15 @@ namespace Jellyfin.Plugin.Requests.Notify;
 /// <see cref="ServerRequesterNotice"/> pushes off it: what this interface promises is that a caller
 /// which has just moved a request tells the person and carries on.
 /// </para>
+/// <para>
+/// <b>The order two messages reach the path underneath in is not promised, and that is the price of
+/// the paragraph above.</b> Each message is decided on a task of its own, so two people whose
+/// requests moved one after another are told in whichever order their settings finished being read.
+/// Promising the caller's order instead would mean holding the second message until the first
+/// setting had been read, which is the waiting this class is here to keep off the caller's thread.
+/// What is promised is that every message is decided exactly once and that
+/// <see cref="QuietAsync"/> does not return while one is still being decided.
+/// </para>
 /// </summary>
 public sealed class QuietedRequesterNotice : IRequesterNotice
 {
