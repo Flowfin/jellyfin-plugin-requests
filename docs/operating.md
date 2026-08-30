@@ -4,8 +4,8 @@ The path from an installed plugin to a queue somebody can work, and the sequence
 queue stops moving. It is written for an operator who has never seen this plugin and does not want to
 read the rest of `docs/` first.
 
-Read the "This is not finished" section of [../README.md](../README.md) before any of it. One release
-exists, it carries the package for one of the two claimed server lines, and the packaged install path
+Read the "This is not finished" section of [../README.md](../README.md) before any of it. Two releases
+exist, both carry the package for one of the two claimed server lines, and the packaged install path
 has not been tried on a server. Nothing below changes that.
 
 ## From an installed plugin to a queue

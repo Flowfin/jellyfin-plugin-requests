@@ -93,10 +93,11 @@ files:
   and the server reported `12.0.0`. Listing 12.0 as supported without saying that would be a
   statement about a server nobody has run this on.
 - **The packaged install path has not been tried for this plugin.** What every run installs is the
-  built assembly copied into the container, not a package fetched and unpacked by the server. A
-  release exists, `0.1.0.0-stable`, and no run recorded in this repository installed from it. The
-  sibling in the set is the other way round: it arrives as its own published package, unpacked whole,
-  so the set half of the run does exercise that path and the half about this plugin does not.
+  built assembly copied into the container, not a package fetched and unpacked by the server. Two
+  releases exist, `0.1.0.0-stable` and `0.2.0.0-stable`, and no run recorded in this repository
+  installed from either. The sibling in the set is the other way round: it arrives as its own
+  published package, unpacked whole, so the set half of the run does exercise that path and the half
+  about this plugin does not.
 - **The supported set is one board, and it is not the one the seam is written against.** A board
   joins the set for a line on the day it publishes a release for that line, and every candidate
   besides `jellyfin-plugin-sso` has published nothing. So a green run says nothing about the sibling
