@@ -469,10 +469,42 @@ in the alphabet that document gives the listing filter:
             completed,
           ]
 
-So both rows are confirmed as words the service knows, at the only place anything here has read, and
-the numbers they arrive as are written down nowhere in that document. `FAILED` is the row that
-matters, because it is the one word that moves a request on evidence only the service holds, and the
-number behind it is the first thing an adapter has to learn from an instance.
+So both rows are words the service knows, at the only place in that document they appear, and the
+numbers they arrive as are written down nowhere in it.
+
+**The numbers are in the implementation instead, and the description above is behind it.** The same
+repository declares both alphabets as enumerations, and the request-status one has five members where
+the description names three:
+
+    curl -sS -o media.ts -w "http=%{http_code} bytes=%{size_download}\n" \
+      https://raw.githubusercontent.com/sct/overseerr/develop/server/constants/media.ts
+    http=200 bytes=272
+
+    export enum MediaRequestStatus {
+      PENDING = 1,
+      APPROVED,
+      DECLINED,
+      FAILED,
+      COMPLETED,
+    }
+
+    export enum MediaStatus {
+      UNKNOWN = 1,
+      PENDING,
+      PROCESSING,
+      PARTIALLY_AVAILABLE,
+      AVAILABLE,
+      DELETED,
+    }
+
+A member of a TypeScript numeric enumeration that carries no value of its own takes one more than its
+predecessor, so the request statuses run `PENDING` 1, `APPROVED` 2, `DECLINED` 3, `FAILED` 4,
+`COMPLETED` 5, and the media statuses run `UNKNOWN` 1 through `DELETED` 6.
+
+**That is the number-to-word step's data and it is not this table's.** Every word in the mapping above
+is accounted for, `FAILED` being 4 and `COMPLETED` 5 rather than absent, so the row that moves a
+request on evidence only the service holds has a number behind it. Where the step that reads it lives
+is still the decision named above, and it is still not taken here.
 
 **Five of the six media values have no row**, and the rule for an unseen word is what makes that safe
 rather than silently wrong: `UNKNOWN`, `PENDING`, `PROCESSING`, `PARTIALLY_AVAILABLE` and `DELETED`
@@ -483,5 +515,8 @@ here recognises.
 ### What was not read
 
 Nothing off a running instance, and that is the same disclosure as the one above rather than a softer
-version of it. No call has ever been made from this tree to a service of this form, no response of
-one has ever been captured here, and the numbers behind `FAILED` and `COMPLETED` are unknown.
+version of it. No call has ever been made from this tree to a service of this form and no response of
+one has ever been captured here. Both readings above are of a branch of that project's own
+repository, which is what its maintainers intend to ship rather than what any operator is running:
+the two disagreeing about the request-status alphabet is the demonstration that a document and a
+service are different things, and a numbering read from source is subject to the same gap.
