@@ -193,6 +193,11 @@ at startup, in the server's own task list under `Requests`.
 Deleted rather than anonymised. A record stripped of its requester still says a title was asked for
 on this server on that date, and keeping that is not what a retention period is for.
 
+**That is asked to change and has not.** The decision of 2026-08-28 on #49 says age-based stripping
+uses the same tombstone as an account deletion, which is the opposite of the sentence above and of
+the argument `RetentionSweep` carries for it. Nothing has been built either way and the sweep still
+removes; which of the two stands is #337.
+
 **Finished means fulfilled, declined or failed**, which is the same partition the quota already
 draws, and the suite asserts the two agree over every state rather than leaving them to drift. An
 open or approved request is never removed by age, because those are the two somebody still owes an
@@ -238,12 +243,34 @@ when an account is deleted and this plugin consumes it:
     git grep -n 'IEventConsumer<UserDeletedEventArgs>' -- Jellyfin.Plugin.Requests/
     Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:232:        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
 
-There are two rules and they are not the same rule.
+There are three rules and they are not one rule.
 
-**A request they asked for is theirs and is removed.** Record and history together, not stripped of
-its requester: a row that has lost the person who asked still says a title was asked for on this
-server on that date, which is half a record going and reads as deletion in a document without being
-one in the file.
+**A finished request they asked for stays, with a tombstone where they were.** The record keeps its
+title, its date and its answer, and `MediaRequest.RequestedByUserId` holds one fixed constant instead
+of the person:
+
+    git grep -n 'public static Guid Tombstone' -- Jellyfin.Plugin.Requests/People/DeletedPerson.cs
+    Jellyfin.Plugin.Requests/People/DeletedPerson.cs:33:    public static Guid Tombstone { get; } = new Guid("00000000-0000-0000-0000-000000000049");
+
+It is a constant rather than anything computed from the identifier it replaces. A pseudonym derived
+from that identifier is the same person written down differently: two records carrying it say the
+same account asked for both, and anybody holding the original can confirm a match by running the
+derivation. This value carries nothing about who was replaced, so what the record says afterwards is
+that somebody who is gone asked for this title on this date. Deletion-by-record was the alternative
+and loses the administrator's history of what was asked and answered along with the person, which is
+the trade taken on #49 on 28 August.
+
+**An unfinished request they asked for is removed, and that is an interim rather than the answer.**
+The same decision asks for an open request to be closed as withdrawn instead, and there is no state
+for that: a withdrawn-shaped value was considered and refused on #113, and the refusal is written
+into the model in two places:
+
+    git grep -n 'Cancelled' -- Jellyfin.Plugin.Requests/
+    Jellyfin.Plugin.Requests/Model/RequestActor.cs:43:    /// is no state for a user withdrawing, refused with the <c>Cancelled</c> state on #113. The
+    Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs:69:/// user withdrawing has no state to move to because <c>Cancelled</c> was refused on #113. An
+
+Which of the two stands is #337. Until it is answered, an unfinished request of theirs is removed,
+record and history together, which is what happened to every request of theirs before this.
 
 **A request somebody else asked for that they had joined stays, and they come off its list.** The
 request is not theirs, and taking a third party's request away because somebody else deleted their
@@ -260,9 +287,23 @@ deleted administrator's identifier. Clearing it would say something false rather
 empty value there means no person moved the request, so a cleared field would read as this plugin
 having decided somebody else's request on its own. That was answered on #49 on 27 August, and the
 answer is that the value stays and the queue is what shows an identifier nothing resolves as a person
-who is gone. **That rendering is #307 and is not built yet.** Until it is, an administrator reading the queue for
-such a request sees a raw identifier rather than a name, which is what the field always was and is
-not new; what is new is that nothing on the server can turn it into a name any more.
+who is gone.
+
+**That rendering is built, and this page said it was not.** #307 closed as completed on 2026-08-27
+and the queue page drew it the same day, while the sentence here went on saying an administrator sees
+a raw identifier. It was found by reading the page against the tree rather than by anything failing:
+
+    git log --format='%h %ad %s' --date=short -1 -- Jellyfin.Plugin.Requests/Web/queue.html
+    211b90c 2026-08-27 Draw who last moved a request, and keep a deleted account apart from an unanswered call
+
+    git grep -n 'queue.movedBy.deleted' -- Jellyfin.Plugin.Requests/
+    Jellyfin.Plugin.Requests/Localisation/Strings/en.json:122:  "queue.movedBy.deleted": "A person who has been deleted",
+    Jellyfin.Plugin.Requests/Web/queue.html:558:                        return RequestsShell.word("queue.movedBy.deleted");
+
+What the page draws is an identifier the dashboard's user list does not hold, and it says so only
+where that list was actually read, so a failed call is never reported as a deleted account. The
+tombstone above is such an identifier, which is why a tombstoned request reads as asked for by
+somebody who is gone without the page being taught a second rule.
 
 **A second identifier is left standing, and this one is a boundary rather than an answer.** Every
 activity entry written for a move that person made keeps their identifier, and the consumer that
