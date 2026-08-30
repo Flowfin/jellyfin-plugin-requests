@@ -195,11 +195,12 @@ the same trap #97 names for the hop between shipped plugin versions.
 The version 0 fixture was produced by this tree's own store at `592e517`, the commit before the
 version landed, by adding two requests through `AddAsync` and copying `requests.json` out.
 
-It is not a shipped version's output, and it could not be. One release exists, and the commit it was
-built from carries no store to write anything:
+It is not a shipped version's output, and it could not be. The release that existed when it was
+captured is `0.1.0.0-stable`, and the commit that one was built from carries no store to write
+anything:
 
     gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName,createdAt
-    [{"createdAt":"2026-08-08T09:38:30Z","tagName":"0.1.0.0-stable"}]
+    [{"createdAt":"2026-08-27T06:50:36Z","tagName":"0.2.0.0-stable"},{"createdAt":"2026-08-08T09:38:30Z","tagName":"0.1.0.0-stable"}]
     git rev-parse 0.1.0.0-stable^{commit}
     c44552645f0dba120c49599deedbc0244b59dcec
     git ls-tree -r --name-only c445526 -- Jellyfin.Plugin.Requests/Storage
@@ -210,6 +211,8 @@ built from carries no store to write anything:
 
 The contract and its two exceptions, and no implementation. So the shape that fixture holds is what a
 server running the mainline between `7b62877` and the change that landed the version has on its disk.
+The other release in that listing does ship a store, and its own output is the section below rather
+than a second thing this paragraph is about.
 
 ### The version 1 fixtures, which are a shipped version's output
 

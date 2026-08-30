@@ -37,17 +37,36 @@ directly, and carries the fixture it is watched refusing.
 
 ## This is not finished
 
-One release exists, and no plugin catalogue serves it:
+Two releases exist, and a manifest under Flowfin's control serves both:
 
     gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName --jq '.[].tagName'
+    0.2.0.0-stable
     0.1.0.0-stable
 
-[docs/RELEASING.md](docs/RELEASING.md) says the same about itself: a GitHub
-release is the whole output, and nothing feeds a catalogue until a manifest
-generator is added. The archive that release carries is built for the one server
-line `build.yaml` names, so an operator on the other line has nothing to install
-even by hand. The packaged install path has not been tried on any server, on
-either line.
+The address an operator adds, what the entries carry and the checksums read back
+against the archives are in [docs/catalogue.md](docs/catalogue.md), which is the
+authority for all of it. Nothing on this board writes that document: the release
+route here publishes a GitHub release and feeds no catalogue, which
+[docs/RELEASING.md](docs/RELEASING.md) says about itself, and what this tree does
+with the published manifest is read it back against the releases once a day.
+
+Three things belong here rather than behind the link, because they decide whether
+this is worth installing.
+
+**The official Jellyfin catalogue does not carry this and will not.** That list is
+filled by enumerating one organisation's repositories, this repository does not
+move into it, and the price of that decision is that an operator reaches this
+plugin only by being told the address.
+
+**Both published entries carry the 10.11 line's package.** The 12.0 line has none,
+because the release route builds the one server line `build.yaml` names, so a
+server on the 12.0 line is offered the `net9.0` build rather than nothing. That
+comparison is read at the server's own source rather than assumed, on the same
+page.
+
+**The packaged install path has not been tried on any server, on either line.**
+What every recorded run installs is the built assembly copied in, not a package a
+server fetched and unpacked.
 
 Nothing here should be pointed at a server you care about.
 
@@ -58,7 +77,7 @@ wrong, what the evidence is and what has to be true for it to be closed.
 
 Two server generations are claimed, and each gets its own package because a
 plugin compiled for one runtime does not load on the other. Claimed is not
-published: the section above says which of the two the one release carries.
+published: the section above says which of the two the releases carry.
 
 | Line           | Runtime | Packaging metadata | Oldest server claimed |
 | -------------- | ------- | ------------------ | --------------------- |
@@ -70,10 +89,10 @@ an edit to either shows up as a difference between this table and what the
 command prints:
 
     git grep -nE '^(version|targetAbi|framework):' -- build.yaml build-jf12.yaml
-    build-jf12.yaml:13:version: "0.1.0.0"
+    build-jf12.yaml:13:version: "0.2.0.0"
     build-jf12.yaml:15:targetAbi: "12.0.0.0"
     build-jf12.yaml:16:framework: "net10.0"
-    build.yaml:5:version: "0.1.0.0"
+    build.yaml:5:version: "0.2.0.0"
     build.yaml:10:targetAbi: "10.11.0.0"
     build.yaml:11:framework: "net9.0"
 
@@ -83,7 +102,7 @@ disagreement between it and the assembly rather than trusting three copies to be
 edited together:
 
     git grep -n '<PluginVersion>' -- Directory.Build.props
-    Directory.Build.props:11:        <PluginVersion>0.1.0.0</PluginVersion>
+    Directory.Build.props:42:        <PluginVersion>0.2.0.0</PluginVersion>
 
 That test is `PluginVersionMatchesThePackagingMetadata` in
 `Jellyfin.Plugin.Requests.Tests/PackagingMetadataTests.cs`, and
