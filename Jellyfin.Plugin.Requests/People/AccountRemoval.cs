@@ -17,9 +17,27 @@ namespace Jellyfin.Plugin.Requests.People;
 /// and reaches only finished requests; this is about a person and reaches every request they are on.
 /// </para>
 /// <para>
-/// <b>The two rules, and they are not the same rule.</b> A request the deleted person asked for is
-/// theirs and goes. A request somebody else asked for that they had joined is not theirs, so the
-/// request stays and they come off its list of joiners. That split is the decision recorded on #49.
+/// <b>The three rules, and they are not one rule.</b> A FINISHED request the deleted person asked
+/// for stays, with <see cref="DeletedPerson.Tombstone"/> where their identifier was: the record
+/// then says that somebody who is gone asked for this title on this date, which keeps an
+/// administrator's history of what was asked and answered without keeping a person. An UNFINISHED
+/// one of theirs goes. A request somebody else asked for that they had joined is not theirs, so the
+/// request stays and they come off its list of joiners.
+/// </para>
+/// <para>
+/// <b>The middle rule is an interim and says so.</b> The ruling of 2026-08-28 on #49 asks for an
+/// open request of a deleted person to be closed as withdrawn rather than removed, and there is no
+/// state for that: a withdrawn-shaped value was considered and refused on #113, which
+/// <see cref="Model.RequestLifecycle"/> and <see cref="Model.RequestActor"/> both record. Which of
+/// the two decisions stands is #337. Until it is answered an unfinished request of theirs is
+/// removed, which is what this did for every request of theirs before #336.
+/// </para>
+/// <para>
+/// <b>What finished means is not decided here.</b> It is
+/// <see cref="Storage.RetentionSweep.IsFinished"/>, which is the complement of the partition
+/// <see cref="Model.RequestQuota"/> already draws and is asserted over every value of
+/// <see cref="Model.RequestState"/>. A second reading of the word here would be a rule that can
+/// disagree with the sweep about the same request.
 /// </para>
 /// <para>
 /// <b>What this deliberately does not touch.</b>
@@ -88,9 +106,14 @@ public sealed class AccountRemoval
     private enum Outcome
     {
         /// <summary>
-        /// It was theirs and it is gone.
+        /// It was theirs, unfinished, and it is gone.
         /// </summary>
         Removed,
+
+        /// <summary>
+        /// It was theirs, finished, and it stays with the tombstone where they were.
+        /// </summary>
+        Tombstoned,
 
         /// <summary>
         /// It was somebody else's and they are off it.
@@ -126,6 +149,7 @@ public sealed class AccountRemoval
         }
 
         var removed = 0;
+        var tombstoned = 0;
         var detached = 0;
         var left = 0;
 
@@ -143,6 +167,10 @@ public sealed class AccountRemoval
                     removed++;
                     break;
 
+                case Outcome.Tombstoned:
+                    tombstoned++;
+                    break;
+
                 case Outcome.Detached:
                     detached++;
                     break;
@@ -158,16 +186,17 @@ public sealed class AccountRemoval
         // because the list holds the people who said no and nobody else.
         await _notices.SetAsync(userId, tellsThem: true, cancellationToken).ConfigureAwait(false);
 
-        var report = new AccountRemovalReport(removed, detached, left);
+        var report = new AccountRemovalReport(removed, tombstoned, detached, left);
 
         // At information rather than debug where anything happened: this is the plugin deleting
         // somebody's records without anybody asking it to, and an operator answering for what is
         // held should find that it happened in the log they already read.
-        if ((removed > 0 || detached > 0) && _logger.IsEnabled(LogLevel.Information))
+        if ((removed > 0 || tombstoned > 0 || detached > 0) && _logger.IsEnabled(LogLevel.Information))
         {
             _logger.LogInformation(
-                "A deleted account left {Removed} request(s) of their own, which were removed, and {Detached} request(s) of other people's, which they were taken off.",
+                "A deleted account left {Removed} unfinished request(s) of their own, which were removed, {Tombstoned} finished one(s), which stay with the person taken out of them, and {Detached} request(s) of other people's, which they were taken off.",
                 removed,
+                tombstoned,
                 detached);
         }
 
@@ -207,9 +236,27 @@ public sealed class AccountRemoval
             {
                 if (current.Request.RequestedByUserId == userId)
                 {
-                    return await _store.RemoveAsync(current.Request.Id, current.Revision, cancellationToken).ConfigureAwait(false)
-                        ? Outcome.Removed
-                        : Outcome.Gone;
+                    if (!RetentionSweep.IsFinished(current.Request))
+                    {
+                        return await _store.RemoveAsync(current.Request.Id, current.Revision, cancellationToken).ConfigureAwait(false)
+                            ? Outcome.Removed
+                            : Outcome.Gone;
+                    }
+
+                    // The joiner list is written as well, because a person can be the requester of
+                    // one request and a joiner of the same one only through a store that already
+                    // disagrees with the model. Writing both here costs nothing and means the
+                    // record this leaves cannot name them through the other field.
+                    await _store.ReplaceAsync(
+                        current.Request with
+                        {
+                            RequestedByUserId = DeletedPerson.Tombstone,
+                            JoinedByUserIds = [.. current.Request.JoinedByUserIds.Where(joined => joined != userId)]
+                        },
+                        current.Revision,
+                        cancellationToken).ConfigureAwait(false);
+
+                    return Outcome.Tombstoned;
                 }
 
                 if (!current.Request.JoinedByUserIds.Contains(userId))

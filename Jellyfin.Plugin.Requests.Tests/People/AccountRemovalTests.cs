@@ -123,7 +123,7 @@ public sealed class AccountRemovalTests
 
         var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal(new AccountRemovalReport(0, 0, 0), report);
+        Assert.Equal(new AccountRemovalReport(0, 0, 0, 0), report);
 
         var held = Assert.Single(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
 
@@ -147,11 +147,18 @@ public sealed class AccountRemovalTests
             CancellationToken.None).ConfigureAwait(true);
         await store.AddAsync(ARequest(3, SomebodyElse), CancellationToken.None).ConfigureAwait(true);
 
+        // A finished one of theirs, which is the record that now SURVIVES the removal. Without it
+        // this property would be asserted only over shapes that are removed or detached, which is
+        // the half of the store the tombstone was added for.
+        await store.AddAsync(
+            ARequest(4, TheDeletedPerson) with { State = RequestState.Fulfilled },
+            CancellationToken.None).ConfigureAwait(true);
+
         await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
         var held = await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal(2, held.Count);
+        Assert.Equal(3, held.Count);
         Assert.All(held, one => Assert.NotEqual(TheDeletedPerson, one.Request.RequestedByUserId));
         Assert.All(held, one => Assert.DoesNotContain(TheDeletedPerson, one.Request.JoinedByUserIds));
         Assert.All(held, one => Assert.NotEqual(TheDeletedPerson, one.Request.StateChangedByUserId));
@@ -200,7 +207,7 @@ public sealed class AccountRemovalTests
 
         // Nothing was done to it: the person is not the requester and not a joiner, so the store's
         // own answer to "what names them" does not return it.
-        Assert.Equal(new AccountRemovalReport(0, 0, 0), report);
+        Assert.Equal(new AccountRemovalReport(0, 0, 0, 0), report);
 
         var held = Assert.Single(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
 
@@ -343,6 +350,150 @@ public sealed class AccountRemovalTests
 
         // And nobody else is touched, which is the half a sweep that emptied the file would fail.
         Assert.False(await notices.TellsThemAsync(SomebodyElse, CancellationToken.None).ConfigureAwait(true));
+    }
+
+    /// <summary>
+    /// A finished request the deleted person asked for stays, with the tombstone where they were.
+    /// <para>
+    /// The record surviving is the half this is for. The decision of 2026-08-28 on #49 refuses
+    /// deletion-by-record because an administrator's history of what was asked and answered would go
+    /// with the person, so a test that only asserted the identifier had changed would pass for a
+    /// sweep that removed the row and is not what this asks.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AFinishedRequestTheDeletedPersonAskedForStaysWithTheTombstoneWhereTheyWere()
+    {
+        var store = new InMemoryRequestStore();
+
+        await store.AddAsync(
+            ARequest(1, TheDeletedPerson) with { State = RequestState.Fulfilled },
+            CancellationToken.None).ConfigureAwait(true);
+
+        var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Equal(new AccountRemovalReport(0, 1, 0, 0), report);
+
+        var held = Assert.Single(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
+
+        Assert.Equal(DeletedPerson.Tombstone, held.Request.RequestedByUserId);
+        Assert.NotEqual(TheDeletedPerson, held.Request.RequestedByUserId);
+
+        // What the record still says, which is the reason it was kept rather than removed.
+        Assert.Equal(RequestState.Fulfilled, held.Request.State);
+        Assert.Equal("Something somebody wanted", held.Request.DisplayTitle);
+        Assert.Equal(Asked, held.Request.RequestedAt);
+    }
+
+    /// <summary>
+    /// An unfinished request of theirs is still removed, which is this change's interim and is
+    /// asserted rather than left to be discovered.
+    /// <para>
+    /// The ruling asks for such a request to be closed as withdrawn instead, and there is no state
+    /// for that: a withdrawn-shaped value was considered and refused on #113. Which of the two
+    /// decisions stands is #337. This test is what a later change answering it has to argue with.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task AnUnfinishedRequestOfTheirsIsStillRemoved()
+    {
+        var store = new InMemoryRequestStore();
+
+        await store.AddAsync(
+            ARequest(1, TheDeletedPerson) with { State = RequestState.Approved },
+            CancellationToken.None).ConfigureAwait(true);
+
+        var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Equal(new AccountRemovalReport(1, 0, 0, 0), report);
+        Assert.Empty(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
+    }
+
+    /// <summary>
+    /// Every finished state is tombstoned and every unfinished one is removed, over the whole of
+    /// <see cref="RequestState"/> rather than over the two values the tests above happen to name.
+    /// <para>
+    /// The partition is <see cref="RetentionSweep.IsFinished"/>'s, and reading it here rather than
+    /// listing states is what stops this test and the sweep meaning different things by the word on
+    /// the day a state is added.
+    /// </para>
+    /// </summary>
+    /// <param name="state">The state the request is in.</param>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Theory]
+    [InlineData(RequestState.Open)]
+    [InlineData(RequestState.Approved)]
+    [InlineData(RequestState.Declined)]
+    [InlineData(RequestState.Fulfilled)]
+    [InlineData(RequestState.Failed)]
+    public async Task WhichOnesStayIsTheSamePartitionTheSweepDraws(RequestState state)
+    {
+        var store = new InMemoryRequestStore();
+        var asked = ARequest(1, TheDeletedPerson) with { State = state };
+
+        await store.AddAsync(asked, CancellationToken.None).ConfigureAwait(true);
+
+        var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
+        var held = await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true);
+
+        if (RetentionSweep.IsFinished(asked))
+        {
+            Assert.Equal(1, report.Tombstoned);
+            Assert.Equal(DeletedPerson.Tombstone, Assert.Single(held).Request.RequestedByUserId);
+        }
+        else
+        {
+            Assert.Equal(1, report.Removed);
+            Assert.Empty(held);
+        }
+    }
+
+    /// <summary>
+    /// The tombstone is not an identifier a server could have minted, and is not the empty one.
+    /// <para>
+    /// Two different failures. A value a server could mint could collide with a real account, and
+    /// then a tombstoned record would name somebody who never asked for anything. The empty
+    /// identifier already means "nobody" in this plugin, and reusing it would make "a person who is
+    /// gone asked for this" and "no person is named here" the same value.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheTombstoneIsNotAnIdentifierAServerCouldMint()
+    {
+        Assert.NotEqual(Guid.Empty, DeletedPerson.Tombstone);
+
+        // Jellyfin mints version 4 identifiers. The version is the high nibble of the seventh byte,
+        // read off the value rather than off its text.
+        Assert.NotEqual(4, DeletedPerson.Tombstone.ToByteArray()[7] >> 4);
+
+        Assert.True(DeletedPerson.Is(DeletedPerson.Tombstone));
+        Assert.False(DeletedPerson.Is(TheDeletedPerson));
+    }
+
+    /// <summary>
+    /// A finished request of the deleted person, an unfinished one, and one of somebody else's they
+    /// had joined are answered by three different rules in one run, and the counts say which was
+    /// which.
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task TheThreeRulesAreCountedApartInOneRun()
+    {
+        var store = new InMemoryRequestStore();
+
+        await store.AddAsync(
+            ARequest(1, TheDeletedPerson) with { State = RequestState.Fulfilled },
+            CancellationToken.None).ConfigureAwait(true);
+        await store.AddAsync(ARequest(2, TheDeletedPerson), CancellationToken.None).ConfigureAwait(true);
+        await store.AddAsync(
+            ARequest(3, SomebodyElse) with { JoinedByUserIds = [TheDeletedPerson] },
+            CancellationToken.None).ConfigureAwait(true);
+
+        var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
+
+        Assert.Equal(new AccountRemovalReport(1, 1, 1, 0), report);
     }
 
     /// <summary>

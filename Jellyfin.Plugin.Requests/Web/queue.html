@@ -530,10 +530,16 @@
                      * requester gets, in the same list, read on the same call.
                      *
                      * An identifier that list does not hold is a person this server no longer has,
-                     * which is what a deleted account leaves behind: #308 removes the requests a
-                     * deleted person asked for and takes them off the ones they joined, and leaves
-                     * this field alone, because clearing it would say that no person moved the
-                     * request rather than that the person who did is gone.
+                     * which is what a deleted account leaves behind. #308 takes a deleted person off
+                     * the requests they had joined, removes the unfinished ones they asked for, and
+                     * leaves this field alone, because clearing it would say that no person moved
+                     * the request rather than that the person who did is gone.
+                     *
+                     * A finished request they asked for is no longer removed either: #336 leaves it
+                     * standing with a tombstone in the requester field, which is deliberately an
+                     * identifier this list cannot hold. So the third case below is reached by two
+                     * different absences now - an account the server deleted, and a constant that
+                     * was never an account - and the cell says the same true thing about both.
                      *
                      * The fourth is the one this function exists for. Where the user list was never
                      * read, no identifier in it means nothing at all, so the cell falls back to the
