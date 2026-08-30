@@ -74,6 +74,33 @@ plugin that handed it over is not recorded.
 name, a display name, an email address or an external account. Whoever the identifier belongs to is a
 question the server answers, and this plugin does not copy the answer into its own file.
 
+### A third identifier goes somewhere this plugin keeps nothing of its own
+
+**Every move a request makes writes a line into the server's activity log, and that line names the
+person who made the move.** The entry is built here and handed to the host, and the identifier is one
+of the four fields it carries:
+
+    git grep -n 'new ActivityLog(note.Name, note.Type, note.UserId)' -- Jellyfin.Plugin.Requests/Notify/ServerActivityJournal.cs
+    Jellyfin.Plugin.Requests/Notify/ServerActivityJournal.cs:50:        var entry = new ActivityLog(note.Name, note.Type, note.UserId)
+
+| Field                 | Who it names                                              | Where it is written       |
+| --------------------- | --------------------------------------------------------- | ------------------------- |
+| `ActivityNote.UserId` | whoever made the move, or nobody where the plugin made it | the server's activity log |
+
+Beside the identifier the entry carries the request's identifier and as much of the title as fits in
+sixty characters, so one row says who moved which request about which title, and when.
+[notifications.md](notifications.md) writes an entry out field by field and carries entries read off
+a running server of each claimed line.
+
+**The empty identifier there means nobody rather than somebody.** A move the fulfilment sweep makes
+on its own carries no person, the server's entity has no nullable user, and the entry's second line
+says in words that the plugin rather than a person made the move.
+
+**This store is the server's rather than this plugin's**, which is why it is not among the three
+files below and why neither of the two rules further down reaches it. It is named here because a
+page listing where a person is named cannot leave out the one place this plugin writes an identifier
+and cannot take it back.
+
 ### Two fields carry free text somebody typed
 
     git grep -nE 'public string\? (RequesterNote|DeclineNote)' -- Jellyfin.Plugin.Requests/Model/MediaRequest.cs
@@ -99,6 +126,10 @@ when.
 Three files, all under the server's own data directory, and the table of them is in
 [storage.md](storage.md) under "What is on the disk, and where". This page does not repeat the paths,
 because two copies of a path are two answers the day one of them moves.
+
+The activity entries above are in none of the three. They are rows in the server's own log, reached
+through `IActivityManager`, and where that log lives is the server's answer rather than this
+plugin's.
 
 Everything in the first table above is in the queue file, and the identifier in the second is in the
 notices file. The settings file holds no person at all, which is the whole
@@ -188,6 +219,17 @@ that removed it after a year would turn a person's own choice back on without te
 holds about somebody is that they said no, and the way it goes is that they say yes or that their
 account goes, which is the section below.
 
+**Nothing removes an activity entry either, and that is an absence of reach rather than a decision.**
+The sweep reads the queue file and writes the queue file, and nothing in it can see the server's
+activity log:
+
+    git grep -n 'IActivityJournal' -- Jellyfin.Plugin.Requests/Storage/ ; echo "exit=$?"
+    exit=1
+
+So a row saying who moved which request about which title outlives the request it describes. How long
+the server keeps its own activity entries is the server's business rather than this plugin's, and no
+reading on this board has measured it.
+
 ## What happens when a Jellyfin user is deleted
 
 **Their records go, and the plugin is told rather than asked to notice.** The server raises an event
@@ -221,6 +263,18 @@ answer is that the value stays and the queue is what shows an identifier nothing
 who is gone. **That rendering is #307 and is not built yet.** Until it is, an administrator reading the queue for
 such a request sees a raw identifier rather than a name, which is what the field always was and is
 not new; what is new is that nothing on the server can turn it into a name any more.
+
+**A second identifier is left standing, and this one is a boundary rather than an answer.** Every
+activity entry written for a move that person made keeps their identifier, and the consumer that
+removes their records cannot reach one:
+
+    git grep -n 'IActivityJournal' -- Jellyfin.Plugin.Requests/People/ ; echo "exit=$?"
+    exit=1
+
+The entries are rows in the server's own log and this plugin has no call that reads or deletes one,
+so what an operator can do about them is what the dashboard offers for any entry, whichever plugin
+wrote it. The field above stays because clearing it would say something false; this one stays because
+nothing here can take it away, and the two are not the same statement.
 
 **What the sweep cannot promise, said as a negative.** A request that keeps being decided on while the
 removal runs is retried a bounded number of times and then left as it is, with a line in the log at a
