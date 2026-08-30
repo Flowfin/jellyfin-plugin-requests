@@ -12,12 +12,13 @@ server without a service runs is
 over is below, and what happens when the service misbehaves is a separate question this page does not
 answer. Where a credential lives is answered at the end of it.
 
-**There is no adapter in this tree, and no issue on this board asks for one.** #82 closed as
+**There is no adapter in this tree, and #315 is the issue that asks for one.** #82 closed as
 completed on 2026-08-23 having built the submission path behind the interface, and it did not produce
 a client that speaks to a service: the only implementation of the interface is still the one for a
-server without one. Whether such an adapter is written on this board at all is an open call, recorded
-on #113. So every sentence below that says something arrives with the adapter is waiting on that
-call, and not on an issue somebody can pick up.
+server without one. Whether such an adapter is written on this board at all was an open call recorded
+on #113, and that call is taken: one is written here, as its own module. So every sentence below that
+says something arrives with the adapter is waiting on work somebody can pick up rather than on a
+decision nobody has taken.
 
 ## The mapping
 
@@ -147,9 +148,9 @@ under the service's own account, so the service is told that a request was made 
 Attribution is turned on one person at a time, by writing a row, and writing the row is what says
 that person's account name may leave.
 
-Where the table is kept and how it is edited arrives with the adapter that reads it, and no issue on
-this board asks for that adapter. Nothing on this side reads the table today, so a settings field for
-it now would be somewhere to type something nothing uses.
+Where the table is kept and how it is edited arrives with the adapter that reads it, which is #315.
+Nothing on this side reads the table today, so a settings field for it now would be somewhere to type
+something nothing uses.
 
 ### What leaves the server when a bridge is configured
 
@@ -327,10 +328,160 @@ quantify over a value that does not exist. They land with the adapter and not be
 
 The words above are the ones issue #81 names for the Overseerr form, which is the form the first
 adapter is written against, decided on #113. **They were not read off a running service, and nothing
-in this tree can read one.** No fixture here was captured from a service, no schema was fetched, and
-the suite makes no outbound call.
+in this tree can read one.** No fixture here was captured from a service and the suite makes no
+outbound call.
 
-So the list is this board's own statement of the vocabulary rather than a measurement of it, and the
-rule for an unseen word is what stands between that and a wrong answer. Whoever writes the adapter is
-the first person in a position to compare the two, and a word that arrives from a real service and is
-not here is a row this table is missing rather than a fault in the service.
+What has been read is that form's own published description, and the comparison against it is the
+section below. That is a weaker reading than a running service and a stronger one than this table had
+before it, and it leaves the sentence above exactly as it stands: a document describing a service is
+not the service, and a description can be behind the implementation it describes.
+
+So the list is still this board's own statement of the vocabulary rather than a measurement of a
+running one, and the rule for an unseen word is what stands between that and a wrong answer. Whoever
+writes the adapter against an instance is the first person in a position to compare the two against
+the thing itself, and a word that arrives from a real service and is not here is a row this table is
+missing rather than a fault in the service.
+
+## The form's own description, read
+
+Fetched on 2026-08-30 from the form's own repository, which is the only description of it anything
+here has read:
+
+    curl -sS -o overseerr-api.yml -w "http=%{http_code} bytes=%{size_download}\n" \
+      https://raw.githubusercontent.com/sct/overseerr/develop/overseerr-api.yml
+    http=200 bytes=177902
+
+Everything below is quoted out of that file rather than summarised, so a reader can disagree with the
+source rather than with this page. Nothing in this repository fetches it and no check compares this
+page against it, so these quotations go stale in silence, and the command above is what a later reader
+re-runs rather than trusting them.
+
+### Where the calls go, and what carries the credential
+
+    servers:
+      - url: '{server}/api/v1'
+
+    securitySchemes:
+      cookieAuth:
+        type: apiKey
+        name: connect.sid
+        in: cookie
+      apiKey:
+        type: apiKey
+        in: header
+        name: X-Api-Key
+
+**The credential travels in a header rather than in a query string**, and that is what makes one of
+the four claims above cheap to keep true instead of impossible. A transport failure names its
+destination in the exception the platform raises, which is the half of the leak no wording of this
+plugin's own log lines can fix; with the key in a header that exception carries the address and not
+the credential. The cookie scheme beside it is how to get this wrong, and an adapter that ever
+authenticated by a route putting the value in a URL would put the leak back where it started.
+
+### The four operations, against the four this side has
+
+`IRequestBackend` has four and no more, and each one lands on a path item in that document.
+
+| This side             | The form                      | What it answers                                   |
+| --------------------- | ----------------------------- | ------------------------------------------------- |
+| `CheckReachableAsync` | `GET /status`                 | that the service is up, and nothing about the key |
+| `SubmitAsync`         | `POST /request`               | `201` with the request the service created        |
+| `ReportAsync`         | `GET /request/{requestId}`    | `200` with that request                           |
+| `WithdrawAsync`       | `DELETE /request/{requestId}` | `204` and no body                                 |
+
+**`/status` is answered without a credential**, and for the first row that is a problem rather than a
+convenience:
+
+    /status:
+      get:
+        summary: Get Overseerr status
+        security: []
+
+A green answer from it says the service is up and says nothing about whether the key is accepted, so
+`Reachable` read off `/status` alone reports a working bridge on an install whose credential is
+wrong. Which call answers the second question is #86's and is not decided here.
+
+**A submission has two required fields and every other one is optional:**
+
+    mediaType:
+      type: string
+      enum: [movie, tv]
+      example: movie
+    mediaId:
+      type: number
+      example: 123
+
+    required:
+      - mediaType
+      - mediaId
+
+This side has a kind and a title. What a `mediaId` is over there, and where an adapter gets one, is
+the question that answer opens, and this page does not close it.
+
+**A withdrawal can be refused for a reason that is about the credential rather than about the
+request**, which that document says in prose and not in a status code:
+
+    delete:
+      summary: Delete request
+      description: Removes a request. If the user has the `MANAGE_REQUESTS` permission, any request can be removed. Otherwise, only pending requests can be removed.
+
+Everything this plugin hands over has already been approved here, and a request that side has
+approved is not pending, so the ordinary withdrawal is exactly the one a caller without that
+permission may not make.
+
+### The two alphabets are numbers, and this table is words
+
+    status:
+      type: number
+      example: 0
+      description: Status of the request. 1 = PENDING APPROVAL, 2 = APPROVED, 3 = DECLINED
+      readOnly: true
+
+    status:
+      type: number
+      example: 0
+      description: Availability of the media. 1 = `UNKNOWN`, 2 = `PENDING`, 3 = `PROCESSING`, 4 = `PARTIALLY_AVAILABLE`, 5 = `AVAILABLE`, 6 = `DELETED`
+
+**A number-to-word step exists and lives nowhere.** The table above is data so that two adapters
+cannot disagree about what a word means with nothing saying which is right. An adapter that turns `3`
+into `DECLINED` on its own moves that argument one layer down, where the table stops being the place
+it is settled. Where the step lives is a decision the adapter has to take rather than discover.
+
+**Two of the five request words this table holds are absent from those three, and the same document
+shows the service using both.** `FAILED` and `COMPLETED` are not among `1`, `2` and `3`, and they are
+in the alphabet that document gives the listing filter:
+
+    - in: query
+      name: filter
+      schema:
+        type: string
+        nullable: true
+        enum:
+          [
+            all,
+            approved,
+            available,
+            pending,
+            processing,
+            unavailable,
+            failed,
+            deleted,
+            completed,
+          ]
+
+So both rows are confirmed as words the service knows, at the only place anything here has read, and
+the numbers they arrive as are written down nowhere in that document. `FAILED` is the row that
+matters, because it is the one word that moves a request on evidence only the service holds, and the
+number behind it is the first thing an adapter has to learn from an instance.
+
+**Five of the six media values have no row**, and the rule for an unseen word is what makes that safe
+rather than silently wrong: `UNKNOWN`, `PENDING`, `PROCESSING`, `PARTIALLY_AVAILABLE` and `DELETED`
+move nothing and are reported as unseen. `DELETED` is the one to look at before an adapter ships,
+because media a service no longer holds is a fact this side may want, and today it is a word nothing
+here recognises.
+
+### What was not read
+
+Nothing off a running instance, and that is the same disclosure as the one above rather than a softer
+version of it. No call has ever been made from this tree to a service of this form, no response of
+one has ever been captured here, and the numbers behind `FAILED` and `COMPLETED` are unknown.
