@@ -911,3 +911,21 @@ The adopted rows that name an issue are decisions, not deliveries. What is
 running is the check list at the top, printed from a run, and an adopted row
 with an open issue beside it is a workflow this repository has decided it wants
 and does not yet have.
+
+## A deliberate formatting violation, so that a red required check can be watched refusing a merge
+
+This section exists to be badly formatted. The third done-when on #30 asks for a
+pull request with one of the required checks red that cannot be merged, shown by
+trying it, and no reading of a ruleset shows that. The block below breaks
+`Check formatting`, which is required on `master`, and nothing else:
+
+
+
+*   the blank run above is three lines where Prettier keeps one
+*  this list uses `*` markers at two different indents
+
+
+
+The branch carrying this is never merged. What it produces is a transcript of a
+merge being refused, which goes onto #30, and the section goes no further than
+that branch.
