@@ -20,6 +20,17 @@ namespace Jellyfin.Plugin.Requests.Tests.Notify;
 /// this, default on, and no operator setting overrides it - which is why the leg that has an
 /// administrator try is here rather than in a document.
 /// </para>
+/// <para>
+/// <b>No order is promised over two people, and #330 is where that was decided rather than left
+/// open.</b> Two readings were available: compare what was told as a set, or make
+/// <see cref="QuietedRequesterNotice"/> promise the order its caller handed the messages over in.
+/// The second is refused, because keeping such a promise means holding the second message until the
+/// first person's setting has been read, and reading a setting off the calling thread is the whole
+/// of what that class exists to do. So a caller that has just moved two requests is entitled to have
+/// both people told, exactly once each, and to nothing about which of them hears first. Every leg
+/// below therefore compares <see cref="SortedRecipients"/> rather than the sequence as it arrived,
+/// and a leg that reintroduced a sequence would be asserting something the subject does not offer.
+/// </para>
 /// </summary>
 [SuppressMessage(
     "Design",
@@ -50,7 +61,7 @@ public sealed class APersonsOwnSwitchTests
 
         await switched.QuietAsync(CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal([Somebody], inner.Told.Select(message => message.ToUserId).ToArray());
+        Assert.Equal([Somebody], SortedRecipients(inner));
     }
 
     /// <summary>
@@ -68,7 +79,7 @@ public sealed class APersonsOwnSwitchTests
 
         await switched.QuietAsync(CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal([Asker, Somebody], inner.Told.Select(message => message.ToUserId).ToArray());
+        Assert.Equal([Asker, Somebody], SortedRecipients(inner));
     }
 
     /// <summary>
@@ -139,7 +150,7 @@ public sealed class APersonsOwnSwitchTests
         switched.Tell(Message(Asker));
         await switched.QuietAsync(CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal([Asker], inner.Told.Select(message => message.ToUserId).ToArray());
+        Assert.Equal([Asker], SortedRecipients(inner));
     }
 
     /// <summary>
@@ -171,7 +182,7 @@ public sealed class APersonsOwnSwitchTests
         switched.Tell(Message(Administrator));
         await switched.QuietAsync(CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal([Asker], inner.Told.Select(message => message.ToUserId).ToArray());
+        Assert.Equal([Asker], SortedRecipients(inner));
     }
 
     /// <summary>
@@ -237,6 +248,26 @@ public sealed class APersonsOwnSwitchTests
         Assert.Equal(RequestFailureCode.TheStoreCouldNotBeRead, Refused(read).Code);
         Assert.Equal(RequestFailureCode.TheStoreCouldNotBeRead, Refused(written).Code);
     }
+
+    /// <summary>
+    /// Who was told, sorted here rather than left in the order the messages arrived.
+    /// <para>
+    /// The sort is what makes a leg of this class independent of which of two tasks finished first,
+    /// and it is a comparison of sequences rather than of sets on purpose: a message kept twice or
+    /// lost moves the sorted answer as readily as it moves the unsorted one, so the count and the
+    /// membership are still asserted and only the order is given up.
+    /// </para>
+    /// <para>
+    /// The identifiers this class uses differ in their last byte and sort ordinally in the order
+    /// they are declared, so the expectations below read in the obvious order.
+    /// </para>
+    /// </summary>
+    /// <param name="inner">The path that kept what it was told.</param>
+    /// <returns>The people who were told, ordinally by identifier.</returns>
+    private static Guid[] SortedRecipients(RecordingRequesterNotice inner)
+        => [.. inner.Told
+            .Select(message => message.ToUserId)
+            .OrderBy(id => id.ToString(), StringComparer.Ordinal)];
 
     /// <summary>
     /// One message for one person.
