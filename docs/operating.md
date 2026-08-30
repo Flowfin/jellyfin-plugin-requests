@@ -38,6 +38,20 @@ the order to take them in and what each one costs you later.
   [personal-data.md](personal-data.md).
 - **The address a notice is posted to.** Leave it empty unless you have somewhere to receive one.
   Empty means nothing is sent, and that is a supported way to run rather than a half-configured one.
+- **Which movements go to that address.** Approvals, declines and fulfilments have a switch each and
+  all three are on, so an address typed and nothing else decided posts all three. The one worth
+  deciding on the first evening rather than on the first noisy one is fulfilments: nobody moves a
+  request to fulfilled, the library does, so its volume follows how fast titles are arriving rather
+  than how often anybody works the queue. With the address empty all three say nothing, which is why
+  they are on rather than off.
+- **Whether an administrator is told that a request arrived.** This is off, it is a decision of its
+  own rather than a fourth switch on the list above, and it is the one an operator looking for "tell
+  me when somebody asks" would otherwise conclude does not exist. It needs no address: it sends
+  nothing out of the machine and goes down connections the server already holds to clients already
+  signed in. Read what [notifications.md](notifications.md) measures about it before turning it on,
+  because no Jellyfin client subscribes to the name it goes out under, so switching it on and
+  watching the dashboard shows nothing. What reaches an operator today is the activity entries the
+  dashboard already draws, and the queue.
 
 ### 3. Know that approval is not a switch
 
