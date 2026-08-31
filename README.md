@@ -64,9 +64,13 @@ server on the 12.0 line is offered the `net9.0` build rather than nothing. That
 comparison is read at the server's own source rather than assumed, on the same
 page.
 
-**The packaged install path has not been tried on any server, on either line.**
-What every recorded run installs is the built assembly copied in, not a package a
-server fetched and unpacked.
+**A published release has been installed on a server once, on the 10.11 line
+only.** Run `33357925338`, at `501a943`, downloaded `requests_0.2.0.0.zip`,
+checked it against the digest published beside it, and the server answered that
+the plugin was `Active` at `0.2.0.0`. Three things that leaves untried: the server
+was `10.11.11` rather than the claimed floor `10.11.0`, the bytes were copied into
+the plugin directory rather than fetched and unpacked by the server itself, and
+the 12.0 line has no release for anybody to install.
 
 Nothing here should be pointed at a server you care about.
 
