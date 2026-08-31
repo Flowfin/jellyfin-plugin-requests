@@ -450,8 +450,69 @@ wrong. Which call answers the second question is #86's and is not decided here.
       - mediaType
       - mediaId
 
-This side has a kind and a title. What a `mediaId` is over there, and where an adapter gets one, is
-the question that answer opens, and this page does not close it.
+This side has a kind, a title and whatever external identifiers the request arrived with. What a
+`mediaId` is over there is answered below. Where an adapter gets one is answered for most requests
+by a rule this side already enforces, and is a decision nobody has taken for the rest.
+
+### `mediaId` is a TMDB identifier, and the description does not say so
+
+It is given as a number with an example and nothing about whose number it is. What the service does
+with the value says which one. Fetched on 2026-08-31, from the same repository as the description
+above:
+
+    curl -sS -o MediaRequest.ts -w "http=%{http_code} bytes=%{size_download}\n" \
+      https://raw.githubusercontent.com/sct/overseerr/develop/server/entity/MediaRequest.ts
+    http=200 bytes=19586
+
+    grep -n 'tmdb.getMovie\|tmdb.getTvShow\|tmdbId: requestBody.mediaId' MediaRequest.ts
+    116:        ? await tmdb.getMovie({ movieId: requestBody.mediaId })
+    117:        : await tmdb.getTvShow({ tvId: requestBody.mediaId });
+    121:        tmdbId: requestBody.mediaId,
+
+The value posted is handed straight to that service's TMDB client as a film or a programme
+identifier and is then stored as `tmdbId`. So a submission from here carries the TMDB identifier of
+the thing that was asked for, and no other provider's number will do. This is read off the
+implementation rather than the description, which is the same weaker-and-stronger reading as the
+numbering above and goes stale in the same silence.
+
+**Most requests that reach a submission carry an identifier, and that is a rule here rather than a
+hope.** Nothing is handed over until an operator has approved it, and an approval is refused on a
+request carrying no external identifier at all:
+
+    git grep -n 'RequestNotIdentifiedException(to)' -- Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs
+    Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs:339:            throw new RequestNotIdentifiedException(to);
+
+**What that rule does not promise is the one this call needs.** It asks for an identifier and not for
+a TMDB one, so a request identified by an IMDb or a TVDB number alone is approvable here and has no
+`mediaId` over there. The described API offers no way to turn one number into the other. Its three
+searches take text:
+
+    grep -n '^  /search' overseerr-api.yml
+    4115:  /search:
+    4163:  /search/keyword:
+    4203:  /search/company:
+
+    sed -n '4121,4127p' overseerr-api.yml
+          parameters:
+            - in: query
+              name: query
+              required: true
+              schema:
+                type: string
+                example: 'Mulan'
+
+Searching that text and taking a result would be this plugin deciding what a title means, which is
+the one thing the identity rule refuses by name:
+
+    git grep -n 'Identity is a provider identifier and a kind' -- Jellyfin.Plugin.Requests/Model/RequestIdentity.cs
+    Jellyfin.Plugin.Requests/Model/RequestIdentity.cs:16:/// <b>Identity is a provider identifier and a kind, never a title.</b> Titles collide, get
+
+So what an adapter does with an approved request that carries no TMDB identifier is a decision and
+not a lookup. Three answers are available and this page takes none of them: refuse the handover and
+leave the request approved with its failure recorded, which is the path `HandoverFailedAt` already
+carries; require a TMDB identifier at approval rather than any identifier, which is a change to the
+rule above and to every surface that creates a request; or ask the service to search a title, which
+the sentence above refuses. It is owed on #315.
 
 **A withdrawal can be refused for a reason that is about the credential rather than about the
 request**, which that document says in prose and not in a status code:
@@ -551,7 +612,7 @@ here recognises.
 
 Nothing off a running instance, and that is the same disclosure as the one above rather than a softer
 version of it. No call has ever been made from this tree to a service of this form and no response of
-one has ever been captured here. Both readings above are of a branch of that project's own
+one has ever been captured here. Every reading above is of a branch of that project's own
 repository, which is what that project intends to ship rather than what any operator is running:
 the two disagreeing about the request-status alphabet is the demonstration that a document and a
 service are different things, and a numbering read from source is subject to the same gap.
