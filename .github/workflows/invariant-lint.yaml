@@ -6,15 +6,18 @@
 # invariant, added the first time an invariant is decided rather than in a batch
 # afterwards.
 #
-# ONE OF THE READERS HERE IS NOT A PATTERN, AND IT IS HERE RATHER THAN IN A
-# WORKFLOW OF ITS OWN. `scripts/check-pasted-evidence.sh` resolves the
+# TWO OF THE READERS HERE ARE NOT PATTERNS, AND THEY ARE HERE RATHER THAN IN
+# WORKFLOWS OF THEIR OWN. `scripts/check-pasted-evidence.sh` resolves the
 # `path:line:text` lines the documents paste as evidence against the files they
-# name, which no pattern can do because it compares two places in the tree
-# against each other. It is the same class of rule - one this board decided, that
-# no compiler states, and that a document could otherwise only ask for - so it
-# runs under the same job. Under a job of its own it would report a context the
-# ruleset does not require, and #30 is where the six contexts already in that
-# position are waiting; this one holds a merge from the day it lands instead.
+# name, and `scripts/check-negative-disclosures.sh` re-runs the blocks that
+# assert something is NOT in the tree and compares the exit code. Neither is
+# expressible as a pattern: one compares two places in the tree against each
+# other, and the other runs a command. They are the same class of rule - one this
+# board decided, that no compiler states, and that a document could otherwise
+# only ask for - so they run under the same job. Under jobs of their own they
+# would report contexts the ruleset does not require, and #30 is where the six
+# contexts already in that position are waiting; here they hold a merge from the
+# day they land instead.
 #
 # Two steps, and both are needed. The first scans the repository and fails on any
 # finding, which is what makes a rule a gate. The second scans the fixtures and
@@ -101,3 +104,13 @@ jobs:
       # would miss every instance of the thing this refuses.
       - name: Refuse a pasted line the tree does not produce
         run: ./scripts/check-pasted-evidence.sh
+
+      # This one runs commands it read out of tracked text, so what it refuses to
+      # run matters as much as what it decides. Two of the cases in the proof
+      # write a sentinel file if a shell ever sees them, and the proof asserts
+      # neither wrote one.
+      - name: Every refusal the negative-disclosure reader claims, refused for its own reason
+        run: ./scripts/prove-negative-disclosure-refusals.sh
+
+      - name: Refuse a negative disclosure the tree does not bear out
+        run: ./scripts/check-negative-disclosures.sh

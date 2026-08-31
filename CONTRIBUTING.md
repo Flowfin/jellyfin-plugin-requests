@@ -54,6 +54,11 @@ What is worth knowing before the first push:
   wrong, so `scripts/check-pasted-evidence.sh` refuses that under the same job.
   Re-run the command above the block and paste what it prints; do not edit the
   number to fit. It says what it cannot read at the top of the script.
+- A block ending `; echo "exit=$?"` is a claim that something is not in the tree,
+  and `scripts/check-negative-disclosures.sh` re-runs it under the same job. It
+  runs `git grep` and nothing else, from a fixed set of options, and a command
+  carrying anything a shell would act on is refused rather than run. Write the
+  claim in that form and it is checked; write it any other way and it is not.
 
 Run the build and the suite before pushing:
 
