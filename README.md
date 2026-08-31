@@ -67,10 +67,20 @@ page.
 **A published release has been installed on a server once, on the 10.11 line
 only.** Run `33357925338`, at `501a943`, downloaded `requests_0.2.0.0.zip`,
 checked it against the digest published beside it, and the server answered that
-the plugin was `Active` at `0.2.0.0`. Three things that leaves untried: the server
-was `10.11.11` rather than the claimed floor `10.11.0`, the bytes were copied into
-the plugin directory rather than fetched and unpacked by the server itself, and
-the 12.0 line has no release for anybody to install.
+the plugin was `Active` at `0.2.0.0`. The server was `10.11.11`.
+
+**On the floor server it claims, the same release does not load.** `build.yaml`
+says `targetAbi: "10.11.0.0"`, which names the server `10.11.0`, and putting
+`requests_0.2.0.0.zip` on that server reports
+`Requests is NotSupported rather than Active` - run `33358848505`. Jellyfin sets
+that status in one place, on a failure to load the assembly's types, so the
+published build references something that server's shared libraries do not carry.
+Which of the two moves, the claimed floor or the reference, is #152. **Do not
+install this on a `10.11.0` server: it will not run.**
+
+Two further things neither run covers: the bytes are copied into the plugin
+directory rather than fetched and unpacked by the server itself, and the 12.0
+line has no release for anybody to install.
 
 Nothing here should be pointed at a server you care about.
 

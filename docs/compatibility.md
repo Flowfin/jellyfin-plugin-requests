@@ -98,10 +98,21 @@ files:
   checks the archive against the digest published beside it, and puts the unpacked bytes on a server
   of that line. Run `33357925338` at `501a943` did it for `0.2.0.0-stable` on `10.11.11`, and the
   server answered `Requests is Active at 0.2.0.0`. What that still does not cover: the archive is
-  unpacked by the run rather than fetched and unpacked by the server, the server was not the claimed
-  floor `10.11.0`, and the 12.0 line has no release to install at all. The sibling in the set
-  arrives as its own published package and is unpacked whole, so the set half of the run exercises
-  the server's own path and the half about this plugin still does not.
+  unpacked by the run rather than fetched and unpacked by the server, and the 12.0 line has no
+  release to install at all. The sibling in the set arrives as its own published package and is
+  unpacked whole, so the set half of the run exercises the server's own path and the half about this
+  plugin still does not.
+- **The floor server of the 10.11 line refuses the published release, and this is the bullet above
+  it read against the claim.** `build.yaml` declares `targetAbi: "10.11.0.0"`, which names the
+  server `10.11.0`. The same archive on that server ends the run at its verdict step with
+  `Requests is NotSupported rather than Active`, in run `33358848505`. Jellyfin sets that status in
+  exactly one place, catching a `TypeLoadException` or a `ReflectionTypeLoadException` while loading
+  the assembly's types, so the shipped build references something `10.11.0`'s shared libraries do
+  not carry. **The floor build does not cover this and the two are easy to read as one guard.**
+  `abi-floor.yaml` compiles the SOURCE against the floor SDK and was green on the same day; what
+  ships is compiled against the current SDK, so a green floor build says the source could be built
+  against the floor and nothing about the artefact that went out. #152 holds which of the two
+  moves.
 - **The supported set is one board, and it is not the one the seam is written against.** A board
   joins the set for a line on the day it publishes a release for that line, and every candidate
   besides `jellyfin-plugin-sso` has published nothing. So a green run says nothing about the sibling

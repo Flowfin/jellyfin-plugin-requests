@@ -6,8 +6,9 @@ read the rest of `docs/` first.
 
 Read the "This is not finished" section of [../README.md](../README.md) before any of it. Two releases
 exist, both carry the package for one of the two claimed server lines, and one of them has been
-installed on a server of that line once, not at the claimed floor and not by the server's own
-download. Nothing below changes that.
+installed once on `10.11.11` and answered. On `10.11.0`, the floor that same package claims, the
+server refuses to load it. Nothing below changes either half, and none of it applies on a server
+where the plugin does not load at all.
 
 ## From an installed plugin to a queue
 

@@ -13,7 +13,7 @@ overview: "A user asks the server for a film or a series, an administrator answe
 description: >
   A user who cannot find something asks for it from inside Jellyfin rather than through a message to whoever runs the server. The ask lands in a queue an administrator works through, and the person who asked can see what happened to it.
 
-  This is not finished. A user can ask for a title and follow what happened to their own asks, and an administrator answers them in a queue. There is no gesture that finds a title the server does not have unless a browsing sibling plugin supplies one, and nothing here downloads anything: approving a request moves a record, and whatever the operator already runs is what fetches. One published release has been installed on a server of the 10.11 line and answered as active; that is one line of the two, and not at the claimed floor.
+  This is not finished. A user can ask for a title and follow what happened to their own asks, and an administrator answers them in a queue. There is no gesture that finds a title the server does not have unless a browsing sibling plugin supplies one, and nothing here downloads anything: approving a request moves a record, and whatever the operator already runs is what fetches. One published release has been installed on a 10.11.11 server and answered as active. On 10.11.0, the floor this package declares, the same release does not load at all: the server reports it as not supported. Do not install this on a 10.11.0 server.
 category: "General"
 owner: "Flowfin"
 artifacts:
