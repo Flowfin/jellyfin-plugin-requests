@@ -24,7 +24,7 @@
 # WHAT IT DOES NOT DO. It does not install anything and it does not hash an archive. Whether the
 # bytes behind an entry are the bytes the entry promises is the manifest generator's own rule, proven
 # in `scripts/prove-manifest-refusals.sh`, and whether a released asset installs into a server is
-# #152 and is not measured anywhere yet.
+# `scripts/check-released-package.sh` and the workflow that runs it, which arrived for #152.
 #
 # usage: scripts/check-manifest-is-fresh.sh <manifest-json> <releases-file>
 #   the releases file holds one release tag per line, in any order - the shape

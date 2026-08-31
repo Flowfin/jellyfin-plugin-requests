@@ -423,6 +423,7 @@ longer tracks it.
 | `full-disk.yaml`          | adopted, landed   | What a caller sees when the volume the store writes to runs out of room, on a mount with a hard size, on the runtime of each line. The suite cannot ask it: filling a filesystem needs one to fill, and the headless rule refuses a test that needs a container engine. #46.                                                                                                                                                                                                               |
 | `manifest.yaml`           | adopted, landed   | The manifest generator watched refusing what it says it refuses, over one manifest per defect, with a clean pair of packages beside them. A generator that has never said no writes a manifest for a clean pair, which is also what a generator with no rules does. #110.                                                                                                                                                                                                                  |
 | `manifest-freshness.yaml` | adopted, landed   | The document a server fetches, read back against the releases that exist, once a day and on its own files. It is not the publish checking itself: the incident behind #111 is a publish whose manifest write failed while the run stayed green, so the step that failed would have been the step reporting it. A claimed line with no release is reported rather than passed over. It raises nothing an operator sees, which is #111's third condition and waits on the fleet sweep. #111. |
+| `release-install.yaml`    | adopted, landed   | The archive a published release attaches, downloaded, checked against the digest published beside it, and installed on a server of the line its own metadata names. `package.yaml` installs the package the run just built, so a publish that attached the wrong bytes passes it, and `manifest-freshness.yaml` hashes no archive and installs nothing. A claimed line with no release is reported rather than passed over. #152.                                                          |
 | `changelog.yaml`          | declined, deleted | It drafts a release changelog against a version scheme this repository has not fixed, and nothing covers that risk here because there is nothing to release yet; #107.                                                                                                                                                                                                                                                                                                                     |
 | `command-dispatch.yaml`   | declined, deleted | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                                                                                                                                                                                                                                                                                                                                |
 | `command-rebase.yaml`     | declined, deleted | Same comment-driven surface, the half that rewrites pull request branches on command, and the same absence.                                                                                                                                                                                                                                                                                                                                                                                |
@@ -737,6 +738,7 @@ arrived after that head, so their green runs are their own and carry their own h
 | `sibling-set.yaml`            | 32624752477, `surface/66-a-view-of-your-own-requests`, both lines red at `Alone, then with the set`, on the alone half rather than the collision half | 32603611260               |
 | `user-isolation.yaml`         | 32560880189, `proof/67-the-queue-is-not-closed-to-everybody`, both lines red at the queue step                                                        | 32603611273               |
 | `manifest-freshness.yaml`     | none of this kind, below                                                                                                                              | 33246667212, at `12182bf` |
+| `release-install.yaml`        | none of this kind, below                                                                                                                              | pending, below            |
 | `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                       | 32623457801, at `d154ab3` |
 
 The job and step of each red run are read off the run rather than off a log:
@@ -758,6 +760,17 @@ every answer it refuses over files rather than over a fetch, and which has itsel
 failing: with the reader replaced by a script that exits zero it reports `12 of the rules above did
 not bite` and reds. The green cell is the first run of it on the mainline, which fetched the live
 document and compared it rather than only proving the reader.
+
+**`release-install.yaml` has the same shape and the same two reasons.** Its `install` job reds when
+an asset a release has already published does not install, and a release is immutable, so arranging
+that on purpose means publishing a broken release to everybody who has added this repository and
+being unable to take it back. There is no red run of the kind that column holds and there is not
+going to be one. What stands in its place is its `prove` job, which hands
+`scripts/check-released-package.sh` every answer it refuses over files rather than over a download,
+and which has itself been watched failing: with the reader replaced by a script that exits zero it
+reports `11 of the rules above did not bite` and reds. The green cell is filled by the first run of
+the `install` job, which downloads the newest release of every claimed line that has one and installs
+it, rather than by a run that only proved the reader.
 
 ### The two cells that were wrong
 

@@ -398,6 +398,16 @@ The plugin is copied into the container after the server has started, because `/
 and a copy made before that lands where the running server never looks. The server is then
 restarted, because plugins are read at start.
 
+**What it installs is decided by the caller, and there are three callers.** Handed nothing, it
+publishes the project and installs the assembly, which is the run recorded below.
+`.github/workflows/package.yaml` names `PLUGIN_FROM_DIRECTORY` and installs the package that run
+just built, so the bytes an artifact list actually produces are the ones under test.
+`.github/workflows/release-install.yaml` names it too, and what it points at is a package downloaded
+from a published release, checked against the digest published beside it by
+`scripts/check-released-package.sh` first. That third one also names `EXPECTED_PLUGIN_VERSION`,
+because the version a months-old release reports is not the version this tree holds and comparing it
+against the tree would red a check for a disagreement it is not about.
+
 ### The recorded run
 
 Run on `e574918775c69640139ee1ecc1f2202efeff27aa`, 2026-08-06, against these images:
