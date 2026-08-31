@@ -13,6 +13,12 @@
 # release is reported rather than passed over: a line with nothing published cannot fail an install,
 # and a run that had nothing to cover must not read afterwards as one that covered it.
 #
+# TWO SERVERS PER LINE, AND THE SECOND IS THE ONE THE CLAIM IS ABOUT. A server of the line answers
+# whether the package is a plugin at all; the floor server the line's `targetAbi` names answers
+# whether the version this package claims to support can load it, which is the claim an operator on
+# an older server relies on. Both images come out of `scripts/server-lines.tsv`, and a line whose
+# floor has no published image is declared there with a dash and reported here rather than counted.
+#
 # WHAT IT DOES NOT DO, SAID HERE RATHER THAN DISCOVERED. It does not install the way a server
 # installs. A server fetches the archive named in a manifest and unpacks it itself; this puts the
 # unpacked bytes in the plugin directory, which is what every container check in this repository
@@ -40,6 +46,7 @@ on:
       - 'scripts/prove-released-install-refusals.sh'
       - 'scripts/server-under-test.sh'
       - 'scripts/verify-plugin-loads.sh'
+      - 'scripts/server-image-for.sh'
       - 'scripts/server-lines.tsv'
       - '.github/workflows/release-install.yaml'
       - 'build.yaml'
@@ -51,6 +58,7 @@ on:
       - 'scripts/prove-released-install-refusals.sh'
       - 'scripts/server-under-test.sh'
       - 'scripts/verify-plugin-loads.sh'
+      - 'scripts/server-image-for.sh'
       - 'scripts/server-lines.tsv'
       - '.github/workflows/release-install.yaml'
       - 'build.yaml'
@@ -111,6 +119,7 @@ jobs:
           cat "${RUNNER_TEMP}/releases.txt"
 
           covered=0
+          floors=0
           port=18096
 
           for packaging in build.yaml build-*.yaml; do
@@ -166,16 +175,34 @@ jobs:
             # built by a publish that may be several versions behind the working branch.
             PLUGIN_FROM_DIRECTORY="${staged}" EXPECTED_PLUGIN_VERSION="${version}" \
               ./scripts/verify-plugin-loads.sh "${image}" "${framework}" "${port}"
+            port=$((port + 1))
+
+            # THE FLOOR IS THE SERVER THE CLAIM IS ABOUT. `targetAbi` says the oldest server this
+            # package supports, and an install that worked only on the newest one of that line says
+            # nothing about the claim. The floor image is read out of the same table as the line's,
+            # so there is one place a server version is written and not two.
+            floor_image=$(./scripts/server-image-for.sh "${framework}" floor)
+            if [ -z "${floor_image}" ]; then
+              # The table declares that this line's floor has no published server image. Said here
+              # rather than left to the reader of a run that installed once and claimed a floor.
+              echo "note: ${named} declares no floor server image, so the install at targetAbi ${abi} itself was not attempted."
+            else
+              PLUGIN_FROM_DIRECTORY="${staged}" EXPECTED_PLUGIN_VERSION="${version}" \
+                ./scripts/verify-plugin-loads.sh "${floor_image}" "${framework}" "${port}"
+              port=$((port + 1))
+              floors=$((floors + 1))
+            fi
             echo "::endgroup::"
 
             covered=$((covered + 1))
-            port=$((port + 1))
           done
 
           # A run that installed nothing is not a run in which everything installed. The releases
-          # exist or they do not, and either way the last line says which of the two happened.
+          # exist or they do not, and either way the last two lines say which of the two happened
+          # and how much of the claim was actually reached.
           if [ "${covered}" -eq 0 ]; then
             echo "::error::No claimed line has a release, so nothing was installed. This job did not find a problem; it had nothing to look at."
             exit 1
           fi
           echo "${covered} claimed line(s) had a release, and the published asset of each loaded on a server of its line."
+          echo "${floors} of those ${covered} also loaded on the floor server the line's targetAbi names."
