@@ -57,7 +57,10 @@ What is not decided here, and where it is:
 - The on-disk shape, its version, and the rules for changing it are below.
 - How long a finished request is kept is `FinishedRequestRetentionDays`, and what acts on it is
   `RetentionSweep` beside this store, driven by a scheduled task. What happens to a record when the
-  person it names is deleted is still open and is #49.
+  person it names is deleted was decided on #49 and is built: `RemovedAccounts` under `People/`
+  consumes the server's own deletion event, and it applies three rules rather than one.
+  [personal-data.md](personal-data.md) is the account of them and the authority for them, because
+  they are policy and this page is the store.
 
 ## The three questions the store is asked
 
@@ -394,9 +397,31 @@ looks like. The generated equality on the record is not value equality:
 requests holding the same values compare unequal whenever the dictionaries are two objects, which is
 every time one of them came off disk. A store deciding whether a write changed anything, or a test
 asserting that what was read is what was written, cannot use `==` for it and has to compare the
-dictionary itself. Nothing in the tree does that today; this is written here so the first thing that
-needs to does not discover it as a bug.
+dictionary itself. This was written here so that the first thing needing it would not meet it as a
+bug, and something needed it: the durability leg puts every collection back before comparing the
+record and then compares the map entry by entry, with the same reason written at it.
 
-The harness for those runs is not tracked. It is a console project referencing the plugin, and adding
-one to a tree whose only test project is the suite is a means decision this issue did not take. The
-round trip belongs in the suite when the store exists, which is #46.
+    git grep -n 'ProviderIds = readFull.Value.Request.ProviderIds' -- Jellyfin.Plugin.Requests.Tests/Storage/FileRequestStoreDurabilityTests.cs
+    Jellyfin.Plugin.Requests.Tests/Storage/FileRequestStoreDurabilityTests.cs:109:                ProviderIds = readFull.Value.Request.ProviderIds,
+
+The harness for those runs is not tracked. It was a console project referencing the plugin, and
+adding one to a tree whose only test project was the suite was a means decision that issue did not
+take. **That reason has since been overtaken and the harness is still not here**, which are two
+statements rather than one: the tree now carries such a project, added for a probe that has to run as
+a process of its own rather than to hold a round trip.
+
+    git grep -n '<OutputType>' -- tools/full-disk-probe/FullDiskProbe.csproj
+    tools/full-disk-probe/FullDiskProbe.csproj:4:    <OutputType>Exe</OutputType>
+
+The round trip did not wait for it. The store exists and the round trip is in the suite, which is
+where this page said it belonged and where #46 put it on 2026-08-09, in the same change that built
+the durability this section argues for:
+
+    git grep -n 'class FileRequestStore ' -- Jellyfin.Plugin.Requests/Storage/FileRequestStore.cs
+    Jellyfin.Plugin.Requests/Storage/FileRequestStore.cs:72:public sealed class FileRequestStore : IRequestStore, IDisposable
+
+    git grep -n 'public async Task EveryFieldComesBackFromAStoreOpenedFreshOverTheSameDirectory' -- Jellyfin.Plugin.Requests.Tests/Storage/FileRequestStoreDurabilityTests.cs
+    Jellyfin.Plugin.Requests.Tests/Storage/FileRequestStoreDurabilityTests.cs:67:    public async Task EveryFieldComesBackFromAStoreOpenedFreshOverTheSameDirectory()
+
+So what is left of the paragraph above is the measurement and the trap it recorded, both of which
+still hold. What is gone is the absence it was written against.
