@@ -73,10 +73,12 @@ the plugin was `Active` at `0.2.0.0`. The server was `10.11.11`.
 says `targetAbi: "10.11.0.0"`, which names the server `10.11.0`, and putting
 `requests_0.2.0.0.zip` on that server reports
 `Requests is NotSupported rather than Active` - run `33358848505`. Jellyfin sets
-that status in one place, on a failure to load the assembly's types, so the
-published build references something that server's shared libraries do not carry.
-Which of the two moves, the claimed floor or the reference, is #152. **Do not
-install this on a `10.11.0` server: it will not run.**
+that status in one place, on a failure to load the assembly's types. What that
+server does not carry is not a member, it is the version: the archive's five
+Jellyfin references are stamped `10.11.11.0` and `10.11.0` carries all five at
+`10.11.0.0`, and a reference above what the host carries does not bind. Which of
+the two moves, the SDK the package is built against or the floor it claims, is
+#152. **Do not install this on a `10.11.0` server: it will not run.**
 
 Two further things neither run covers: the bytes are copied into the plugin
 directory rather than fetched and unpacked by the server itself, and the 12.0
