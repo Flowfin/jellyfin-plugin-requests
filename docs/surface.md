@@ -169,8 +169,10 @@ operator handing this address to their household should treat it as handing over
 
 **It offers no decision about a request.** Approving and declining need an administrator, and
 cancelling something still open needs a state a request can be withdrawn into, which this plugin does
-not have: whether there is a cancelled state is an open decision on #113. So the page is a thing to
-read, and a control that could not do anything would be worse than none.
+not have: a cancelled state was considered and refused on #113, and the refusal was read against a
+later ruling asking for the opposite and upheld on #337. So the absence is settled rather than
+pending, the page is a thing to read, and a control that could not do anything would be worse than
+none.
 
 **It carries one control, and it is not a decision.** A checkbox that turns off the message this
 plugin pushes at the person reading the page when one of their own requests moves. It belongs there
