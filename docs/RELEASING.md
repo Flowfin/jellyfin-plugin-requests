@@ -45,7 +45,7 @@ and it is why two lines are two releases rather than one release with two packag
     **Nothing enforces this step.** The workflow reports and holds no merge and no
     tag, so what stands between a collision and a release is somebody reading this
     line. Which contexts hold anything here is a branch ruleset setting rather than
-    a file in this tree, and it is #107.
+    a file in this tree, and it is #30.
 
     The run also prints which boards were in the set and which were skipped for
     having published nothing on that line. Read it: green over one board is not

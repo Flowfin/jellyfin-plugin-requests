@@ -582,7 +582,7 @@ above is still a hand run at the commit it names and has not been retaken from a
 What that job is not is a required check. It reports, and a merge is not held on it, so a change
 that breaks loading still reaches the mainline; what has changed is that somebody sees it happen on
 the pull request rather than finding out later. Which contexts hold a merge here is a branch
-ruleset setting and is #107.
+ruleset setting and is #30.
 
 The 12.0 line is a release candidate. `12.0-rc4` is what exists today and the tag will move.
 
