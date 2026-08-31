@@ -490,8 +490,8 @@ than this repository's code.
 Two things follow from that and are worth writing down here rather than being rediscovered.
 
 Nothing here reports anything to this project. No path sends anything anywhere by default and none of
-them sends anything to the maintainer at all, at any setting. That is not a property of the sink's
-design, it is a standing decision recorded on #113, and it has no opt-in.
+them sends anything to me at all, at any setting. That is not a property of the sink's design, it is
+a standing decision recorded on #113, and it has no opt-in.
 
 Nothing leaves the machine until an operator turns it on. The outbound sink is off on a fresh
 install by having nowhere to send to, and what an operator narrows it with once it has somewhere is

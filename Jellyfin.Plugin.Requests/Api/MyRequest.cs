@@ -82,8 +82,8 @@ public sealed record MyRequest
     public string? YourNote { get; init; }
 
     /// <summary>
-    /// Gets why it was declined, where it was. A decline reason is required, decided by the
-    /// maintainer on #113, and a requester who is not told why asks the same thing again.
+    /// Gets why it was declined, where it was. A decline reason is required, which I decided on
+    /// #113, and a requester who is not told why asks the same thing again.
     /// </summary>
     public DeclineReason? DeclineReason { get; init; }
 

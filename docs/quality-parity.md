@@ -631,10 +631,10 @@ The third is what the number is made of:
     10 CI-Tests
 
 `Fuzzing` is 0 because fuzzing is declined in the table above, by name and with a
-replacement. `Contributors` is 0 for a repository with one maintainer and cannot
-be anything else. `CII-Best-Practices` is 0 until somebody registers for a badge
-elsewhere. `Maintained` is 0 with the reason printed by the run itself, which is
-that the repository is younger than ninety days:
+replacement. `Contributors` is 0 for a repository I am the only contributor to
+and cannot be anything else. `CII-Best-Practices` is 0 until somebody registers
+for a badge elsewhere. `Maintained` is 0 with the reason printed by the run
+itself, which is that the repository is younger than ninety days:
 
     $ grep -oE 'score is 0: project was created within the last [0-9]+ days' \
         sarif/results.sarif

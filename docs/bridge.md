@@ -517,6 +517,6 @@ here recognises.
 Nothing off a running instance, and that is the same disclosure as the one above rather than a softer
 version of it. No call has ever been made from this tree to a service of this form and no response of
 one has ever been captured here. Both readings above are of a branch of that project's own
-repository, which is what its maintainers intend to ship rather than what any operator is running:
+repository, which is what that project intends to ship rather than what any operator is running:
 the two disagreeing about the request-status alphabet is the demonstration that a document and a
 service are different things, and a numbering read from source is subject to the same gap.
