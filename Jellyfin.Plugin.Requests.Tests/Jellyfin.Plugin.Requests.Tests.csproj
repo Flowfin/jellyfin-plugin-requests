@@ -88,6 +88,11 @@
     <None Include="../CODE_OF_CONDUCT.md" Link="CODE_OF_CONDUCT.md" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../DCO" Link="DCO" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../docs/quality-parity.md" Link="docs/quality-parity.md" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The two the security policy sends a reader to for what leaves the server, for the reason
+         above rather than a new one: the policy names one outbound path and neither describes it,
+         so following the link is what the reader does next. -->
+    <None Include="../docs/personal-data.md" Link="docs/personal-data.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../docs/notifications.md" Link="docs/notifications.md" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../.github/workflows/dco.yml" Link="dco.yml" CopyToOutputDirectory="PreserveNewest" />
     <!-- Every workflow file, next to the suite, so the parity page's enumeration of them is read
          against the directory rather than against a count somebody typed into a sentence. A
