@@ -200,10 +200,18 @@ at startup, in the server's own task list under `Requests`.
 Deleted rather than anonymised. A record stripped of its requester still says a title was asked for
 on this server on that date, and keeping that is not what a retention period is for.
 
-**That is asked to change and has not.** The decision of 2026-08-28 on #49 says age-based stripping
-uses the same tombstone as an account deletion, which is the opposite of the sentence above and of
-the argument `RetentionSweep` carries for it. Nothing has been built either way and the sweep still
-removes; which of the two stands is #337.
+**That was asked to change and the ask is withdrawn.** The decision of 2026-08-28 on #49 said
+age-based stripping uses the same tombstone as an account deletion, which is the opposite of the
+sentence above and of the argument `RetentionSweep` carries for it. #337 answered it on 2026-08-30,
+against the ruling and for the tree: the sweep goes on removing, and the sentence putting the two on
+one code path is withdrawn.
+
+The reason is what the period is for rather than how it is spelled. A stripped row is never removed,
+so a queue file that only ever gains rows would hold one row per request ever made for the life of
+the install, each of them saying that a title was asked for on this server on that date. The two
+paths are two on purpose: the tombstone is what a finished record carries between an account
+deletion and the end of its period, removal is what the period is for, and nothing outlives it. No
+issue builds this half, because it is the behaviour that already ships.
 
 **Finished means fulfilled, declined or failed**, which is the same partition the quota already
 draws, and the suite asserts the two agree over every state rather than leaving them to drift. An
@@ -268,7 +276,7 @@ that somebody who is gone asked for this title on this date. Deletion-by-record 
 and loses the administrator's history of what was asked and answered along with the person, which is
 the trade taken on #49 on 28 August.
 
-**An unfinished request they asked for is removed, and that is an interim rather than the answer.**
+**An unfinished request they asked for is removed, and that is the interim rather than the answer.**
 The same decision asks for an open request to be closed as withdrawn instead, and there is no state
 for that: a withdrawn-shaped value was considered and refused on #113, and the refusal is written
 into the model in two places:
@@ -277,8 +285,16 @@ into the model in two places:
     Jellyfin.Plugin.Requests/Model/RequestActor.cs:43:    /// is no state for a user withdrawing, refused with the <c>Cancelled</c> state on #113. The
     Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs:69:/// user withdrawing has no state to move to because <c>Cancelled</c> was refused on #113. An
 
-Which of the two stands is #337. Until it is answered, an unfinished request of theirs is removed,
-record and history together, which is what happened to every request of theirs before this.
+**#337 answered that on 2026-08-30, and the refusal stands.** Closed as withdrawn means the terminal
+state that already exists, carrying a reason that says the requester is gone, rather than a sixth
+`RequestState` value. The argument #113 made is still true - a user withdrawing is a second road to
+finished that an operator does nothing different about - and a landed decision is not re-taken by a
+later sentence that did not name it. What the answer costs is one `DeclineReason` value instead of
+eleven new cells in the lifecycle table and everything that reads it.
+
+**The behaviour has not moved yet, and #361 is where it does.** Until that lands an unfinished
+request of theirs is removed, record and history together, which is what happened to every request
+of theirs before this.
 
 **A request somebody else asked for that they had joined stays, and they come off its list.** The
 request is not theirs, and taking a third party's request away because somebody else deleted their
