@@ -6,6 +6,20 @@
 # a MissingMethodException on the oldest server it says it supports. That
 # failure lands on a user and on nothing before them.
 #
+# WHAT THIS JOB CANNOT COVER IS THE ARTEFACT, AND THE FLOOR SERVER HAS ALREADY
+# REFUSED ONE. It compiles the SOURCE against the floor SDK. What ships is
+# compiled against the current SDK, and an assembly's reference table is stamped
+# with the versions of the assemblies it was compiled against, so the published
+# `0.2.0.0` archive asks a `10.11.0` server for `MediaBrowser.Common`,
+# `MediaBrowser.Model`, `MediaBrowser.Controller`, `Jellyfin.Data` and
+# `Jellyfin.Database.Implementations` at `10.11.11.0`, and that server carries
+# all five at `10.11.0.0`. A reference above what the host carries does not
+# bind: the assembly loads, `GetTypes()` throws, and the server reports the
+# plugin `NotSupported`. Nothing has to be called for that to happen, so this
+# job being green says nothing about it and the two are easy to read as one
+# guard. It happened in run `33358848505`, the measurement is on #152, and which
+# of the two numbers moves is decided there rather than here.
+#
 # The lines are not listed here. They are read out of the packaging files at the
 # repository root, one file per package, and each file's own `targetAbi` and
 # `framework` fields decide what its job builds. Adding a line is adding a

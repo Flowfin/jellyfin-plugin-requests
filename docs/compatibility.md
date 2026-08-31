@@ -107,8 +107,12 @@ files:
   server `10.11.0`. The same archive on that server ends the run at its verdict step with
   `Requests is NotSupported rather than Active`, in run `33358848505`. Jellyfin sets that status in
   exactly one place, catching a `TypeLoadException` or a `ReflectionTypeLoadException` while loading
-  the assembly's types, so the shipped build references something `10.11.0`'s shared libraries do
-  not carry. **The floor build does not cover this and the two are easy to read as one guard.**
+  the assembly's types. **What that server does not carry is not a member, it is the version.** The
+  archive's five Jellyfin references are stamped `10.11.11.0` and the `10.11.0` server carries all
+  five at `10.11.0.0`; a reference above what the host carries does not bind, so nothing has to be
+  called for the load to fail. That measurement, and the type graph resolving clean against the
+  floor's own assemblies, are on #152. **The floor build does not cover this and the two are easy to
+  read as one guard.**
   `abi-floor.yaml` compiles the SOURCE against the floor SDK and was green on the same day; what
   ships is compiled against the current SDK, so a green floor build says the source could be built
   against the floor and nothing about the artefact that went out. #152 holds which of the two
