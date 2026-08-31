@@ -738,7 +738,7 @@ arrived after that head, so their green runs are their own and carry their own h
 | `sibling-set.yaml`            | 32624752477, `surface/66-a-view-of-your-own-requests`, both lines red at `Alone, then with the set`, on the alone half rather than the collision half | 32603611260               |
 | `user-isolation.yaml`         | 32560880189, `proof/67-the-queue-is-not-closed-to-everybody`, both lines red at the queue step                                                        | 32603611273               |
 | `manifest-freshness.yaml`     | none of this kind, below                                                                                                                              | 33246667212, at `12182bf` |
-| `release-install.yaml`        | none of this kind, below                                                                                                                              | pending, below            |
+| `release-install.yaml`        | none of this kind, below                                                                                                                              | 33357925338, at `501a943` |
 | `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                       | 32623457801, at `d154ab3` |
 
 The job and step of each red run are read off the run rather than off a log:
@@ -768,9 +768,11 @@ being unable to take it back. There is no red run of the kind that column holds 
 going to be one. What stands in its place is its `prove` job, which hands
 `scripts/check-released-package.sh` every answer it refuses over files rather than over a download,
 and which has itself been watched failing: with the reader replaced by a script that exits zero it
-reports `11 of the rules above did not bite` and reds. The green cell is filled by the first run of
-the `install` job, which downloads the newest release of every claimed line that has one and installs
-it, rather than by a run that only proved the reader.
+reports `11 of the rules above did not bite` and reds. The green cell is the first run of the
+`install` job on the mainline rather than one that only proved the reader: it downloaded
+`requests_0.2.0.0.zip`, checked it against the digest published beside it, and the server answered
+`Requests is Active at 0.2.0.0`. It covered one claimed line of two, and it says so on its own last
+two lines rather than leaving that to be worked out.
 
 ### The two cells that were wrong
 

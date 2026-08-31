@@ -92,12 +92,16 @@ files:
 - **The 12.0 evidence is against a release candidate.** The image was `jellyfin/jellyfin:12.0-rc4`
   and the server reported `12.0.0`. Listing 12.0 as supported without saying that would be a
   statement about a server nobody has run this on.
-- **The packaged install path has not been tried for this plugin.** What every run installs is the
-  built assembly copied into the container, not a package fetched and unpacked by the server. Two
-  releases exist, `0.1.0.0-stable` and `0.2.0.0-stable`, and no run recorded in this repository
-  installed from either. The sibling in the set is the other way round: it arrives as its own
-  published package, unpacked whole, so the set half of the run does exercise that path and the half
-  about this plugin does not.
+- **A published release has been installed once, and not the way a server installs.** This bullet
+  said no run recorded here had installed from either release. One has since #152:
+  `.github/workflows/release-install.yaml` downloads the newest release of every claimed line,
+  checks the archive against the digest published beside it, and puts the unpacked bytes on a server
+  of that line. Run `33357925338` at `501a943` did it for `0.2.0.0-stable` on `10.11.11`, and the
+  server answered `Requests is Active at 0.2.0.0`. What that still does not cover: the archive is
+  unpacked by the run rather than fetched and unpacked by the server, the server was not the claimed
+  floor `10.11.0`, and the 12.0 line has no release to install at all. The sibling in the set
+  arrives as its own published package and is unpacked whole, so the set half of the run exercises
+  the server's own path and the half about this plugin still does not.
 - **The supported set is one board, and it is not the one the seam is written against.** A board
   joins the set for a line on the day it publishes a release for that line, and every candidate
   besides `jellyfin-plugin-sso` has published nothing. So a green run says nothing about the sibling

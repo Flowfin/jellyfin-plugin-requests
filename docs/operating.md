@@ -5,8 +5,9 @@ queue stops moving. It is written for an operator who has never seen this plugin
 read the rest of `docs/` first.
 
 Read the "This is not finished" section of [../README.md](../README.md) before any of it. Two releases
-exist, both carry the package for one of the two claimed server lines, and the packaged install path
-has not been tried on a server. Nothing below changes that.
+exist, both carry the package for one of the two claimed server lines, and one of them has been
+installed on a server of that line once, not at the claimed floor and not by the server's own
+download. Nothing below changes that.
 
 ## From an installed plugin to a queue
 
