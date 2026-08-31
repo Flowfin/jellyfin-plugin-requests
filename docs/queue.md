@@ -58,7 +58,7 @@ The page does that turning:
 The list behind `people` is asked for once when the page opens:
 
     git grep -n "getUsers" -- Jellyfin.Plugin.Requests/Web/
-    Jellyfin.Plugin.Requests/Web/queue.html:819:                        return ApiClient.getUsers()
+    Jellyfin.Plugin.Requests/Web/queue.html:825:                        return ApiClient.getUsers()
 
 A list that cannot be read leaves the identifier in the cell, which is worse to read rather than
 wrong, and it leaves the queue readable. This is the only call either page makes that is not to this
@@ -262,19 +262,19 @@ row carries the decisions its state admits, from #61, and the two items above ar
 
     git grep -n "cell(row, " -- Jellyfin.Plugin.Requests/Web/queue.html
     Jellyfin.Plugin.Requests/Web/queue.html:382:                    function cell(row, text) {
-    Jellyfin.Plugin.Requests/Web/queue.html:738:                            cell(row, title(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:739:                            cell(row, RequestsShell.named("kind", request.Kind));
-    Jellyfin.Plugin.Requests/Web/queue.html:740:                            cell(row, RequestsShell.named("queue.state", request.State));
-    Jellyfin.Plugin.Requests/Web/queue.html:741:                            cell(row, moment(request.RequestedAt));
-    Jellyfin.Plugin.Requests/Web/queue.html:742:                            cell(row, moment(request.StateChangedAt));
-    Jellyfin.Plugin.Requests/Web/queue.html:743:                            cell(row, movedBy(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:744:                            cell(row, who(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:745:                            cell(row, waitingFor(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:746:                            cell(row, held(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:747:                            cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
-    Jellyfin.Plugin.Requests/Web/queue.html:748:                            cell(row, request.RequesterNote || "");
-    Jellyfin.Plugin.Requests/Web/queue.html:749:                            cell(row, decided(request));
-    Jellyfin.Plugin.Requests/Web/queue.html:752:                                cell(row, handover(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:744:                            cell(row, title(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:745:                            cell(row, RequestsShell.named("kind", request.Kind));
+    Jellyfin.Plugin.Requests/Web/queue.html:746:                            cell(row, RequestsShell.named("queue.state", request.State));
+    Jellyfin.Plugin.Requests/Web/queue.html:747:                            cell(row, moment(request.RequestedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:748:                            cell(row, moment(request.StateChangedAt));
+    Jellyfin.Plugin.Requests/Web/queue.html:749:                            cell(row, movedBy(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:750:                            cell(row, who(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:751:                            cell(row, waitingFor(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:752:                            cell(row, held(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:753:                            cell(row, askedBefore(request)).className = "requestsQueueAskedBefore";
+    Jellyfin.Plugin.Requests/Web/queue.html:754:                            cell(row, request.RequesterNote || "");
+    Jellyfin.Plugin.Requests/Web/queue.html:755:                            cell(row, decided(request));
+    Jellyfin.Plugin.Requests/Web/queue.html:758:                                cell(row, handover(request));
 
 The first of those fourteen lines is the function that writes a cell and the rest are the cells one
 row carries. The last of them is indented one level deeper than the others because it is the only
@@ -284,8 +284,8 @@ being a column of blanks about a bridge nobody set up. Beside them is the decisi
 which is #61:
 
     git grep -n "decide(row, request)" -- Jellyfin.Plugin.Requests/Web/queue.html
-    Jellyfin.Plugin.Requests/Web/queue.html:570:                    function decide(row, request) {
-    Jellyfin.Plugin.Requests/Web/queue.html:755:                            decide(row, request);
+    Jellyfin.Plugin.Requests/Web/queue.html:576:                    function decide(row, request) {
+    Jellyfin.Plugin.Requests/Web/queue.html:761:                            decide(row, request);
 
 Read against the six items above, that is all of them. Thirteen cells and thirteen headings, and
 that pairing is checked rather than counted by eye: a row carrying one cell more than the header

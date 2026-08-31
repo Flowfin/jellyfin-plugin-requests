@@ -294,8 +294,8 @@ back in order to render its page. This plugin's own page does exactly that for t
 exist today:
 
     git grep -n "getPluginConfiguration" -- Jellyfin.Plugin.Requests/Configuration/configPage.html
-    Jellyfin.Plugin.Requests/Configuration/configPage.html:145:                                return ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId);
-    Jellyfin.Plugin.Requests/Configuration/configPage.html:158:                        ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId)
+    Jellyfin.Plugin.Requests/Configuration/configPage.html:220:                                return ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId);
+    Jellyfin.Plugin.Requests/Configuration/configPage.html:233:                        ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId)
 
 So the protection a credential gets here is the protection the server's data directory gets, and this
 page claims no more than that.

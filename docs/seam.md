@@ -439,7 +439,7 @@ for somebody to infer from the first.
 `IRequestStore` is public, and the plugin registers it into the container the server hands it:
 
     git grep -n 'AddSingleton<IRequestStore>' -- Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs
-    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:63:        serviceCollection.AddSingleton<IRequestStore>(provider => new FileRequestStore(
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:68:        serviceCollection.AddSingleton<IRequestStore>(provider => new FileRequestStore(
 
 That collection is the server's own, not one this plugin keeps to itself, so the registration sits
 where everything else in the process can be resolved from. What the interface answers is not

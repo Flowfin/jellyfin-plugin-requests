@@ -64,6 +64,7 @@ which is the trade taken deliberately on #49 in exchange for not keeping identif
 have gone.
 
     git grep -n 'public RequestArrival? Arrival' -- Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs
+    Jellyfin.Plugin.Requests/Model/RequestHistoryEntry.cs:97:    public RequestArrival? Arrival { get; init; }
 
 The value says which surface, and never which caller. A request handed over the seam is filed against
 whoever the calling plugin said asked for it, with no session behind the name, and one asked for over
@@ -104,8 +105,8 @@ and cannot take it back.
 ### Two fields carry free text somebody typed
 
     git grep -nE 'public string\? (RequesterNote|DeclineNote)' -- Jellyfin.Plugin.Requests/Model/MediaRequest.cs
-    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:209:    public string? RequesterNote
-    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:242:    public string? DeclineNote
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:210:    public string? RequesterNote
+    Jellyfin.Plugin.Requests/Model/MediaRequest.cs:243:    public string? DeclineNote
 
 `RequesterNote` is what the person asking wrote, and `DeclineNote` is what the operator wrote back.
 Both are bounded in length and neither is bounded in content. Anybody can write a name, an address or
@@ -136,17 +137,23 @@ notices file. The settings file holds no person at all, which is the whole
 of that class rather than a sample:
 
     git grep -nE '^    public (const )?(int|bool|string) ' -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
-    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:52:    public const int MinimumRetentionDays = 30;
-    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:67:    public int OpenRequestsPerUser { get; set; } = 10;
-    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:72:    public bool AcceptsMovies { get; set; } = true;
-    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:83:    public bool AcceptsSeries { get; set; } = true;
-    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:99:    public int FinishedRequestRetentionDays { get; set; } = 365;
-    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:123:    public string OutboundNoticeAddress { get; set; } = string.Empty;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:53:    public const int MinimumRetentionDays = 30;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:68:    public int OpenRequestsPerUser { get; set; } = 10;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:73:    public bool AcceptsMovies { get; set; } = true;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:84:    public bool AcceptsSeries { get; set; } = true;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:100:    public int FinishedRequestRetentionDays { get; set; } = 365;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:120:    public bool TellsAdministratorsAboutArrivals { get; set; }
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:152:    public string OutboundNoticeAddress { get; set; } = string.Empty;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:167:    public bool AnnouncesApprovals { get; set; } = true;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:181:    public bool AnnouncesDeclines { get; set; } = true;
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:191:    public bool AnnouncesFulfilments { get; set; } = true;
 
-Three numbers, one of them the floor under another, two switches, and one address. Nothing there is
-about anybody. The address is where a notice is posted and is empty until an operator types one; it
-names a machine rather than a person, and what typing one into it sends is the section on what
-leaves the server below.
+Three numbers, one of them the floor under another, six switches, and one address. Nothing there is
+about anybody. Two of the switches say what kinds of thing may be asked for, three say which
+movements are announced outward, and one says whether a live administrator is told that a request
+arrived; [configuration.md](configuration.md) is the authority for each. The address is where a
+notice is posted and is empty until an operator types one; it names a machine rather than a person,
+and what typing one into it sends is the section on what leaves the server below.
 
 `PluginConfigurationTests` refuses a second setting of that shape, so a credential arriving beside
 it is a red suite rather than a thing to notice.
@@ -241,7 +248,8 @@ reading on this board has measured it.
 when an account is deleted and this plugin consumes it:
 
     git grep -n 'IEventConsumer<UserDeletedEventArgs>' -- Jellyfin.Plugin.Requests/
-    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:232:        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
+    Jellyfin.Plugin.Requests/People/RemovedAccounts.cs:30:public sealed class RemovedAccounts : IEventConsumer<UserDeletedEventArgs>
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:240:        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
 
 There are three rules and they are not one rule.
 
@@ -293,12 +301,12 @@ who is gone.
 and the queue page drew it the same day, while the sentence here went on saying an administrator sees
 a raw identifier. It was found by reading the page against the tree rather than by anything failing:
 
-    git log --format='%h %ad %s' --date=short -1 -- Jellyfin.Plugin.Requests/Web/queue.html
+    git log --format='%h %ad %s' --date=short -S 'queue.movedBy.deleted' --reverse -- Jellyfin.Plugin.Requests/Web/queue.html | head -1
     211b90c 2026-08-27 Draw who last moved a request, and keep a deleted account apart from an unanswered call
 
     git grep -n 'queue.movedBy.deleted' -- Jellyfin.Plugin.Requests/
     Jellyfin.Plugin.Requests/Localisation/Strings/en.json:122:  "queue.movedBy.deleted": "A person who has been deleted",
-    Jellyfin.Plugin.Requests/Web/queue.html:558:                        return RequestsShell.word("queue.movedBy.deleted");
+    Jellyfin.Plugin.Requests/Web/queue.html:564:                        return RequestsShell.word("queue.movedBy.deleted");
 
 What the page draws is an identifier the dashboard's user list does not hold, and it says so only
 where that list was actually read, so a failed call is never reported as a deleted account. The
@@ -358,7 +366,7 @@ There is no metadata lookup either. This plugin calls no metadata source at all,
 rather than a habit:
 
     git grep -n 'id: no-call-to-a-metadata-source' -- tools/opengrep/rules.yaml
-    tools/opengrep/rules.yaml:479:  - id: no-call-to-a-metadata-source
+    tools/opengrep/rules.yaml:529:  - id: no-call-to-a-metadata-source
 
 And nothing reports anything to this project, at any setting, by design and with no opt-in. That is
 recorded in [notifications.md](notifications.md) with the decision behind it.
