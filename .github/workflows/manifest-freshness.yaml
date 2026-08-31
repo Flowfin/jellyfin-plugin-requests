@@ -8,10 +8,27 @@
 # fetches, and reads it against the releases that exist.
 #
 # WHAT IT DOES NOT DO, SAID HERE RATHER THAN DISCOVERED. It does not raise anything an operator will
-# see. A failed scheduled run on this board becomes an issue raised by the fleet sweep on
-# `iderex/wache#31` once that sweep's credential lands, which is #111's third condition and is
-# answered in the direction of not building a notifier here. Until then a red run here sits in a run
-# list, which is the condition this workflow does not meet and does not claim to.
+# see. That is #111's third condition, and it is the one this workflow does not meet and does not
+# claim to. A red run here sits in a run list.
+#
+# THE MECHANISM THIS COMMENT NAMED FOR IT HAS LANDED AND DOES NOT CARRY IT. What stood here said a
+# failed scheduled run on this board becomes an issue raised by the fleet sweep on
+# `iderex/wache#31` once that sweep's credential lands. The credential landed, the sweep was built
+# and merged, and that issue is closed as completed - and what it reads is open code-scanning,
+# Dependabot and secret-scanning counts per board. It reads no board's workflow-run conclusions, so
+# a red run here is not a thing it can see:
+#
+#     gh issue view 31 --repo iderex/wache --json number,state,stateReason --jq '[.number,.state,.stateReason]|@tsv'
+#     31      CLOSED  COMPLETED
+#
+#     gh api repos/iderex/wache/contents/.github/workflows/fleet-alert-sweep.yml --jq .content \
+#       | base64 -d | grep -c conclusion
+#     0
+#
+# So what would carry this condition is an open question on #111 rather than a landing somebody is
+# waiting for, and this comment says so instead of pointing at a wait that has ended. Whether the
+# platform's own notice of a failed scheduled run reaches anybody is a per-account setting nothing
+# here can read, and it is not evaluated either way.
 #
 # The reading is `scripts/check-manifest-is-fresh.sh` and every refusal it makes is watched biting in
 # `scripts/prove-manifest-freshness-refusals.sh`, which needs no network and runs on every pull
