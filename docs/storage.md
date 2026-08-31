@@ -354,9 +354,9 @@ The chosen medium needs nothing that is not already in the runtime. The plugin p
 references are the two Jellyfin assemblies and nothing else, and neither is added by this decision:
 
     git grep -n 'PackageReference Include' -- Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj Directory.Build.props
-    Directory.Build.props:54:        <PackageReference Include="SerilogAnalyzer" Version="0.15.0" PrivateAssets="All" />
-    Directory.Build.props:55:        <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
-    Directory.Build.props:56:        <PackageReference Include="SmartAnalyzers.MultithreadingAnalyzer" Version="1.1.31" PrivateAssets="All" />
+    Directory.Build.props:85:        <PackageReference Include="SerilogAnalyzer" Version="0.15.0" PrivateAssets="All" />
+    Directory.Build.props:86:        <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
+    Directory.Build.props:87:        <PackageReference Include="SmartAnalyzers.MultithreadingAnalyzer" Version="1.1.31" PrivateAssets="All" />
     Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:23:    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)">
     Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:26:    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)">
 
