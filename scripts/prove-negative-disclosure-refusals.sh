@@ -95,7 +95,13 @@ accepts() {
 # not staged yet, and the broken-negative case passed because the checker was correct about a file
 # git could not see.
 present='usr/bin/env bash'
-absent='NoSuchSymbolIsInThisTreeAnywhereAtAll'
+
+# The absent one is built from two halves so that naming it here does not put it in the tree. Written
+# whole it would be tracked the moment this file is, which is how it broke: it passed on the machine
+# it was written on, where this file was not staged yet, and failed on the runner, where it was.
+absent_head='NoSuchSymbolIsIn'
+absent_tail='ThisTreeAnywhereAtAll'
+absent="${absent_head}${absent_tail}"
 
 if ! git grep -q -- "$present" -- scripts/; then
     echo "the fixture is wrong: scripts/ no longer holds ${present}, so nothing here proves a present string is found." >&2
