@@ -8,6 +8,18 @@
 # The 12.0 entry is a release candidate. docs/compatibility.md says so in its own words and this
 # file does not repeat the argument.
 #
-# framework	image
-net9.0	jellyfin/jellyfin:10.11.11
-net10.0	jellyfin/jellyfin:12.0-rc4
+# THE THIRD COLUMN IS THE FLOOR SERVER, WHICH IS A DIFFERENT QUESTION FROM THE SECOND. The second is
+# a server of the line, and every check that wants one server of a line asks for it. The third is the
+# OLDEST server the line's claimed `targetAbi` names, which is the one an install has to work on for
+# the claim to mean anything, and it is what `.github/workflows/release-install.yaml` asks for. A
+# `targetAbi` of `A.B.C.D` names the server version `A.B.C`, which is the same reading
+# `.github/workflows/abi-floor.yaml` makes of the same field.
+#
+# A DASH MEANS THAT LINE'S FLOOR HAS NO PUBLISHED SERVER IMAGE, and it is written here rather than
+# discovered by a failed pull, so that an absent image is a fact somebody declared and a failed pull
+# stays a failure. The 12.0 line is in release candidates: there is no `jellyfin/jellyfin:12.0.0` to
+# install anything on, and the day one is published is the day this dash becomes a tag.
+#
+# framework	image	floor image
+net9.0	jellyfin/jellyfin:10.11.11	jellyfin/jellyfin:10.11.0
+net10.0	jellyfin/jellyfin:12.0-rc4	-
