@@ -17,6 +17,9 @@
 # built by the gate is put on a server: the bytes a person would install are the ones under test,
 # and a publish is a different set of files from a package.
 #
+# `EXPECTED_PLUGIN_VERSION` names the version the server must report, for a caller installing bytes
+# this tree did not build. Unset, the number comes from `Directory.Build.props` as it always did.
+#
 # What a caller gets, after `server_start`:
 #
 #   $BASE       the address to call, on the loopback interface
@@ -209,8 +212,18 @@ for plugin in json.load(sys.stdin):
     # The number is read out of the one place that holds it rather than written here, so this adds no
     # copy of it. Exactly one value, or the test below ends the run: two would make which one is
     # meant a guess, and none would compare against the empty string and pass on any server at all.
+    #
+    # A CALLER INSTALLING SOMETHING OTHER THAN THIS TREE NAMES THE NUMBER, and the released-package
+    # check is the caller that has to. What it installs is an archive a publish attached months ago,
+    # so the tree's own version is the wrong thing to compare it against: the first version bump
+    # after a release would redden that check for a disagreement it is not about. Every other caller
+    # passes nothing and gets the reading it had before.
     local expected_version
-    expected_version=$(grep -o '<PluginVersion>[^<]*' "$repo_root/Directory.Build.props" | cut -d'>' -f2)
+    if [ -n "${EXPECTED_PLUGIN_VERSION:-}" ]; then
+        expected_version=$EXPECTED_PLUGIN_VERSION
+    else
+        expected_version=$(grep -o '<PluginVersion>[^<]*' "$repo_root/Directory.Build.props" | cut -d'>' -f2)
+    fi
     test "$(printf '%s' "$expected_version" | grep -c '^')" = "1"
 
     PLUGIN_ID=$(printf '%s' "$plugins" | python3 -c '

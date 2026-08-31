@@ -1,0 +1,181 @@
+# Does the release an operator downloads install into a server of the line it claims?
+#
+# #152's last condition, and the one thing about a release nothing here measured. Two other routes
+# come close and neither answers it. `.github/workflows/package.yaml` installs a package on a server
+# of its line, but the package is the one that run just built, so a publish that attached the wrong
+# bytes passes it. `.github/workflows/manifest-freshness.yaml` reads the document a server fetches
+# against the releases that exist, and says of itself that it hashes no archive and installs nothing.
+# What is left between them is the asset itself: downloaded the way an operator downloads it, checked
+# against the digest published beside it, and put on a server of the line its own metadata names.
+#
+# EVERY CLAIMED LINE THAT HAS A RELEASE, AND A NOTE FOR EVERY LINE THAT HAS NONE. The lines are read
+# out of the packaging files at the root, the releases out of the tracker, and a claimed line with no
+# release is reported rather than passed over: a line with nothing published cannot fail an install,
+# and a run that had nothing to cover must not read afterwards as one that covered it.
+#
+# WHAT IT DOES NOT DO, SAID HERE RATHER THAN DISCOVERED. It does not install the way a server
+# installs. A server fetches the archive named in a manifest and unpacks it itself; this puts the
+# unpacked bytes in the plugin directory, which is what every container check in this repository
+# does. So it answers whether the published bytes are a plugin that loads, and not whether the
+# server's own download-and-unpack path works on them.
+#
+# It also raises nothing an operator sees. A failed scheduled run sits in a run list, which is the
+# same bound `manifest-freshness.yaml` names for itself and the same issue answers it: #111's third
+# condition.
+#
+# THIS IS NOT A REQUIRED CHECK. The required set is a repository setting rather than a file in this
+# tree, and #30 is where it is written down and applied.
+name: Released package installs
+
+on:
+  schedule:
+    # Once a day, away from the hours the other scheduled readings take. What this bounds is how
+    # long a release nobody can install stays unreported, and a release is not published on a
+    # schedule, so a day is short against the time such a thing has previously gone unnoticed.
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/check-released-package.sh'
+      - 'scripts/prove-released-install-refusals.sh'
+      - 'scripts/server-under-test.sh'
+      - 'scripts/verify-plugin-loads.sh'
+      - 'scripts/server-lines.tsv'
+      - '.github/workflows/release-install.yaml'
+      - 'build.yaml'
+      - 'build-*.yaml'
+  push:
+    branches: [master]
+    paths:
+      - 'scripts/check-released-package.sh'
+      - 'scripts/prove-released-install-refusals.sh'
+      - 'scripts/server-under-test.sh'
+      - 'scripts/verify-plugin-loads.sh'
+      - 'scripts/server-lines.tsv'
+      - '.github/workflows/release-install.yaml'
+      - 'build.yaml'
+      - 'build-*.yaml'
+
+# Explicit deny-all at workflow level; each job grants only what it needs.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prove:
+    # The reader that decides whether an asset is installable at all, handed every answer it refuses,
+    # one triple of files at a time. It downloads nothing and starts no server, so it answers in
+    # seconds and it answers on a machine with no network.
+    name: the released-package reader refuses what it says it refuses
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Every answer the reader refuses, refused for its own reason
+        run: |
+          set -euo pipefail
+          ./scripts/prove-released-install-refusals.sh
+
+  install:
+    name: the published release loads on a server of its line
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Take the newest release of every claimed line, install it, and read the server back
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # The tag names the line since #110: `X.Y.Z.W-stable` is the line build.yaml carries and
+          # `X.Y.Z.W-<line>-stable` is build-<line>.yaml. The newest tag per line is asked of the
+          # tracker rather than derived from a list here, and `gh release list` answers newest first.
+          gh release list --repo "${GITHUB_REPOSITORY}" --limit 200 \
+            --json tagName --jq '.[].tagName' > "${RUNNER_TEMP}/releases.txt"
+          echo "releases:"
+          cat "${RUNNER_TEMP}/releases.txt"
+
+          covered=0
+          port=18096
+
+          for packaging in build.yaml build-*.yaml; do
+            [ -f "${packaging}" ] || continue
+            abi=$(sed -n 's/^targetAbi: *"\([^"]*\)".*/\1/p' "${packaging}" | head -1)
+            case "${packaging}" in
+              build.yaml)
+                suffix=""
+                named="the line build.yaml names"
+                ;;
+              *)
+                line=${packaging#build-}
+                line=${line%.yaml}
+                suffix="-${line}"
+                named="the ${line} line"
+                ;;
+            esac
+
+            tag=$(grep -E "^[0-9]+(\.[0-9]+)+${suffix}-stable$" "${RUNNER_TEMP}/releases.txt" | head -1 || true)
+            if [ -z "${tag}" ]; then
+              # SILENT ABOUT THE LINE RATHER THAN GREEN ABOUT IT. A claimed line with nothing
+              # published cannot fail an install, so there is nothing here to refuse; saying so is
+              # the difference between a run that covered the line and one that had nothing to cover.
+              echo "note: ${named} (targetAbi ${abi}) has no release, so no install was attempted for it."
+              continue
+            fi
+
+            echo "::group::${named}: ${tag}"
+            assets="${RUNNER_TEMP}/assets-${tag}"
+            rm -rf "${assets}"
+            mkdir -p "${assets}"
+            gh release download "${tag}" --repo "${GITHUB_REPOSITORY}" --dir "${assets}" \
+              --pattern '*.zip' --pattern '*.sha256' --pattern '*.zip.meta.json'
+            ls -1 "${assets}"
+
+            archive=$(ls -1 "${assets}"/*.zip | head -1)
+            ./scripts/check-released-package.sh \
+              "${archive}" "${archive%.zip}.sha256" "${archive}.meta.json" "${assets}/answers"
+            cat "${assets}/answers"
+            # Written by the reader above out of the release's own metadata and this repository's
+            # packaging files. Nothing here re-derives them, so there is one derivation and not two.
+            # shellcheck disable=SC1090
+            . "${assets}/answers"
+
+            staged="${assets}/unpacked"
+            rm -rf "${staged}"
+            mkdir -p "${staged}"
+            unzip -o "${archive}" -d "${staged}"
+            ls -1 "${staged}"
+
+            image=$(./scripts/server-image-for.sh "${framework}")
+            # The version the server must report is the release's, not this tree's: the archive was
+            # built by a publish that may be several versions behind the working branch.
+            PLUGIN_FROM_DIRECTORY="${staged}" EXPECTED_PLUGIN_VERSION="${version}" \
+              ./scripts/verify-plugin-loads.sh "${image}" "${framework}" "${port}"
+            echo "::endgroup::"
+
+            covered=$((covered + 1))
+            port=$((port + 1))
+          done
+
+          # A run that installed nothing is not a run in which everything installed. The releases
+          # exist or they do not, and either way the last line says which of the two happened.
+          if [ "${covered}" -eq 0 ]; then
+            echo "::error::No claimed line has a release, so nothing was installed. This job did not find a problem; it had nothing to look at."
+            exit 1
+          fi
+          echo "${covered} claimed line(s) had a release, and the published asset of each loaded on a server of its line."
