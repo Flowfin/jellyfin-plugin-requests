@@ -103,8 +103,9 @@ paraphrase gets wrong.
 ## Wiring an external request service
 
 **Nothing in this tree talks to one.** The only bridge that ships is the one for a server that has no
-service, it makes no call, and the settings carry no field for an address or a credential. There is
-nothing to wire today.
+service, it makes no call, and the settings carry no bridge address and no credential. There is
+nothing to wire today. The address on the settings page is the one in step 2 above, where a notice
+about a request is posted, and it has nothing to do with a request service.
 
 That is not the same as nothing being decided, and the parts an operator will have to reason about
 are already written down. [bridge.md](bridge.md) is the authority for all three, and this section

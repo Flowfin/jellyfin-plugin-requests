@@ -255,9 +255,44 @@ a second implementation arriving in the plugin assembly unnamed for the same rea
 
 **There is no credential today and nothing here holds one.** The only implementation of the bridge in
 this tree is the one for a server that has no service, it makes no call, and the configuration
-carries no field for an address or for a secret. Everything below is what will be true the day the
+carries no bridge address and no credential. Everything below is what will be true the day the
 adapter adds one, written now so that it is a position rather than a description written afterwards
 to fit whatever was built.
+
+**One field for an address does exist and it is not this one.** `OutboundNoticeAddress` is where a
+notice about a request is posted, it is empty on every install where nobody has decided otherwise,
+and [`notifications.md`](notifications.md) is what it does. It is named here because a sentence
+saying the configuration holds no address, in a tree that holds one, is the sentence a reader carries
+away.
+
+### The mark such a value would carry is already in force
+
+`SecretAttribute` marks a setting whose value may not appear in anything this plugin writes for
+somebody else to read, and the notice address above carries it:
+
+    git grep -nE '^    (\[Secret\]|public string OutboundNoticeAddress)' -- Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:151:    [Secret]
+    Jellyfin.Plugin.Requests/Configuration/PluginConfiguration.cs:152:    public string OutboundNoticeAddress { get; set; } = string.Empty;
+
+**The mark refuses nothing on its own**, and that is the part to read before treating it as
+protection. Nothing reads it at run time and no code path behaves differently for a marked property.
+What holds the rule is a lint rule pointed at the mark, and a suite leg refusing a mark that no rule
+names, so the two cannot drift apart:
+
+    git grep -n 'id: no-marked-setting-in-a-message' -- tools/opengrep/rules.yaml
+    tools/opengrep/rules.yaml:789:  - id: no-marked-setting-in-a-message
+
+    git grep -n 'public void EveryMarkedSettingIsNamedByARuleInTheInvariantLint' -- Jellyfin.Plugin.Requests.Tests/Configuration/SecretsStayOutOfTheLogTests.cs
+    Jellyfin.Plugin.Requests.Tests/Configuration/SecretsStayOutOfTheLogTests.cs:147:    public void EveryMarkedSettingIsNamedByARuleInTheInvariantLint()
+
+It is not a redacting type, and that is a decision rather than an omission: the host keeps this
+configuration by serialising it and the settings page edits it the same way, so a value that hands
+out a redaction on those paths is a setting that does not survive a restart. What answers that
+instead is a write-only settings page.
+
+None of that decides anything about a bridge credential. It is written here so that the section
+below argues against what is in force rather than against an empty tree, and where such a credential
+is kept is #85.
 
 ### Where it goes
 
