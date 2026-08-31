@@ -48,6 +48,12 @@ What is worth knowing before the first push:
 - Some rules of this tree are patterns rather than prose, in
   `tools/opengrep/rules.yaml`. Each one carries a fixture it is watched refusing,
   so adding a rule means adding the fixture that proves it bites.
+- The documents here argue from commands, and the `path:line:text` lines they
+  paste as evidence are read back against the files they name. Edit a file and a
+  document quoting a line below the edit goes stale without either of them being
+  wrong, so `scripts/check-pasted-evidence.sh` refuses that under the same job.
+  Re-run the command above the block and paste what it prints; do not edit the
+  number to fit. It says what it cannot read at the top of the script.
 
 Run the build and the suite before pushing:
 

@@ -6,6 +6,16 @@
 # invariant, added the first time an invariant is decided rather than in a batch
 # afterwards.
 #
+# ONE OF THE READERS HERE IS NOT A PATTERN, AND IT IS HERE RATHER THAN IN A
+# WORKFLOW OF ITS OWN. `scripts/check-pasted-evidence.sh` resolves the
+# `path:line:text` lines the documents paste as evidence against the files they
+# name, which no pattern can do because it compares two places in the tree
+# against each other. It is the same class of rule - one this board decided, that
+# no compiler states, and that a document could otherwise only ask for - so it
+# runs under the same job. Under a job of its own it would report a context the
+# ruleset does not require, and #30 is where the six contexts already in that
+# position are waiting; this one holds a merge from the day it lands instead.
+#
 # Two steps, and both are needed. The first scans the repository and fails on any
 # finding, which is what makes a rule a gate. The second scans the fixtures and
 # fails unless every declared rule fired on one, because a rule that quietly
@@ -77,3 +87,17 @@ jobs:
 
       - name: Prove every rule still refuses something
         run: ./tools/opengrep/prove-rules-fire.sh
+
+      # The reader is watched refusing before its verdict is read. It passes on a
+      # tree nobody has broken, which is the same output a reader that says yes to
+      # everything produces, and the defect it exists for arrives by accident
+      # rather than on demand.
+      - name: Every refusal the pasted-evidence reader claims, refused for its own reason
+        run: ./scripts/prove-pasted-evidence-refusals.sh
+
+      # Over every tracked document rather than the ones this change touched. A
+      # paste goes stale when the file it cites is edited, which is a change that
+      # need not touch the document at all - so reading only the changed documents
+      # would miss every instance of the thing this refuses.
+      - name: Refuse a pasted line the tree does not produce
+        run: ./scripts/check-pasted-evidence.sh
