@@ -62,12 +62,30 @@ There is no telemetry. Nothing about use is collected and nothing is sent
 anywhere for this project's benefit, without exception and without a later
 review of that.
 
-Today the plugin makes no outbound call at all, which is a fact about the tree
-rather than a promise about every version:
+The plugin makes one outbound call and an operator has to turn it on. It is the
+notification sink, and the three lines below are one path rather than three: the
+client, and the socket pipeline it is handed at registration.
 
-    git grep -nE 'HttpClient|WebRequest|WebSocket|Socket' -- Jellyfin.Plugin.Requests ; echo "exit=$?"
-    exit=1
+    git grep -nE 'HttpClient|WebRequest|WebSocket|Socket' -- Jellyfin.Plugin.Requests
+    Jellyfin.Plugin.Requests/Notify/OutboundSink.cs:61:    private readonly HttpClient _client;
+    Jellyfin.Plugin.Requests/Notify/OutboundSink.cs:104:        _client = new HttpClient(handler, disposeHandler: false)
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:151:            new SocketsHttpHandler(),
 
-That will change when a bridge to an external request service exists. What goes
-to such a service is what the operator configured it to receive, and it is
-documented where that is built.
+It posts nothing until an operator sets `OutboundNoticeAddress`, which is empty
+on every install where nobody has decided otherwise, and there is no other way to
+turn it on. What it posts then is one small document per movement in the queue.
+[docs/notifications.md](docs/notifications.md) writes that document out field by
+field, and [docs/personal-data.md](docs/personal-data.md) is the account of
+everything that leaves the server.
+
+**This section said the plugin makes no outbound call at all, and that stopped
+being true on 2026-08-16.** The sentence is corrected here rather than quietly
+replaced, because somebody who read it and took it for a property of the plugin
+took it from this page. It was never a change in behaviour: the sink landed with
+its switch off and has never been on by default. What was wrong is that this page
+went on asserting the tree of six days earlier, and the pasted command under it
+went on being quoted with an output it no longer produced.
+
+A bridge to an external request service would be a second such path and does not
+exist yet. What goes to one is what the operator configured it to receive, and it
+is documented where that is built.
