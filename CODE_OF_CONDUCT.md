@@ -32,10 +32,9 @@ in scope, whether or not it was aimed at a contributor.
 Use the **Security** tab, then **Report a vulnerability**, and say at the top
 that the report is about conduct rather than a vulnerability.
 
-That form is a private channel to the maintainer and is the only one this
-repository has, which is why a conduct report shares it. It is read by the same
-person, and nothing about a report is made public without asking the person who
-sent it.
+That form is a private channel to me and is the only one this repository has,
+which is why a conduct report shares it. I read both, and nothing about a report
+is made public without asking the person who sent it.
 
 ## What happens then
 
@@ -47,6 +46,6 @@ What can follow, in order: a private word, a public correction of something that
 was posted, removal of the content, and a block. Which one it is depends on what
 happened and on whether it happened again.
 
-Where the report is about the maintainer, there is nowhere in this repository to
-take it. GitHub's own abuse reporting is the route that does not run through the
-person being reported.
+Where the report is about me, there is nowhere in this repository to take it.
+GitHub's own abuse reporting is the route that does not run through the person
+being reported.

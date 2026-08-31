@@ -4,7 +4,7 @@
 
 Use GitHub's private vulnerability reporting for this repository: the **Security**
 tab, then **Report a vulnerability**. It is enabled here, and it opens a draft
-advisory only you and the maintainer can read.
+advisory only you and I can read.
 
 The form is here, without navigating:
 

@@ -10,11 +10,11 @@
 #
 # It is a first-party workflow with one `github-script` step rather than an
 # external review service. A service that reasons about a change is a third party
-# reading every diff before a maintainer does, and the same rules are a few
-# dozen lines of JavaScript against the pull request API. Nothing here is
-# checked out: every input is read from the pull request metadata through the
-# API, so there is no untrusted working tree, and no untrusted value is ever
-# interpolated into a shell command.
+# reading every diff before I do, and the same rules are a few dozen lines of
+# JavaScript against the pull request API. Nothing here is checked out: every
+# input is read from the pull request metadata through the API, so there is no
+# untrusted working tree, and no untrusted value is ever interpolated into a
+# shell command.
 #
 # The checks are tiered by confidence, because a check that fires on a
 # reasonable change teaches people to route around it.
