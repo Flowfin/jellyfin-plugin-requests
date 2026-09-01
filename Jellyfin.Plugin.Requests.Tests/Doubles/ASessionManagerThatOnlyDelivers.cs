@@ -37,10 +37,22 @@ namespace Jellyfin.Plugin.Requests.Tests.Doubles;
 /// The recorded call keeps the arguments as they were passed, the user list included, because the
 /// claim under test is about who is in that list.
 /// </para>
+/// <para>
+/// <b>Several threads may push through it at once.</b> <c>ServerRequesterNotice</c> and
+/// <c>ServerArrivalNotice</c> each decide one message on a task of their own and call the session
+/// manager from whichever one runs, so two messages handed over without a wait between them reach
+/// this from two threads with nothing above them serialising it. An unguarded
+/// <see cref="List{T}"/> under that traffic loses an entry, keeps one twice or is enumerated
+/// mid-append, and each of those reads in a report as a defect in whatever the test was actually
+/// about. The whole of what the lock buys is that every push made through this double is kept
+/// exactly once, and that a list already handed out does not move under its reader. No order across
+/// threads is promised, because nothing above it promises one.
+/// </para>
 /// </summary>
 #pragma warning disable CS0067 // The event is never used: the host raises these, and nothing here does.
 internal sealed class ASessionManagerThatOnlyDelivers : ISessionManager
 {
+    private readonly object _gate = new object();
     private readonly List<Delivery> _delivered = [];
     private readonly List<Broadcast> _broadcast = [];
 
@@ -72,15 +84,35 @@ internal sealed class ASessionManagerThatOnlyDelivers : ISessionManager
     public IEnumerable<SessionInfo> Sessions => [];
 
     /// <summary>
-    /// Gets every push at a named person this double was asked to make, in order.
+    /// Gets every push at a named person this double was asked to make, in order, as a copy taken
+    /// under the lock.
     /// </summary>
-    public IReadOnlyList<Delivery> Delivered => _delivered;
+    public IReadOnlyList<Delivery> Delivered
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _delivered.ToArray();
+            }
+        }
+    }
 
     /// <summary>
-    /// Gets every push at whoever administers the server, in order. The server decides which
-    /// sessions those are, so there is no list of people to record and the audience is the fact.
+    /// Gets every push at whoever administers the server, in order, as a copy taken under the lock.
+    /// The server decides which sessions those are, so there is no list of people to record and the
+    /// audience is the fact.
     /// </summary>
-    public IReadOnlyList<Broadcast> Broadcasts => _broadcast;
+    public IReadOnlyList<Broadcast> Broadcasts
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _broadcast.ToArray();
+            }
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether the one usable call fails instead of delivering.
@@ -101,7 +133,10 @@ internal sealed class ASessionManagerThatOnlyDelivers : ISessionManager
             throw new InvalidOperationException("This session manager was told to fail the push.");
         }
 
-        _delivered.Add(new Delivery(userIds, name, data));
+        lock (_gate)
+        {
+            _delivered.Add(new Delivery(userIds, name, data));
+        }
 
         return Task.CompletedTask;
     }
@@ -118,7 +153,10 @@ internal sealed class ASessionManagerThatOnlyDelivers : ISessionManager
             throw new InvalidOperationException("This session manager was told to fail the push.");
         }
 
-        _broadcast.Add(new Broadcast(name, data));
+        lock (_gate)
+        {
+            _broadcast.Add(new Broadcast(name, data));
+        }
 
         return Task.CompletedTask;
     }
