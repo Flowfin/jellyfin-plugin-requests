@@ -115,8 +115,14 @@ files:
   read as one guard.**
   `abi-floor.yaml` compiles the SOURCE against the floor SDK and was green on the same day; what
   ships is compiled against the current SDK, so a green floor build says the source could be built
-  against the floor and nothing about the artefact that went out. #152 holds which of the two
-  moves.
+  against the floor and nothing about the artefact that went out.
+  **Which of the two moves is answered on #360: the package moves to the floor and the claim stands**,
+  because moving the claim would narrow every server this plugin reaches in order to accommodate a
+  packaging accident, silently, for anybody on `10.11.4`. So the plugin compiles against the floor
+  each packaging file names, and `scripts/check-package-abi.sh` refuses a package whose references
+  rise above that claim on both routes that produce one. **This does not repair the published
+  release.** `0.2.0.0` carries the references it shipped with, and the run above stays the answer for
+  it until a later release replaces it, which is #152's.
 - **The supported set is one board, and it is not the one the seam is written against.** A board
   joins the set for a line on the day it publishes a release for that line, and every candidate
   besides `jellyfin-plugin-sso` has published nothing. So a green run says nothing about the sibling

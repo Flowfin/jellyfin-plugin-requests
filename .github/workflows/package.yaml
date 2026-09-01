@@ -205,6 +205,22 @@ jobs:
           ls -l "${ARTIFACT}" "${ARTIFACT}.meta.json"
           unzip -l "${ARTIFACT}"
 
+      - name: Check the package asks a server for no more than its targetAbi claims
+        env:
+          ARTIFACT: ${{ steps.jprm.outputs.artifact }}
+          ABI: ${{ matrix.abi }}
+        # THE ARTEFACT, NOT THE SOURCE. `abi-floor.yaml` compiles the source against the floor SDK
+        # and says nothing about what was packaged; the step above says the archive exists and
+        # nothing about what it asks for. Between the two sat the class that shipped: `0.2.0.0`
+        # asked a `10.11.0` server for five assemblies at `10.11.11.0`, that server carries them at
+        # `10.11.0.0`, the reference does not bind and the server reports the plugin
+        # `NotSupported` after a download that looked like it worked. Every route here was green
+        # while that shipped, which is #360.
+        #
+        # It reads the archive this job just built, so it judges the bytes rather than a publish of
+        # the same source, and it reaches no network and starts no server.
+        run: ./scripts/check-package-abi.sh "${ARTIFACT}" "${ABI}"
+
       - name: Keep the package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -244,3 +260,34 @@ jobs:
           ls -1 "${staged}"
           image=$(./scripts/server-image-for.sh "${FRAMEWORK}")
           PLUGIN_FROM_DIRECTORY="${staged}" ./scripts/verify-plugin-loads.sh "${image}" "${FRAMEWORK}" 18096
+
+  abi-refusals:
+    # The check name a branch ruleset would require. It is matched literally, so renaming this job
+    # removes a requirement instead of renaming one, and it carries no version for the reason
+    # `floor 10.11.0.0` and `floor 12.0.0.0` are not in the required set today: a name that moves
+    # with a matrix stops existing the day the matrix moves.
+    name: the package check refuses what it says it refuses
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    # A job of its own rather than a step inside the matrix. The proof builds the plugin twice and
+    # judges both, which is one answer about the checker rather than one answer per line, and under
+    # the matrix it would be run once per line and prove the same thing twice.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Every answer the package reader gives, watched being given
+        # Beside the check rather than in a workflow of its own, for the reason the floor build's
+        # documentation proof gives: this is where the answer is produced, and a proof that runs on
+        # some other head is a proof of some other file.
+        run: ./scripts/prove-package-abi-refusals.sh

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- One target, unlike the plugin and unlike the probe. What this reads is a file: the
+         metadata tables of an assembly say the same thing whichever runtime asks, so a reader per
+         server line would be two builds of one answer. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Jellyfin.Plugin.Requests.PackageAbi</RootNamespace>
+    <AssemblyName>Jellyfin.Plugin.Requests.PackageAbi</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- No PackageReference at all. System.Reflection.Metadata and System.Reflection.PortableExecutable
+       are in the shared framework, so this builds and runs with nothing fetched from a feed. -->
+
+</Project>

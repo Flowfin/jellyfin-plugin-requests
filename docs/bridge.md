@@ -308,8 +308,23 @@ configuration. The host decides that and this plugin does not choose it:
     ### MediaBrowser.Common.Configuration.IApplicationPaths  [MediaBrowser.Common.dll]
         System.String get_PluginConfigurationsPath()
 
-Read out of the reference assemblies each target framework compiles against, `jellyfin.common` at
-`10.11.11` on `net9.0` and at `12.0.0-rc4` on `net10.0`, with identical output on both. A plugin that
+Read out of the reference assemblies, `jellyfin.common` at `10.11.11` on `net9.0` and at
+`12.0.0-rc4` on `net10.0`, with identical output on both. **The `net9.0` target compiles against
+`10.11.0` since #360**, which is the floor `build.yaml` claims, and the three members are in that
+package too:
+
+    for v in 10.11.0 10.11.11; do echo "--- jellyfin.common $v ---"; tr -d '\000' < ~/.nuget/packages/jellyfin.common/$v/lib/net9.0/MediaBrowser.Common.dll | grep -oE 'get_ConfigurationFilePath|SaveConfiguration|get_PluginConfigurationsPath' | sort | uniq -c; done
+    --- jellyfin.common 10.11.0 ---
+          1 get_ConfigurationFilePath
+          1 get_PluginConfigurationsPath
+          1 SaveConfiguration
+    --- jellyfin.common 10.11.11 ---
+          1 get_ConfigurationFilePath
+          1 get_PluginConfigurationsPath
+          1 SaveConfiguration
+
+That is a count of the name in the assembly rather than a signature, which is a weaker reading than
+the block above it and is stated as one. A plugin that
 wrote its secret somewhere else would be a plugin whose secret is not in the operator's backup and
 not in their restore, which is a worse failure than the one it would be avoiding.
 
