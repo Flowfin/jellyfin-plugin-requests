@@ -32,6 +32,7 @@
   "declineReason.NoRoomForIt": "No room for it",
   "declineReason.NotWanted": "Not wanted",
   "declineReason.Other": "Another reason",
+  "declineReason.TheRequesterIsGone": "The person who asked is gone",
   "declineReason.withNote": "{0}, {1}",
   "kind.Movie": "Film",
   "kind.Series": "Series",

@@ -2,8 +2,10 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.Requests.Model;
 using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Storage;
+using Jellyfin.Plugin.Requests.Time;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Requests.People;
@@ -21,16 +23,28 @@ namespace Jellyfin.Plugin.Requests.People;
 /// for stays, with <see cref="DeletedPerson.Tombstone"/> where their identifier was: the record
 /// then says that somebody who is gone asked for this title on this date, which keeps an
 /// administrator's history of what was asked and answered without keeping a person. An UNFINISHED
-/// one of theirs goes. A request somebody else asked for that they had joined is not theirs, so the
-/// request stays and they come off its list of joiners.
+/// one of theirs is declined, for the reason saying the person who asked is gone, and then carries
+/// the tombstone too, because declining it makes it finished. A request somebody else asked for that
+/// they had joined is not theirs, so the request stays and they come off its list of joiners.
 /// </para>
 /// <para>
-/// <b>The middle rule is an interim and says so.</b> The ruling of 2026-08-28 on #49 asks for an
-/// open request of a deleted person to be closed as withdrawn rather than removed, and there is no
+/// <b>The middle rule was an interim and is not one any more.</b> The ruling of 2026-08-28 on #49
+/// asks for an open request of a deleted person to be closed rather than removed, and there was no
 /// state for that: a withdrawn-shaped value was considered and refused on #113, which
-/// <see cref="Model.RequestLifecycle"/> and <see cref="Model.RequestActor"/> both record. Which of
-/// the two decisions stands is #337. Until it is answered an unfinished request of theirs is
-/// removed, which is what this did for every request of theirs before #336.
+/// <see cref="RequestLifecycle"/> and <see cref="RequestActor"/> both record. #337 answered which of
+/// the two stands, and it upholds that refusal: the close is the terminal state this plugin already
+/// has, carrying <see cref="DeclineReason.TheRequesterIsGone"/>. So an unfinished request of theirs
+/// is declined rather than removed, and the record stays with the tombstone where they were, which
+/// is what a finished request of a deleted person has carried since #336.
+/// </para>
+/// <para>
+/// <b>The decline is made through the lifecycle and not written into the store.</b> Every other
+/// state change this plugin makes is checked against <see cref="RequestLifecycle.Table"/> and leaves
+/// a history entry, and one that did neither would be the only state change here that an operator
+/// answering a complaint could not read the reason for. Two cells admit the plugin into the declined
+/// state for it, and the lifecycle refuses that reason from an operator and every other reason from
+/// this caller, so the widening is that one move rather than a general permission to decline. The
+/// entry it leaves says <see cref="RequestActor.Plugin"/>, because nobody decided this.
 /// </para>
 /// <para>
 /// <b>What finished means is not decided here.</b> It is
@@ -59,10 +73,12 @@ namespace Jellyfin.Plugin.Requests.People;
 /// </para>
 /// <para>
 /// <b>The case nobody has decided, stated rather than hidden.</b> A request the deleted person asked
-/// for and somebody else joined is removed, because it is theirs, and the joiner loses it. Whether it
-/// should instead pass to the earliest joiner, who did ask for the same title, is a call no issue on
-/// this board has taken. Removal is what the decision as written says, and passing it on would make
-/// the record say somebody asked at a moment they did not.
+/// for and somebody else joined is declined, because it is theirs, and the joiner loses what they
+/// were waiting for. Whether it should instead pass to the earliest joiner, who did ask for the same
+/// title, is a call no issue on this board has taken. Ending it is what the decision as written says,
+/// and passing it on would make the record say somebody asked at a moment they did not. #361 changed
+/// what happens to such a request from removal to a decline and did not touch this question: the
+/// joiner is left with a request they cannot act on either way.
 /// </para>
 /// </summary>
 public sealed class AccountRemoval
@@ -80,6 +96,7 @@ public sealed class AccountRemoval
 
     private readonly IRequestStore _store;
     private readonly INoticePreferences _notices;
+    private readonly IClock _clock;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -87,16 +104,22 @@ public sealed class AccountRemoval
     /// </summary>
     /// <param name="store">Where requests are kept.</param>
     /// <param name="notices">Where the switch a person set about being told is kept.</param>
+    /// <param name="clock">
+    /// What stamps the decline this makes. It is injected for the reason everything else here that
+    /// stamps a record is: a moment read off the machine cannot be asserted about.
+    /// </param>
     /// <param name="logger">Where what was done is written.</param>
     /// <exception cref="ArgumentNullException">Where anything it needs is missing.</exception>
-    public AccountRemoval(IRequestStore store, INoticePreferences notices, ILogger logger)
+    public AccountRemoval(IRequestStore store, INoticePreferences notices, IClock clock, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(notices);
+        ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(logger);
 
         _store = store;
         _notices = notices;
+        _clock = clock;
         _logger = logger;
     }
 
@@ -106,9 +129,10 @@ public sealed class AccountRemoval
     private enum Outcome
     {
         /// <summary>
-        /// It was theirs, unfinished, and it is gone.
+        /// It was theirs, unfinished, and it is declined with the tombstone where they were. The
+        /// record stays.
         /// </summary>
-        Removed,
+        Declined,
 
         /// <summary>
         /// It was theirs, finished, and it stays with the tombstone where they were.
@@ -148,7 +172,7 @@ public sealed class AccountRemoval
                 nameof(userId));
         }
 
-        var removed = 0;
+        var declined = 0;
         var tombstoned = 0;
         var detached = 0;
         var left = 0;
@@ -163,8 +187,8 @@ public sealed class AccountRemoval
 
             switch (outcome)
             {
-                case Outcome.Removed:
-                    removed++;
+                case Outcome.Declined:
+                    declined++;
                     break;
 
                 case Outcome.Tombstoned:
@@ -186,16 +210,16 @@ public sealed class AccountRemoval
         // because the list holds the people who said no and nobody else.
         await _notices.SetAsync(userId, tellsThem: true, cancellationToken).ConfigureAwait(false);
 
-        var report = new AccountRemovalReport(removed, tombstoned, detached, left);
+        var report = new AccountRemovalReport(declined, tombstoned, detached, left);
 
         // At information rather than debug where anything happened: this is the plugin deleting
         // somebody's records without anybody asking it to, and an operator answering for what is
         // held should find that it happened in the log they already read.
-        if ((removed > 0 || tombstoned > 0 || detached > 0) && _logger.IsEnabled(LogLevel.Information))
+        if ((declined > 0 || tombstoned > 0 || detached > 0) && _logger.IsEnabled(LogLevel.Information))
         {
             _logger.LogInformation(
-                "A deleted account left {Removed} unfinished request(s) of their own, which were removed, {Tombstoned} finished one(s), which stay with the person taken out of them, and {Detached} request(s) of other people's, which they were taken off.",
-                removed,
+                "A deleted account left {Declined} unfinished request(s) of their own, which were declined because the person who asked is gone and stay with the person taken out of them, {Tombstoned} finished one(s), which stay with the person taken out of them, and {Detached} request(s) of other people's, which they were taken off.",
+                declined,
                 tombstoned,
                 detached);
         }
@@ -238,9 +262,27 @@ public sealed class AccountRemoval
                 {
                     if (!RetentionSweep.IsFinished(current.Request))
                     {
-                        return await _store.RemoveAsync(current.Request.Id, current.Revision, cancellationToken).ConfigureAwait(false)
-                            ? Outcome.Removed
-                            : Outcome.Gone;
+                        // Declined first and tombstoned afterwards, in that order. The history entry
+                        // the lifecycle appends records what the caller was on the request it was
+                        // handed, and a request whose requester had already been replaced is one
+                        // this caller is nothing on.
+                        var declined = RequestLifecycle.Decline(
+                            current.Request,
+                            DeclineReason.TheRequesterIsGone,
+                            note: null,
+                            _clock.UtcNow,
+                            RequestCaller.Plugin);
+
+                        await _store.ReplaceAsync(
+                            declined with
+                            {
+                                RequestedByUserId = DeletedPerson.Tombstone,
+                                JoinedByUserIds = [.. declined.JoinedByUserIds.Where(joined => joined != userId)]
+                            },
+                            current.Revision,
+                            cancellationToken).ConfigureAwait(false);
+
+                        return Outcome.Declined;
                     }
 
                     // The joiner list is written as well, because a person can be the requester of

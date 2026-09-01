@@ -42,21 +42,32 @@ public sealed class AccountRemovalTests
     private static readonly DateTimeOffset Asked = new DateTimeOffset(2026, 8, 27, 8, 0, 0, TimeSpan.Zero);
 
     /// <summary>
-    /// A request the deleted person asked for is gone.
+    /// When the account is deleted, which is after it was asked so a decline this pass makes can be
+    /// told apart from the stamp the request arrived with.
+    /// </summary>
+    private static readonly TestClock Removed = new TestClock(new DateTimeOffset(2026, 8, 29, 21, 0, 0, TimeSpan.Zero));
+
+    /// <summary>
+    /// An open request the deleted person asked for is declined and the record stays.
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
-    public async Task ARequestTheDeletedPersonAskedForIsRemoved()
+    public async Task ARequestTheDeletedPersonAskedForIsDeclinedAndStays()
     {
         var store = new InMemoryRequestStore();
         await store.AddAsync(ARequest(1, TheDeletedPerson), CancellationToken.None).ConfigureAwait(true);
 
         var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal(1, report.Removed);
+        Assert.Equal(1, report.Declined);
         Assert.Equal(0, report.Detached);
         Assert.Equal(0, report.Left);
-        Assert.Empty(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
+
+        var held = Assert.Single(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
+
+        Assert.Equal(RequestState.Declined, held.Request.State);
+        Assert.Equal(DeclineReason.TheRequesterIsGone, held.Request.DeclineReason);
+        Assert.Equal(DeletedPerson.Tombstone, held.Request.RequestedByUserId);
     }
 
     /// <summary>
@@ -79,7 +90,7 @@ public sealed class AccountRemovalTests
 
         var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal(0, report.Removed);
+        Assert.Equal(0, report.Declined);
         Assert.Equal(1, report.Detached);
 
         var held = Assert.Single(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
@@ -158,7 +169,9 @@ public sealed class AccountRemovalTests
 
         var held = await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal(3, held.Count);
+        // Four rather than three: nothing is removed by this pass any more. The open request of
+        // theirs is declined and stays, which is what #337 answered and #361 built.
+        Assert.Equal(4, held.Count);
         Assert.All(held, one => Assert.NotEqual(TheDeletedPerson, one.Request.RequestedByUserId));
         Assert.All(held, one => Assert.DoesNotContain(TheDeletedPerson, one.Request.JoinedByUserIds));
         Assert.All(held, one => Assert.NotEqual(TheDeletedPerson, one.Request.StateChangedByUserId));
@@ -231,25 +244,37 @@ public sealed class AccountRemovalTests
     }
 
     /// <summary>
-    /// A request that moves under the removal is re-read and removed against what the store now
-    /// holds. A sweep that gave up on the first refusal would leave the record it exists to remove.
+    /// A request that moves under the removal is re-read and declined against what the store now
+    /// holds. A sweep that gave up on the first refusal would leave the person on the record it
+    /// exists to take them off.
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
-    public async Task ARequestThatMovesUnderTheRemovalIsStillRemoved()
+    public async Task ARequestThatMovesUnderTheRemovalIsStillDeclined()
     {
         var inner = new InMemoryRequestStore();
         await inner.AddAsync(ARequest(1, TheDeletedPerson), CancellationToken.None).ConfigureAwait(true);
 
-        var store = new StoreThatMovesARequestUnderTheRemoval(
+        // The window is now the one between the read and the WRITE, because this pass writes a
+        // decline where it used to remove. A double that intercepted the removal would move nothing
+        // and this test would pass without ever reaching the retry it is about.
+        var store = new StoreThatMovesARequestUnderTheWrite(
             inner,
             moving => moving with { RequesterNote = "Somebody typed something while this ran." });
 
         var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal(1, report.Removed);
+        Assert.Equal(1, report.Declined);
         Assert.Equal(0, report.Left);
-        Assert.Empty(await inner.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
+
+        var held = Assert.Single(await inner.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
+
+        Assert.Equal(RequestState.Declined, held.Request.State);
+        Assert.Equal(DeletedPerson.Tombstone, held.Request.RequestedByUserId);
+
+        // What the writer typed under the removal survives, which is what re-reading is for: a
+        // decline written against the copy read first would have thrown their note away.
+        Assert.Equal("Somebody typed something while this ran.", held.Request.RequesterNote);
     }
 
     /// <summary>
@@ -274,7 +299,7 @@ public sealed class AccountRemovalTests
         var store = new AStoreThatNeverSettles(inner);
         var log = new RecordingLogger();
 
-        var report = await new AccountRemoval(store, new InMemoryNoticePreferences(), log).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
+        var report = await new AccountRemoval(store, new InMemoryNoticePreferences(), Removed, log).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
         Assert.Equal(1, report.Left);
         Assert.Equal(0, report.Detached);
@@ -299,7 +324,7 @@ public sealed class AccountRemovalTests
         await store.AddAsync(ARequest(1, TheDeletedPerson), CancellationToken.None).ConfigureAwait(true);
 
         var log = new RecordingLogger();
-        await new AccountRemoval(store, new InMemoryNoticePreferences(), log).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
+        await new AccountRemoval(store, new InMemoryNoticePreferences(), Removed, log).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
         Assert.Contains(
             log.At(LogLevel.Information),
@@ -319,7 +344,7 @@ public sealed class AccountRemovalTests
         await store.AddAsync(ARequest(1, SomebodyElse), CancellationToken.None).ConfigureAwait(true);
 
         var log = new RecordingLogger();
-        await new AccountRemoval(store, new InMemoryNoticePreferences(), log).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
+        await new AccountRemoval(store, new InMemoryNoticePreferences(), Removed, log).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
         Assert.Empty(log.At(LogLevel.Information));
         Assert.Empty(log.At(LogLevel.Warning));
@@ -343,7 +368,7 @@ public sealed class AccountRemovalTests
         await notices.SetAsync(TheDeletedPerson, tellsThem: false, CancellationToken.None).ConfigureAwait(true);
         await notices.SetAsync(SomebodyElse, tellsThem: false, CancellationToken.None).ConfigureAwait(true);
 
-        await new AccountRemoval(store, notices, new RecordingLogger())
+        await new AccountRemoval(store, notices, Removed, new RecordingLogger())
             .RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
         Assert.True(await notices.TellsThemAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true));
@@ -387,17 +412,28 @@ public sealed class AccountRemovalTests
     }
 
     /// <summary>
-    /// An unfinished request of theirs is still removed, which is this change's interim and is
-    /// asserted rather than left to be discovered.
+    /// An unfinished request of theirs is declined rather than removed, and everything the record is
+    /// kept for is on it afterwards.
     /// <para>
-    /// The ruling asks for such a request to be closed as withdrawn instead, and there is no state
-    /// for that: a withdrawn-shaped value was considered and refused on #113. Which of the two
-    /// decisions stands is #337. This test is what a later change answering it has to argue with.
+    /// <b>This replaces <c>AnUnfinishedRequestOfTheirsIsStillRemoved</c>, which asserted the
+    /// opposite.</b> That test was the interim #336 landed deliberately, and it said in its own
+    /// summary that a later change answering #337 would have to argue with it. #337 was answered:
+    /// such a request is closed rather than deleted, and the close is the terminal state this plugin
+    /// already has, carrying <see cref="DeclineReason.TheRequesterIsGone"/>. The interim is
+    /// superseded here rather than deleted, so it is visible that the behaviour was reversed on
+    /// purpose instead of having quietly gone.
+    /// </para>
+    /// <para>
+    /// <b>Four things are asserted and each one is a way the change could be half made.</b> The
+    /// record staying is the whole point of the answer; the state and the reason are what make it
+    /// readable on a surface that renders declines; the tombstone is what makes it hold no person;
+    /// and the history entry saying <see cref="RequestActor.Plugin"/> is what stops an operator
+    /// being answerable for a decision nobody took.
     /// </para>
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
-    public async Task AnUnfinishedRequestOfTheirsIsStillRemoved()
+    public async Task AnUnfinishedRequestOfTheirsIsDeclinedRatherThanRemoved()
     {
         var store = new InMemoryRequestStore();
 
@@ -408,11 +444,27 @@ public sealed class AccountRemovalTests
         var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
 
         Assert.Equal(new AccountRemovalReport(1, 0, 0, 0), report);
-        Assert.Empty(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
+
+        var held = Assert.Single(await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true));
+
+        Assert.Equal(RequestState.Declined, held.Request.State);
+        Assert.Equal(DeclineReason.TheRequesterIsGone, held.Request.DeclineReason);
+        Assert.Equal(DeletedPerson.Tombstone, held.Request.RequestedByUserId);
+        Assert.Equal(Removed.UtcNow, held.Request.StateChangedAt);
+
+        // Nobody decided it, so no person is named as having moved it.
+        Assert.Null(held.Request.StateChangedByUserId);
+
+        var entry = Assert.Single(held.Request.History);
+
+        Assert.Equal(RequestState.Approved, entry.From);
+        Assert.Equal(RequestState.Declined, entry.To);
+        Assert.Equal(RequestActor.Plugin, entry.By);
+        Assert.Equal(DeclineReason.TheRequesterIsGone, entry.Reason);
     }
 
     /// <summary>
-    /// Every finished state is tombstoned and every unfinished one is removed, over the whole of
+    /// Every finished state is tombstoned and every unfinished one is declined, over the whole of
     /// <see cref="RequestState"/> rather than over the two values the tests above happen to name.
     /// <para>
     /// The partition is <see cref="RetentionSweep.IsFinished"/>'s, and reading it here rather than
@@ -438,15 +490,20 @@ public sealed class AccountRemovalTests
         var report = await Removal(store).RemoveAsync(TheDeletedPerson, CancellationToken.None).ConfigureAwait(true);
         var held = await store.GetAllAsync(CancellationToken.None).ConfigureAwait(true);
 
+        // Either way the record stays and holds no person. What the partition decides is whether
+        // this pass ended the request or found it already ended.
+        Assert.Equal(DeletedPerson.Tombstone, Assert.Single(held).Request.RequestedByUserId);
+
         if (RetentionSweep.IsFinished(asked))
         {
             Assert.Equal(1, report.Tombstoned);
-            Assert.Equal(DeletedPerson.Tombstone, Assert.Single(held).Request.RequestedByUserId);
+            Assert.Equal(state, held[0].Request.State);
         }
         else
         {
-            Assert.Equal(1, report.Removed);
-            Assert.Empty(held);
+            Assert.Equal(1, report.Declined);
+            Assert.Equal(RequestState.Declined, held[0].Request.State);
+            Assert.Equal(DeclineReason.TheRequesterIsGone, held[0].Request.DeclineReason);
         }
     }
 
@@ -475,7 +532,7 @@ public sealed class AccountRemovalTests
     /// <summary>
     /// A finished request of the deleted person, an unfinished one, and one of somebody else's they
     /// had joined are answered by three different rules in one run, and the counts say which was
-    /// which.
+    /// which. All three records stay, so the counts are the only thing that tells them apart.
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
@@ -502,7 +559,7 @@ public sealed class AccountRemovalTests
     /// <param name="store">Where requests are kept.</param>
     /// <returns>The removal.</returns>
     private static AccountRemoval Removal(IRequestStore store)
-        => new AccountRemoval(store, new InMemoryNoticePreferences(), new RecordingLogger());
+        => new AccountRemoval(store, new InMemoryNoticePreferences(), Removed, new RecordingLogger());
 
     /// <summary>
     /// A request somebody asked for.

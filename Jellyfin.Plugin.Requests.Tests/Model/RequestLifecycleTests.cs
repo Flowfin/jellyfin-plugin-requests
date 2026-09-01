@@ -21,6 +21,11 @@ namespace Jellyfin.Plugin.Requests.Tests.Model;
 public class RequestLifecycleTests
 {
     /// <summary>
+    /// When a move in these tests is made, from a clock a test names rather than the machine's.
+    /// </summary>
+    private static readonly DateTimeOffset MovedAt = new DateTimeOffset(2026, 8, 9, 14, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
     /// Every ordered pair of states has a cell and no pair has two. This is what makes adding a
     /// value to the enumeration a visible piece of work: a sixth state arrives with eleven missing
     /// cells and reds here, instead of quietly being a state nothing can leave or reach.
@@ -347,6 +352,83 @@ public class RequestLifecycleTests
 
     private static string Pair(RequestState from, RequestState to)
         => string.Format(CultureInfo.InvariantCulture, "{0} to {1}", from, to);
+
+    /// <summary>
+    /// The plugin declines an unfinished request for the one reason that is a fact, and for no
+    /// other.
+    /// <para>
+    /// Two cells into <see cref="RequestState.Declined"/> admit the plugin so that an open request
+    /// of a deleted person can be closed rather than removed, which is #337's answer built in #361.
+    /// A cell is coarser than the move it was widened for: on its own it lets the plugin decline
+    /// anything open or approved for any reason on the list, and "not wanted" said by nobody is a
+    /// judgement attributed to a decision that was never taken. This is what narrows the widening
+    /// back to the move it was made for.
+    /// </para>
+    /// </summary>
+    /// <param name="reason">A reason that is somebody's judgement.</param>
+    [Theory]
+    [InlineData(DeclineReason.AlreadyInTheLibrary)]
+    [InlineData(DeclineReason.AlreadyRequested)]
+    [InlineData(DeclineReason.CannotBeObtained)]
+    [InlineData(DeclineReason.NotWanted)]
+    [InlineData(DeclineReason.NoRoomForIt)]
+    [InlineData(DeclineReason.Other)]
+    public void ThePluginDeclinesForTheOneReasonThatIsAFactAndForNoOther(DeclineReason reason)
+    {
+        var open = ARequest();
+
+        Assert.Throws<ArgumentException>(
+            () => RequestLifecycle.Decline(open, reason, note: "Something.", MovedAt, RequestCaller.Plugin));
+
+        var declined = RequestLifecycle.Decline(
+            open,
+            DeclineReason.TheRequesterIsGone,
+            note: null,
+            MovedAt,
+            RequestCaller.Plugin);
+
+        Assert.Equal(RequestState.Declined, declined.State);
+        Assert.Equal(DeclineReason.TheRequesterIsGone, declined.DeclineReason);
+        Assert.Null(declined.StateChangedByUserId);
+        Assert.Equal(RequestActor.Plugin, Assert.Single(declined.History).By);
+    }
+
+    /// <summary>
+    /// An operator may not give the reason saying the person who asked is gone.
+    /// <para>
+    /// The other direction of the same pairing, and the one that keeps the record honest rather than
+    /// the permission narrow. That reason is established when the server reports a deleted account;
+    /// an operator choosing it from a list would write a fact onto the record that nothing
+    /// established, and a surface would then show it beside a requester who is still there.
+    /// </para>
+    /// <para>
+    /// It also holds from <see cref="RequestState.Approved"/>, which is the other cell the widening
+    /// reaches, so the pairing is not a rule about one starting state.
+    /// </para>
+    /// </summary>
+    /// <param name="from">The state the request is in.</param>
+    [Theory]
+    [InlineData(RequestState.Open)]
+    [InlineData(RequestState.Approved)]
+    public void AnOperatorMayNotSayThePersonWhoAskedIsGone(RequestState from)
+    {
+        var request = ARequest() with { State = from };
+        var anOperator = RequestCaller.Administrator(new Guid("2d8f4b16-3a5c-4d97-8e21-7c6b5a4f3e29"));
+
+        Assert.Throws<ArgumentException>(
+            () => RequestLifecycle.Decline(
+                request,
+                DeclineReason.TheRequesterIsGone,
+                note: null,
+                MovedAt,
+                anOperator));
+
+        // And the ordinary decline from the same cell is unaffected, so the refusal above is about
+        // the reason rather than about the move.
+        Assert.Equal(
+            RequestState.Declined,
+            RequestLifecycle.Decline(request, DeclineReason.NotWanted, note: null, MovedAt, anOperator).State);
+    }
 
     /// <summary>
     /// A request with only the fields that have no default, in the state a new one is created in.

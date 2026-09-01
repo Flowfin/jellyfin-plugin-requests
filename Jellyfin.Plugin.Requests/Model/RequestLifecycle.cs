@@ -47,13 +47,26 @@ namespace Jellyfin.Plugin.Requests.Model;
 /// already refuses.
 /// </para>
 /// <para>
-/// One line decides every cell's permitted set: <b>a decision is an administrator's and an
+/// One line decides almost every cell's permitted set: <b>a decision is an administrator's and an
 /// observation is the plugin's</b>. Approving, declining, taking either back and sending something
-/// onward again are answers a person gives, and they are the six cells an administrator may make.
+/// onward again are answers a person gives, and they are the cells an administrator may make.
 /// Arriving in the library and failing to arrive are things that happened whether or not anybody
-/// looked, and they are the four cells the plugin may make. A person marking a request fulfilled
+/// looked, and they are the cells the plugin may make. A person marking a request fulfilled
 /// would be making the state say something about the library that the library does not say, and
-/// #42 is where that is detected instead.
+/// #42 is where that is detected instead. The counts those two sentences carried are gone rather
+/// than corrected: a number in a paragraph beside a table is a second copy of the table, and it went
+/// stale the first time a cell was widened.
+/// </para>
+/// <para>
+/// <b>Two cells are neither, and they are the exception the line above admits.</b> Moving an
+/// unfinished request into <see cref="RequestState.Declined"/> is made by an administrator, who
+/// decides, and by the plugin, which acts on a fact outside the request: the account of the person
+/// who asked has been deleted, so there is nobody left to answer. #337 decided that such a request is
+/// closed rather than removed and #361 built it. The widening is held to that one move rather than
+/// left as a general permission - a caller who is not an administrator may give only
+/// <see cref="DeclineReason.TheRequesterIsGone"/>, and an administrator may not give it at all,
+/// because that reason is established by the server reporting a deletion rather than chosen from a
+/// list.
 /// </para>
 /// <para>
 /// <b>A request with no provider identifier may only be declined.</b> It is a title somebody typed,
@@ -185,7 +198,9 @@ public static class RequestLifecycle
     /// Where the table allows the decline and does not admit this caller for it.
     /// </exception>
     /// <exception cref="ArgumentException">
-    /// Where the reason is <see cref="DeclineReason.Other"/> and no note says what happened.
+    /// Where the reason is <see cref="DeclineReason.Other"/> and no note says what happened; where a
+    /// caller who is not an administrator gives any reason but
+    /// <see cref="DeclineReason.TheRequesterIsGone"/>; or where an administrator gives that one.
     /// </exception>
     /// <exception cref="RequestTextTooLongException">Where the note is too long.</exception>
     public static MediaRequest Decline(
@@ -326,9 +341,42 @@ public static class RequestLifecycle
             throw new IllegalRequestTransitionException(cell.From, cell.To, cell.Why);
         }
 
-        if ((cell.Permitted & by.RolesOn(request)) == RequestActor.None)
+        var roles = by.RolesOn(request);
+
+        if ((cell.Permitted & roles) == RequestActor.None)
         {
             throw new RequestMoveNotPermittedException(cell.From, cell.To, cell.Permitted);
+        }
+
+        // WHICH MOVER MAY GIVE WHICH REASON, AND IT IS A BICONDITIONAL RATHER THAN ONE RULE.
+        //
+        // Two cells admit the plugin into Declined so that an open request of a deleted person can
+        // be closed rather than removed, which is #337's answer built in #361. Widening a cell is
+        // coarser than the move it was widened for: on its own it lets the plugin decline anything
+        // open or approved for any reason on the list, and it lets an operator record a fact about
+        // an account that they are in no position to establish. Neither of those is what was
+        // decided, so both are refused here.
+        //
+        // The check is on the ADMINISTRATOR role rather than on the plugin one, because the
+        // requester role rides along on a caller's own request and testing for the plugin by
+        // absence would let an ordinary user through the day a cell admits one.
+        if (to == RequestState.Declined)
+        {
+            var anOperator = (roles & RequestActor.Administrator) != RequestActor.None;
+
+            if (!anOperator && reason != DeclineReason.TheRequesterIsGone)
+            {
+                throw new ArgumentException(
+                    "A decline nobody decided carries the one reason that is a fact rather than a judgement, that the person who asked is gone. Every other reason on the list is somebody's decision and this caller took none.",
+                    nameof(reason));
+            }
+
+            if (anOperator && reason == DeclineReason.TheRequesterIsGone)
+            {
+                throw new ArgumentException(
+                    "The reason saying the person who asked is gone is established when the server reports a deleted account, not chosen. An operator giving it would put a fact on the record that nothing established.",
+                    nameof(reason));
+            }
         }
 
         // Authority before this one, and that order is deliberate too. Whether a request carries an
@@ -386,11 +434,31 @@ public static class RequestLifecycle
         const RequestActor Decision = RequestActor.Administrator;
         const RequestActor Observation = RequestActor.Plugin;
 
+        // The third set, and the paragraph above says that naming one is the moment to say what the
+        // cell has become. These two cells admit an operator, who decides, and the plugin, which
+        // neither decides nor observes the library: it acts on a fact outside the request, that the
+        // account of the person who asked has been deleted. #361 is where that was built and #337 is
+        // where it was decided.
+        //
+        // The widening is exactly that one move rather than a general permission to decline.
+        // `Moved` refuses a decline the plugin makes for any other reason, and refuses
+        // `DeclineReason.TheRequesterIsGone` from anybody else, so the pair is a biconditional
+        // rather than a door left open.
+        //
+        // It reaches these two cells and no others because they are the two unfinished states:
+        // `RequestQuota.CountsAgainstIt` is open or approved, and `RetentionSweep.IsFinished` is its
+        // complement, which is the partition the account removal walks.
+        const RequestActor DecisionOrTheRequesterLeaving = Decision | RequestActor.Plugin;
+
         var table = new List<RequestTransition>
         {
             Refused(RequestState.Open, RequestState.Open, NotAMove),
             Legal(RequestState.Open, RequestState.Approved, Decision, "An operator says yes."),
-            Legal(RequestState.Open, RequestState.Declined, Decision, "An operator says no."),
+            Legal(
+                RequestState.Open,
+                RequestState.Declined,
+                DecisionOrTheRequesterLeaving,
+                "An operator says no, or the person who asked is gone and nothing is left to answer."),
             Legal(
                 RequestState.Open,
                 RequestState.Fulfilled,
@@ -403,8 +471,8 @@ public static class RequestLifecycle
             Legal(
                 RequestState.Approved,
                 RequestState.Declined,
-                Decision,
-                "An operator takes an approval back, and the reason says why. This is the repair for an approval given by mistake."),
+                DecisionOrTheRequesterLeaving,
+                "An operator takes an approval back, and the reason says why. This is the repair for an approval given by mistake. It is also where an approved request goes when the person who asked is gone."),
             Legal(
                 RequestState.Approved,
                 RequestState.Fulfilled,

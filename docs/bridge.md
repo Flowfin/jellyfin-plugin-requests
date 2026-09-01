@@ -480,7 +480,7 @@ hope.** Nothing is handed over until an operator has approved it, and an approva
 request carrying no external identifier at all:
 
     git grep -n 'RequestNotIdentifiedException(to)' -- Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs
-    Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs:339:            throw new RequestNotIdentifiedException(to);
+    Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs:387:            throw new RequestNotIdentifiedException(to);
 
 **What that rule does not promise is the one this call needs.** It asks for an identifier and not for
 a TMDB one, so a request identified by an IMDb or a TVDB number alone is approvable here and has no

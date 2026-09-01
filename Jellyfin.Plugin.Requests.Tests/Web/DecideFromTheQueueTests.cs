@@ -150,12 +150,23 @@ public sealed class DecideFromTheQueueTests
     }
 
     /// <summary>
-    /// Every reason a decline may carry is one the page offers, and the list opens on none of them.
+    /// Every reason an operator may give is one the page offers, every reason they may not is one it
+    /// does not, and the list opens on none of them.
     /// <para>
     /// The reasons are a closed set in the model and a list of options on the page, which is the
     /// same second-copy problem the decisions above have. A reason added to the model and not here
     /// is one no operator can give; an option here that the model does not know is a decline the
     /// endpoint refuses after the operator has written the sentence beside it.
+    /// </para>
+    /// <para>
+    /// <b>The set is not the enumeration any more, and it is asked of the lifecycle rather than
+    /// listed here.</b> <see cref="DeclineReason.TheRequesterIsGone"/> is a fact the plugin
+    /// establishes when the server reports a deleted account, and
+    /// <see cref="RequestLifecycle.Decline"/> refuses it from an administrator, so offering it would
+    /// be an option that reds the endpoint after the operator has chosen it. Naming it here as an
+    /// exception would put the rule in two places; asking which reasons an administrator may
+    /// actually give keeps one, and a seventh reason arrives on the page or is refused from it by
+    /// the same reading.
     /// </para>
     /// <para>
     /// The option that chooses nothing is required to be the selected one. A list that opens on a
@@ -174,15 +185,59 @@ public sealed class DecideFromTheQueueTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(
-            Enum.GetNames<DeclineReason>().Order(StringComparer.Ordinal),
-            offered,
-            StringComparer.Ordinal);
+        var choosable = Enum.GetValues<DeclineReason>()
+            .Where(AnOperatorMayGive)
+            .Select(reason => reason.ToString())
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        // The reading is worth nothing if it answers yes to everything, so the two sets are known to
+        // differ before they are compared.
+        Assert.NotEqual(Enum.GetNames<DeclineReason>().Length, choosable.Length);
+
+        Assert.Equal(choosable, offered, StringComparer.Ordinal);
 
         var opensOn = options.Where(option => option.Selected).ToArray();
 
         Assert.Single(opensOn);
         Assert.Empty(opensOn[0].Value);
+    }
+
+    /// <summary>
+    /// Whether an administrator may decline an open request for this reason, asked of the lifecycle
+    /// rather than decided here.
+    /// </summary>
+    /// <param name="reason">The reason.</param>
+    /// <returns><see langword="true"/> where the move is made rather than refused.</returns>
+    private static bool AnOperatorMayGive(DeclineReason reason)
+    {
+        var open = new MediaRequest
+        {
+            Id = new Guid("00000000-0000-4000-8000-0000000000aa"),
+            RequestedByUserId = new Guid("00000000-0000-4000-8000-0000000000bb"),
+            RequestedAt = new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero),
+            Kind = RequestedItemKind.Movie,
+            DisplayTitle = "Something somebody wanted",
+            StateChangedAt = new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero)
+        };
+
+        try
+        {
+            // A note beside every reason, because one of them requires it and this reading is not
+            // about that rule.
+            _ = RequestLifecycle.Decline(
+                open,
+                reason,
+                note: "Why this was declined.",
+                new DateTimeOffset(2026, 8, 31, 13, 0, 0, TimeSpan.Zero),
+                RequestCaller.Administrator(new Guid("00000000-0000-4000-8000-0000000000cc")));
+
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

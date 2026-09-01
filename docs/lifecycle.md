@@ -58,12 +58,12 @@ itself, so a sixth state is eleven new cells rather than a silent widening.
 
 - **Open to Open**: refused. A move to the state it is already in is not a move, and appending a history entry saying nothing happened makes the history harder to read rather than more complete.
 - **Open to Approved**: allowed. An operator says yes.
-- **Open to Declined**: allowed. An operator says no.
+- **Open to Declined**: allowed. An operator says no, or the person who asked is gone and nothing is left to answer.
 - **Open to Fulfilled**: allowed. The library already holds what was asked for, so there is nothing left for anybody to decide.
 - **Open to Failed**: refused. Nothing was ever sent onward, so there is nothing that could have failed.
 - **Approved to Open**: refused. Nothing returns to open. A request reading as undecided after somebody decided it hides that decision from the next person to look at the queue.
 - **Approved to Approved**: refused. A move to the state it is already in is not a move, and appending a history entry saying nothing happened makes the history harder to read rather than more complete.
-- **Approved to Declined**: allowed. An operator takes an approval back, and the reason says why. This is the repair for an approval given by mistake.
+- **Approved to Declined**: allowed. An operator takes an approval back, and the reason says why. This is the repair for an approval given by mistake. It is also where an approved request goes when the person who asked is gone.
 - **Approved to Fulfilled**: allowed. It arrived and the person who asked can watch it.
 - **Approved to Failed**: allowed. It was sent onward and did not arrive, so it stops looking like an operator forgot about it.
 - **Declined to Open**: refused. Nothing returns to open. A request reading as undecided after somebody decided it hides that decision from the next person to look at the queue.
@@ -100,6 +100,31 @@ on Wednesday, which is what happened.
 one is a request for the right one, and it is a new request because the old one describes what was
 asked for and got an answer. A library that no longer holds the media is an observation, which the
 `Availability` field on the record already carries with the time it was made.
+
+## The one decline nobody decides
+
+Every cell into `Declined` is an operator's, except that the two out of an unfinished state are also
+the plugin's. That is not an observation in the sense the rest of the table uses the word: nothing
+about the library changed. What changed is outside the request - the Jellyfin account of the person
+who asked was deleted - so there is nobody left to give it to and nobody left to tell, and the
+request is closed rather than removed. #337 decided that and #361 built it.
+
+Widening a cell is coarser than the move it was widened for, so the reason and the mover are paired
+rather than left independent:
+
+    git grep -n 'TheRequesterIsGone = ' -- Jellyfin.Plugin.Requests/Model/DeclineReason.cs
+    Jellyfin.Plugin.Requests/Model/DeclineReason.cs:82:    TheRequesterIsGone = 6
+
+A caller that is not an administrator may give that reason and no other, so the widening does not
+become a general permission for the plugin to decline anything open. An administrator may give every
+other reason and not that one, because it is a fact the server reports rather than a judgement
+anybody makes, and an operator choosing it from a list would write down something nothing
+established. The queue page therefore offers six of the seven, and which six is read off the
+lifecycle by the test rather than listed on the page a second time.
+
+The entry it leaves in the history says the mover was the plugin, and
+`MediaRequest.StateChangedByUserId` is empty on such a request, so nobody is recorded as having taken
+a decision they did not take.
 
 ## What holds the two doors, and what it does not reach
 
