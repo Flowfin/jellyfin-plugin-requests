@@ -19,9 +19,11 @@
 # does. So it answers whether the published bytes are a plugin that loads, and not whether the
 # server's own download-and-unpack path works on them.
 #
-# It also raises nothing an operator sees. A failed scheduled run sits in a run list, which is the
-# same bound `manifest-freshness.yaml` names for itself and the same issue answers it: #111's third
-# condition.
+# It also raises nothing on its own. A failed scheduled run sits in a run list, which is the same
+# bound `manifest-freshness.yaml` names for itself, and the same thing answers it for both:
+# `publish-failure-alert.yaml` sweeps every run no pull request shows and files what it finds.
+# This one is not registered with it and nothing here has to be - what that sweep watches is derived
+# from the run list rather than from a list of names.
 #
 # THIS IS NOT A REQUIRED CHECK. The required set is a repository setting rather than a file in this
 # tree, and #30 is where it is written down and applied.
