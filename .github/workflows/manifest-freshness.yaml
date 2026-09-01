@@ -16,9 +16,10 @@
 # credential landed; the credential landed, the sweep was built and merged, and what it reads is open
 # code-scanning, Dependabot and secret-scanning counts per board rather than any board's workflow-run
 # conclusions. It then said the condition named no mechanism at all. It names one now:
-# `publish-failure-alert.yaml`, which asks the run list which runs on the default branch concluded
-# non-success, and files, updates and closes one issue for what it finds. It watches every workflow
-# here rather than this one, so nothing has to be registered with it when a workflow is added.
+# `publish-failure-alert.yaml`, which asks the run list which recent runs concluded non-success where
+# no pull request shows them, and files, updates and closes one issue for what it finds. It watches
+# every workflow here rather than this one, so nothing has to be registered with it when a workflow is
+# added.
 #
 # The residual it leaves is written in that file rather than restated here, and the shortest part of
 # it is that a sweep cannot sweep up its own failure. Whether the platform's own notice of a failed

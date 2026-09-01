@@ -21,7 +21,7 @@
 #
 # It also raises nothing on its own. A failed scheduled run sits in a run list, which is the same
 # bound `manifest-freshness.yaml` names for itself, and the same thing answers it for both:
-# `publish-failure-alert.yaml` sweeps every workflow on the default branch and files what it finds.
+# `publish-failure-alert.yaml` sweeps every run no pull request shows and files what it finds.
 # This one is not registered with it and nothing here has to be - what that sweep watches is derived
 # from the run list rather than from a list of names.
 #

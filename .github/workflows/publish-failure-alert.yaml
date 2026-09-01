@@ -1,10 +1,11 @@
-# A run that concluded non-success on the default branch becomes an issue somebody sees.
+# A run that failed where no pull request shows it becomes an issue somebody sees.
 #
 # #111's third condition. Its first two are met: a failure in any release step reds the run, and
 # `manifest-freshness.yaml` reads the document a server fetches against the releases that exist. Both
-# of them end in a run list, and a run on the default branch is not a required pull-request check, so
-# nothing about it is emailed and it can stay red while every pull request shows green. That is the
-# state the incident behind #111 arose in.
+# of them end in a run list. A run that reports to a pull request is seen by whoever opened it, and it
+# blocks the merge; a run that reports to no pull request is emailed to nobody and can stay red for as
+# long as nobody opens the run list. That second kind is the whole subject here, and it is the state
+# the incident behind #111 arose in.
 #
 # WHY THIS IS THE SIBLING BOARD'S FILE RATHER THAN A NEW ONE. `jellyfin-plugin-sso` answered exactly
 # this question in its own `publish-failure-alert.yml`, and three of its properties are decisions that
@@ -23,13 +24,34 @@
 #     under a fixed label, and when nothing is red any more it says so there and closes it. A flapping
 #     check produces a readable history in one place instead of a stream nobody reads.
 #
+# WHAT IT SWEEPS IS NOT THE DEFAULT BRANCH, AND THAT IS THIS BOARD'S CORRECTION TO THE FILE IT COPIES.
+# The sibling's sweep asks for runs on the default branch. Here that would miss the very run #111 is
+# written about: `publish.yaml` is triggered by a tag push and nothing else, so its runs carry the tag
+# as their head branch rather than `master`. Measured before this file was written:
+#
+#     gh run list --repo Flowfin/jellyfin-plugin-requests --workflow publish.yaml --limit 10 \
+#       --json headBranch,event,conclusion --jq '.[]|[.headBranch,.event,.conclusion]|@tsv'
+#     0.2.0.0-stable  push    success
+#     0.1.0.0-stable  push    success
+#
+# So the ref is not the property. What is is whether a pull request shows the run: the sweep asks for
+# every recent run of this repository and drops the ones a pull request already reports. Two event
+# names are dropped and no more, so an event class nobody has seen yet is REPORTED rather than passed
+# over, which is the same direction the conclusion denylist fails in.
+#
 # WHAT IT WATCHES IS EVERY WORKFLOW ON THIS BOARD AND NOT THE TWO #111 NAMES. That condition says "a
 # failure of either", meaning the release run and the freshness check. A mechanism scoped to two
 # workflows leaves every other red scheduled run silent, which is that issue's own complaint one level
 # down, and the third such workflow somebody adds would not be on the list. Coverage is a PROPERTY
-# here: the run list is asked which runs on the default branch concluded non-success, so a workflow
-# added to this repository is watched the day it lands and there is nothing to register anywhere.
-# Outside these comments this file names no workflow at all.
+# here: the run list is asked which runs concluded non-success, so a workflow added to this repository
+# is watched the day it lands and there is nothing to register anywhere. Outside these comments this
+# file names no workflow at all - strip the comment lines and no workflow name is left to go stale.
+#
+# THE WINDOW IS A BOUND AND THE SWEEP PRINTS WHETHER IT REACHED IT. `RUN_LIMIT` runs are fetched and
+# those younger than `WINDOW_HOURS` are examined, and on a busy day the limit can be the tighter of the
+# two. A sweep that quietly examined less than its window would read as one that examined the window
+# and found nothing, so it compares the oldest run it fetched against the cutoff and says which of the
+# two bounded it - in the log and in the issue body.
 #
 # THE RESIDUAL, WRITTEN HERE RATHER THAN LEFT TO BE DISCOVERED. This sweep excludes itself, so a
 # failure of the sweep is invisible to the sweep. That regress does not terminate - whatever watches
@@ -49,8 +71,8 @@ name: Publish failure alert
 
 on:
   schedule:
-    # Every hour, away from the hour itself. What this bounds is how long a red run on the default
-    # branch stays unreported, and the previous bound on that was never.
+    # Every hour, away from the hour itself. What this bounds is how long a red run nobody is shown
+    # stays unreported, and the previous bound on that was never.
     - cron: '43 * * * *'
   workflow_dispatch:
     inputs:
@@ -74,9 +96,9 @@ concurrency:
 
 jobs:
   sweep:
-    name: a run that concluded non-success on the default branch is reported
+    name: a run that failed where no pull request shows it is reported
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       # Read the run list, and file or update the tracking issue. Nothing else: no `contents`, so the
       # job cannot write to the tree, and no ability to re-run or cancel anything.
@@ -84,18 +106,22 @@ jobs:
       issues: write
 
     steps:
-      - name: Sweep the default branch and file, update or close the alert issue
+      - name: Sweep the run list and file, update or close the alert issue
         # Every value reaching the shell arrives through env; none is spliced into the script.
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          BRANCH: ${{ github.event.repository.default_branch }}
           SELF: ${{ github.workflow }}
           EVENT: ${{ github.event_name }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
           # Only failures this recent are reported. The window is what keeps a long-dead red run from
           # re-opening the tracking issue on every tick after the cause is fixed and the issue closed.
           WINDOW_HOURS: '24'
+          # How many runs are fetched before the window is applied. Measured on this board on
+          # 2026-09-01: 500 runs reached back about thirty hours on a day carrying 300 runs in
+          # twenty-four, so the window is the tighter bound there rather than this number. Where it is
+          # not, the step says so instead of reporting a partial sweep as a whole one.
+          RUN_LIMIT: '500'
         run: |
           set -euo pipefail
 
@@ -108,25 +134,41 @@ jobs:
             workflow_dispatch) DRY_RUN="${INPUT_DRY_RUN:-true}" ;;
             *) DRY_RUN=true ;;
           esac
-          echo "event=${EVENT} dry_run=${DRY_RUN} branch=${BRANCH}"
+          echo "event=${EVENT} dry_run=${DRY_RUN} repo=${REPO}"
 
           cutoff=$(date -u -d "-${WINDOW_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
 
-          # The derived set. No workflow is named: every run on the default branch is examined and the
-          # conclusion decides. This workflow excludes itself, and both sides of that test come from
-          # this same file, so renaming it keeps the exclusion correct with no second place to edit.
-          gh run list --repo "${REPO}" --branch "${BRANCH}" --limit 100 \
-            --json workflowName,conclusion,url,event,updatedAt > runs.json
+          # The derived set. No workflow and no ref is named: every recent run is examined, the two
+          # pull-request events are dropped because such a run is already shown to whoever opened it,
+          # and the conclusion decides the rest. This workflow excludes itself, and both sides of that
+          # test come from this same file, so renaming it keeps the exclusion correct with no second
+          # place to edit.
+          gh run list --repo "${REPO}" --limit "${RUN_LIMIT}" \
+            --json workflowName,conclusion,url,event,updatedAt,headBranch > runs.json
+
+          fetched=$(jq length runs.json)
+          oldest=$(jq -r 'if length == 0 then "" else (min_by(.updatedAt) | .updatedAt) end' runs.json)
+          # WHICH OF THE TWO BOUNDS BIT. A sweep whose oldest fetched run is younger than the cutoff
+          # examined less than its window, and saying so is the difference between "nothing was red in
+          # the last day" and "nothing was red among the runs I could see".
+          if [ -n "${oldest}" ] && [ "${oldest}" ">" "${cutoff}" ]; then
+            reach="the ${RUN_LIMIT}-run limit bounded this sweep, not the ${WINDOW_HOURS}-hour window: the oldest run examined is ${oldest}, later than the cutoff ${cutoff}"
+          else
+            reach="the ${WINDOW_HOURS}-hour window bounded this sweep; ${fetched} run(s) fetched, oldest ${oldest:-none}"
+          fi
+          echo "${reach}"
+
           jq -r --arg self "${SELF}" --arg cutoff "${cutoff}" '
             .[]
             | select(.workflowName != $self)
+            | select(.event != "pull_request" and .event != "pull_request_target")
             | select(.updatedAt >= $cutoff)
             | select((.conclusion // "") as $c
                      | $c != "success" and $c != "skipped" and $c != "cancelled" and $c != "")
-            | [.url, .conclusion, .event, .workflowName] | @tsv
+            | [.url, .conclusion, .event, .workflowName, .headBranch] | @tsv
           ' runs.json > red.tsv
 
-          echo "Examined $(jq length runs.json) run(s) on ${BRANCH}; $(wc -l < red.tsv) non-success since ${cutoff}."
+          echo "Examined ${fetched} run(s); $(wc -l < red.tsv) non-success outside a pull request since ${cutoff}."
 
           if [ ! -s red.tsv ]; then
             echo "Nothing red."
@@ -141,7 +183,7 @@ jobs:
               echo "DRY RUN: would close #${open_issue}."
             else
               gh issue comment "${open_issue}" --repo "${REPO}" \
-                --body "Nothing on \`${BRANCH}\` is red any more, so this closes. Examined $(jq length runs.json) run(s) since ${cutoff}."
+                --body "Nothing outside a pull request is red any more, so this closes. ${reach}."
               gh issue close "${open_issue}" --repo "${REPO}" --reason completed
               echo "Closed #${open_issue}."
             fi
@@ -153,7 +195,7 @@ jobs:
           # idempotent, and a failure here is not fatal.
           if [ "${DRY_RUN}" != "true" ]; then
             gh label create release-alert --repo "${REPO}" --color B60205 \
-              --description "Automated: a workflow concluded non-success on the default branch. #111" \
+              --description "Automated: a workflow failed where no pull request shows it. #111" \
               --force >/dev/null 2>&1 || true
           fi
 
@@ -175,7 +217,7 @@ jobs:
           # entry for a workflow is its newest, and how many of its runs are red is carried as a
           # number instead of as a repeated section.
           awk -F'\t' '!seen[$4]++' red.tsv > per-workflow.tsv
-          while IFS=$'\t' read -r url conclusion event wf_name; do
+          while IFS=$'\t' read -r url conclusion event wf_name head_ref; do
             run_id="${url##*/}"
             step=$(gh run view "${run_id}" --repo "${REPO}" --json jobs \
               --jq '[.jobs[] | select(.conclusion=="failure") | .steps[]
@@ -197,13 +239,14 @@ jobs:
             printf '%s\t%s\n' "${wf_name}" "${step}" >> key.txt
             count=$(cut -f4 red.tsv | grep -cxF "${wf_name}" || echo 1)
             since=$(jq -r --arg w "${wf_name}" '[.[] | select(.workflowName==$w)
+                     | select(.event != "pull_request" and .event != "pull_request_target")
                      | select((.conclusion // "") as $c
                               | $c != "success" and $c != "skipped" and $c != "cancelled" and $c != "")
                      | .updatedAt] | sort | .[0] // ""' runs.json)
             {
               printf '### %s\n\n' "${wf_name}"
-              printf 'Failing step: **%s** (conclusion `%s`, trigger `%s`)\n\n' \
-                "${step}" "${conclusion}" "${event}"
+              printf 'Failing step: **%s** (conclusion `%s`, trigger `%s`, ref `%s`)\n\n' \
+                "${step}" "${conclusion}" "${event}" "${head_ref}"
               printf '```\n%s\n```\n\n' "${log_excerpt}"
               printf 'Red since `%s`, %s run(s) in this window. Latest: %s\n\n' \
                 "${since:-unknown}" "${count}" "${url}"
@@ -213,9 +256,11 @@ jobs:
           # THE BODY HOLDS THE STATE AND THE COMMENTS HOLD THE TRANSITIONS. The key is workflow plus
           # failing step: while it does not change only the body is rewritten and nothing is said, and
           # a step that was not failing before is news.
-          header="Workflows on \`${BRANCH}\` are red. This body is rewritten on every tick and always shows the current state; the comments below mark changes only.
+          header="A workflow failed where no pull request shows it. This body is rewritten on every tick and always shows the current state; the comments below mark changes only.
 
-          A run on the default branch is not a required pull-request check and is not emailed, so it can stay red while every pull request shows green. Where the red run is the release path or the freshness check, a published release may also not be installable: check whether a release was created but the manifest a server fetches was not updated.
+          A run that reports to a pull request is seen by whoever opened it. A run triggered by a tag, a schedule, a push or by hand reports to nobody, so it can stay red while every pull request shows green. Where the red run is the release path, a published release may also not be installable: check whether a release was created but the manifest a server fetches was not updated.
+
+          What this sweep examined: ${reach}.
 
           This issue is closed by the sweep itself once nothing is red.
 
@@ -251,7 +296,7 @@ jobs:
           else
             echo 'No open alert issue; creating one.'
             num=$(gh issue create --repo "${REPO}" --label release-alert \
-              --title 'A workflow concluded non-success on the default branch' \
+              --title 'A workflow failed where no pull request shows it' \
               --body "${body}
 
           <!-- key: ${new_key} -->" | grep -o '[0-9]*$')
