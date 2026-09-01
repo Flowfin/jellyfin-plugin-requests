@@ -93,10 +93,27 @@ name below was copied out of a run rather than out of a workflow file.
     dependency-review
     Deterministic pull request hygiene checks
     Enforce greppable invariants
-    floor 10.11.0.0
-    floor 12.0.0.0
+    floor build.yaml
+    floor build-jf12.yaml
     lines
     Reject Trojan Source Unicode
+
+**Two of those fifteen were `floor 10.11.0.0` and `floor 12.0.0.0` until
+2026-09-01, and the rename is the whole reason they can be required at all.** A
+required context is a string the ruleset holds; a job whose name is built out of
+a matrix value stops existing under that string the moment the value moves, and
+raising a floor here is described everywhere on this board as editing one number
+in one file. The day somebody did that, every pull request would hang pending on
+a context nothing produces, with no red check to point at, and the gate would
+read as satisfied while being absent. That is the same failure this page already
+declines `Scorecard analysis` for, arriving from a third direction. The jobs now
+carry the packaging file, which is what identifies a line here - adding a line is
+adding a file - and the floor each one built against is printed in the run
+instead.
+
+`package 10.11.0.0`, `package 12.0.0.0` and `package-lines` carry a version in
+their names for the same reason and are not in the set above. The same repair
+applies to them the day they are wanted in it.
 
 There are no bypass actors, and none is to be added. A rule with a bypass is a
 rule that holds for whoever did not think to ask, which is the opposite of what
@@ -304,9 +321,12 @@ merge.
 - `build` there is `call / build` and `call / test` here, because the legs live
   in a called workflow and a called job's context carries the calling job's
   name.
-- `ABI floor build` there is `lines`, `floor 10.11.0.0` and `floor 12.0.0.0`
-  here, because the claimed lines are read out of the packaging files rather
-  than listed in a job, so a line is a file and not a name in a ruleset.
+- `ABI floor build` there is `lines`, `floor build.yaml` and
+  `floor build-jf12.yaml` here, because the claimed lines are read out of the
+  packaging files rather than listed in a job, so a line is a file and not a name
+  in a ruleset. The two carried the floor itself until 2026-09-01 and carry the
+  packaging file now, so that raising a floor no longer renames a requirement out
+  of existence.
 - `Package (JPRM) / Build package` there is `package-lines`, `package 10.11.0.0`
   and `package 12.0.0.0` here, for the same reason the floor build is three
   contexts: the lines are read out of the packaging files rather than listed in a
