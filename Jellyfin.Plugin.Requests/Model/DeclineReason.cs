@@ -55,5 +55,29 @@ public enum DeclineReason
     /// There is no room for it. Separate from <see cref="NotWanted"/> because it is a fact about the
     /// disk rather than a judgement about the title, and asking again later is reasonable.
     /// </summary>
-    NoRoomForIt = 5
+    NoRoomForIt = 5,
+
+    /// <summary>
+    /// The person who asked for it is gone. Their Jellyfin account was deleted while this request
+    /// was still open, so there is nobody left to give it to and nobody left to tell.
+    /// <para>
+    /// <b>This is the one reason no operator chooses.</b> Every value above is a sentence somebody
+    /// decided; this one is a fact the plugin establishes when the server tells it an account has
+    /// been deleted. <see cref="RequestLifecycle"/> refuses it from an administrator and refuses
+    /// every other reason from the plugin, so which of the two made a decline is readable off the
+    /// reason as well as off the history entry beside it.
+    /// </para>
+    /// <para>
+    /// <b>Why this is a reason on a state that exists rather than a sixth state.</b> The ruling of
+    /// 2026-08-28 on #49 asks for such a request to be closed rather than removed, and #337 answered
+    /// what "closed" is here: the terminal state this plugin already has. A withdrawn-shaped
+    /// <see cref="RequestState"/> was considered and refused on #113, and that refusal stands. What
+    /// the surfaces need is a finished request whose reason says why, and a reason is exactly what
+    /// this list is for - a request declined for this reason reads correctly on every surface that
+    /// already renders a decline, and a sixth state would have needed a cell in
+    /// <see cref="RequestLifecycle.Table"/> against every other state and a rendering rule in each
+    /// surface.
+    /// </para>
+    /// </summary>
+    TheRequesterIsGone = 6
 }

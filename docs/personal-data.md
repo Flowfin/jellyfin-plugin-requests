@@ -257,7 +257,7 @@ when an account is deleted and this plugin consumes it:
 
     git grep -n 'IEventConsumer<UserDeletedEventArgs>' -- Jellyfin.Plugin.Requests/
     Jellyfin.Plugin.Requests/People/RemovedAccounts.cs:30:public sealed class RemovedAccounts : IEventConsumer<UserDeletedEventArgs>
-    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:240:        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:241:        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
 
 There are three rules and they are not one rule.
 
@@ -276,25 +276,44 @@ that somebody who is gone asked for this title on this date. Deletion-by-record 
 and loses the administrator's history of what was asked and answered along with the person, which is
 the trade taken on #49 on 28 August.
 
-**An unfinished request they asked for is removed, and that is the interim rather than the answer.**
-The same decision asks for an open request to be closed as withdrawn instead, and there is no state
+**An unfinished request they asked for is declined, and then carries the tombstone too.** The same
+decision asks for an open request to be closed rather than removed, and there is no separate state
 for that: a withdrawn-shaped value was considered and refused on #113, and the refusal is written
 into the model in two places:
 
     git grep -n 'Cancelled' -- Jellyfin.Plugin.Requests/
     Jellyfin.Plugin.Requests/Model/RequestActor.cs:43:    /// is no state for a user withdrawing, refused with the <c>Cancelled</c> state on #113. The
-    Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs:69:/// user withdrawing has no state to move to because <c>Cancelled</c> was refused on #113. An
+    Jellyfin.Plugin.Requests/Model/RequestLifecycle.cs:82:/// user withdrawing has no state to move to because <c>Cancelled</c> was refused on #113. An
 
-**#337 answered that on 2026-08-30, and the refusal stands.** Closed as withdrawn means the terminal
-state that already exists, carrying a reason that says the requester is gone, rather than a sixth
-`RequestState` value. The argument #113 made is still true - a user withdrawing is a second road to
-finished that an operator does nothing different about - and a landed decision is not re-taken by a
-later sentence that did not name it. What the answer costs is one `DeclineReason` value instead of
-eleven new cells in the lifecycle table and everything that reads it.
+**#337 answered that on 2026-08-30, and the refusal stands.** Closed means the terminal state that
+already exists, carrying a reason that says the requester is gone, rather than a sixth `RequestState`
+value. The argument #113 made is still true - a user withdrawing is a second road to finished that an
+operator does nothing different about - and a landed decision is not re-taken by a later sentence
+that did not name it. What the answer costs is one `DeclineReason` value instead of eleven new cells
+in the lifecycle table and everything that reads it.
 
-**The behaviour has not moved yet, and #361 is where it does.** Until that lands an unfinished
-request of theirs is removed, record and history together, which is what happened to every request
-of theirs before this.
+**The behaviour moved in #361 and this page said it had not.** The reason is on the list:
+
+    git grep -n 'TheRequesterIsGone = ' -- Jellyfin.Plugin.Requests/Model/DeclineReason.cs
+    Jellyfin.Plugin.Requests/Model/DeclineReason.cs:82:    TheRequesterIsGone = 6
+
+So an open or approved request of a deleted person is now declined for that reason and the record
+stays, with the tombstone where the person was, because declining it makes it finished and a finished
+request of a deleted person carries the tombstone by the rule above. Nothing about a deleted account
+is removed from the queue file any more; what changes is what the record says.
+
+**No person is named as having made that decline, because nobody made it.** The move goes through
+the lifecycle rather than being written into the store, so it is checked and it leaves a history
+entry like every other state change here, and the entry says the mover was the plugin.
+`MediaRequest.StateChangedByUserId` is left empty on it, which is the same field the paragraph below
+is about and the opposite case: there it holds an identifier because a person really did move the
+request, and here it holds nothing because none did.
+
+**The lifecycle admits the plugin into exactly that one move.** Two cells were widened for it, and
+the reason and the mover are paired so the widening is not a general permission to decline: a caller
+that is not an administrator may give only this reason, and an administrator may not give it at all.
+The second half is what keeps the record honest, because an operator choosing it from a list would be
+writing down a fact about somebody's account that nothing established.
 
 **A request somebody else asked for that they had joined stays, and they come off its list.** The
 request is not theirs, and taking a third party's request away because somebody else deleted their
@@ -321,7 +340,7 @@ a raw identifier. It was found by reading the page against the tree rather than 
     211b90c 2026-08-27 Draw who last moved a request, and keep a deleted account apart from an unanswered call
 
     git grep -n 'queue.movedBy.deleted' -- Jellyfin.Plugin.Requests/
-    Jellyfin.Plugin.Requests/Localisation/Strings/en.json:122:  "queue.movedBy.deleted": "A person who has been deleted",
+    Jellyfin.Plugin.Requests/Localisation/Strings/en.json:123:  "queue.movedBy.deleted": "A person who has been deleted",
     Jellyfin.Plugin.Requests/Web/queue.html:564:                        return RequestsShell.word("queue.movedBy.deleted");
 
 What the page draws is an identifier the dashboard's user list does not hold, and it says so only

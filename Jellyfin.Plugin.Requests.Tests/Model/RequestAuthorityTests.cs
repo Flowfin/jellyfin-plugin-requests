@@ -41,15 +41,22 @@ public class RequestAuthorityTests
     // A decision is an administrator's. An observation is the plugin's. A refused cell admits
     // nobody, which is what makes an illegal move and a move nobody may make one row rather than
     // two rules that can drift apart.
+    //
+    // The two cells into Declined from an unfinished state admit both, and that is the one place
+    // this list is widened rather than derived. The plugin is admitted there so an open request of
+    // a deleted person can be closed rather than removed, which is #337's answer built in #361, and
+    // the lifecycle narrows the widening back to that one move by refusing the reason it carries
+    // from anybody else and every other reason from the plugin. That narrowing has tests of its own
+    // beside this list; what this row asserts is that the widening is here on purpose.
     [InlineData(RequestState.Open, RequestState.Open, RequestActor.None)]
     [InlineData(RequestState.Open, RequestState.Approved, RequestActor.Administrator)]
-    [InlineData(RequestState.Open, RequestState.Declined, RequestActor.Administrator)]
+    [InlineData(RequestState.Open, RequestState.Declined, RequestActor.Administrator | RequestActor.Plugin)]
     [InlineData(RequestState.Open, RequestState.Fulfilled, RequestActor.Plugin)]
     [InlineData(RequestState.Open, RequestState.Failed, RequestActor.None)]
 
     [InlineData(RequestState.Approved, RequestState.Open, RequestActor.None)]
     [InlineData(RequestState.Approved, RequestState.Approved, RequestActor.None)]
-    [InlineData(RequestState.Approved, RequestState.Declined, RequestActor.Administrator)]
+    [InlineData(RequestState.Approved, RequestState.Declined, RequestActor.Administrator | RequestActor.Plugin)]
     [InlineData(RequestState.Approved, RequestState.Fulfilled, RequestActor.Plugin)]
     [InlineData(RequestState.Approved, RequestState.Failed, RequestActor.Plugin)]
 
@@ -281,8 +288,17 @@ public class RequestAuthorityTests
     {
         try
         {
+            // Which reason a decline carries is decided by the caller rather than fixed, because
+            // the lifecycle pairs the two: a caller who is not an administrator may give only the
+            // reason saying the person who asked is gone, and an administrator may give any other.
+            // A fixed reason here would turn that rule into an authority answer and this walk would
+            // report a permission that had not moved.
+            var reason = (by.RolesOn(request) & RequestActor.Administrator) != RequestActor.None
+                ? DeclineReason.NotWanted
+                : DeclineReason.TheRequesterIsGone;
+
             _ = to == RequestState.Declined
-                ? RequestLifecycle.Decline(request, DeclineReason.NotWanted, note: null, MovedAt, by)
+                ? RequestLifecycle.Decline(request, reason, note: null, MovedAt, by)
                 : RequestLifecycle.Move(request, to, MovedAt, by);
 
             return true;

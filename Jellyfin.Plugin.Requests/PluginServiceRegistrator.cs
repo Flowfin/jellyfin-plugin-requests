@@ -236,6 +236,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton(provider => new AccountRemoval(
             provider.GetRequiredService<IRequestStore>(),
             provider.GetRequiredService<INoticePreferences>(),
+            provider.GetRequiredService<IClock>(),
             provider.GetRequiredService<ILogger<AccountRemoval>>()));
         serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
 
