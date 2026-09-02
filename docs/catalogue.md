@@ -190,10 +190,10 @@ The scheme is one entry per server line, each carrying its line's `targetAbi`. W
 two entries for one line. This board claims two:
 
     grep -nE '^(version|targetAbi|framework):' build.yaml build-jf12.yaml
-    build.yaml:5:version: "0.2.0.0"
+    build.yaml:5:version: "0.3.0.0"
     build.yaml:10:targetAbi: "10.11.0.0"
     build.yaml:11:framework: "net9.0"
-    build-jf12.yaml:13:version: "0.2.0.0"
+    build-jf12.yaml:13:version: "0.3.0.0"
     build-jf12.yaml:15:targetAbi: "12.0.0.0"
     build-jf12.yaml:16:framework: "net10.0"
 
