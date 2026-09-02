@@ -20,11 +20,16 @@ not need an entry; the git history is where that is read.
   claims from now on, and a packaging run that asks a server for more than the claim is refused
   before a tag can be spent on it. **This does not repair an installed `0.2.0.0`:** that release
   keeps the references it shipped with until a later release replaces it.
-- Deleting a Jellyfin user now takes their requests with them. A request they asked for is removed,
-  a request somebody else asked for that they had joined stays with them off its list, and the
-  switch they may have set about being told is set back to the shipping value. Until now nothing in
-  this plugin was told that an account had gone, so a request record naming a person outlived the
-  account it named until the retention period reached it.
+- Deleting a Jellyfin user now takes that person out of this plugin's records and keeps the records
+  themselves. A request of theirs that was still open or approved is declined, carrying a reason
+  that says the person who asked is gone, and then stays with a marker where their identifier was.
+  A request of theirs that had already finished stays with the same marker. A request somebody
+  else asked for that they had joined stays and they come off its list. The switch they may have
+  set about being told is set back to the shipping value. So the queue goes on saying that a title
+  was asked for on a date without saying by whom, and an administrator answering for what was
+  asked and answered still has it. Until now nothing in this plugin was told that an account had
+  gone, so a request record naming a person outlived the account it named until the retention
+  period reached it.
 - A history entry says what kind of caller made a move instead of naming the person who made it.
   An entry now reads as the requester, an administrator or the plugin itself. A queue file written
   by an earlier version is migrated as it is read and the file is not changed until the next write.
