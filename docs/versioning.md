@@ -126,8 +126,21 @@ a pull request in which either of those `version:` fields moves without touching
 `CHANGELOG.md` fails the `Deterministic pull request hygiene checks` job, which
 #26 landed.
 
-Two absences the old wording named are still absences and are not softened here.
-The job asks whether `CHANGELOG.md` was touched and never what was written in it,
-so an entry that says nothing passes. And it is not in the required set on
-`master`, so a red one reports rather than holds a merge; whether it becomes
-required is #30's.
+Two absences the old wording named were both absences when it was written. One
+still is: the job asks whether `CHANGELOG.md` was touched and never what was
+written in it, so an entry that says nothing passes, and that is not softened
+here.
+
+**The other one has gone and this paragraph went on asserting it.** It said the
+job was not in the required set on `master`, so that a red one reported rather
+than held a merge, and it named #30 as where that would be decided. It was
+decided, and the job is required today:
+
+    $ gh api repos/iderex/jellyfin-plugin-requests/rules/branches/master         --jq '.[] | select(.type=="required_status_checks")
+              | .parameters.required_status_checks[].context'       | grep -x 'Deterministic pull request hygiene checks'
+    Deterministic pull request hygiene checks
+
+A ruleset is a repository setting rather than a file here, so nothing in this
+tree moved on the day that context was added and the sentence stayed green while
+it stopped being true. The whole required set, and one line per difference from
+the sibling board's, is `docs/quality-parity.md`.

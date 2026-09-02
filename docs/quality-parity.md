@@ -48,15 +48,19 @@ This one:
     Analyze (csharp, manual)
     Analyze (javascript-typescript, none)
     lines
+    floor build.yaml
+    floor build-jf12.yaml
 
-**Twelve contexts there against thirteen here, and this sentence read "thirteen
-contexts against three" until 2026-09-02.** Both numbers moved after they were
-written and they moved in opposite directions, so the sentence describing the
-gap outlived the gap closing and then reversing, and a reader who trusts it
-concludes this board is where it was three weeks ago. That is the
-failure this page opens by warning about, arriving in the one place a reader
-has been told to trust over the prose around it: both pastes are presented as
-a command's output, and no reader in this tree resolves either, because
+**Twelve contexts there against fifteen here, and this is the second repair of
+one sentence in one day.** It read "thirteen contexts against three" until the
+morning of 2026-09-02, and the paste above it printed thirteen names until that
+afternoon, when the two floor contexts were added to the required set on
+`master`. A ruleset is a repository setting rather than a file here, so nothing
+in this tree moves when one is edited: the paste stops reproducing, the page
+reads exactly as it did, and the build stays green. That is the failure this
+page opens by warning about, arriving in the one place a reader has been told
+to trust over the prose around it: both pastes are presented as a command's
+output, and no reader in this tree resolves either, because
 `scripts/check-pasted-evidence.sh` reads `path:line:text` lines and an API
 response is not one.
 
@@ -336,16 +340,19 @@ command is right:
     Analyze (csharp, manual)
     Analyze (javascript-typescript, none)
     lines
+    floor build.yaml
+    floor build-jf12.yaml
 
-Thirteen of the fifteen. This paste read five, then six, and then thirteen, and
-no arrival moved anything on this page or on #30 on the day it happened, which
-is both why it goes stale in silence and why it has now gone stale twice. The
-rest of the set above is not applied: a ruleset is a repository setting rather
-than a file in this tree, and nothing in this change touches one.
+All fifteen, and the last two arrived on 2026-09-02. This paste read five, then
+six, then thirteen, and now fifteen; on none of those days did the arrival move
+anything on this page or on #30, which is both why it goes stale in silence and
+why it has now gone stale three times.
 
-Two are missing, and they are the two floor contexts. They carried a matrix
-value until the rename of 2026-09-01, which is the reason they were held back,
-and that reason is gone. Nothing is required that this page has not declared,
+The two that were missing were the two floor contexts. They carried a matrix
+value until the rename of 2026-09-01, which is why they were held back; the
+rename gave them names built out of the packaging file, and a packaging file
+does not change its name when the floor inside it does, so the reason went with
+it. Nothing is required that this page has not declared,
 which
 is the direction worth checking rather than assuming, because a name required
 here and absent above would be a gate nobody wrote a line for:
