@@ -13,6 +13,16 @@ not need an entry; the git history is where that is read.
 
 ## Unreleased
 
+Nothing has landed since the entries below were collected under `0.3.0.0`.
+
+## 0.3.0.0
+
+One of the entries below changes what a server already doing its work does, which
+is the kind of change the scheme reserves for a `MAJOR` bump. Below `1.0.0.0` a
+`MINOR` bump is allowed to carry one and the entry says so, which is what the
+marked entry does. What each part of a number means is in
+[docs/versioning.md](docs/versioning.md).
+
 - The 10.11 package now installs on every server of the line it claims, and not only on the newest
   one. `0.2.0.0` was compiled against `10.11.11` while its packaging metadata claimed `10.11.0.0`,
   so a server below `10.11.11` downloaded it, failed to bind five assembly references, and reported
@@ -20,17 +30,26 @@ not need an entry; the git history is where that is read.
   claims from now on, and a packaging run that asks a server for more than the claim is refused
   before a tag can be spent on it. **This does not repair an installed `0.2.0.0`:** that release
   keeps the references it shipped with until a later release replaces it.
-- Deleting a Jellyfin user now takes their requests with them. A request they asked for is removed,
-  a request somebody else asked for that they had joined stays with them off its list, and the
-  switch they may have set about being told is set back to the shipping value. Until now nothing in
-  this plugin was told that an account had gone, so a request record naming a person outlived the
-  account it named until the retention period reached it.
+- Deleting a Jellyfin user now takes that person out of this plugin's records and keeps the records
+  themselves. A request of theirs that was still open or approved is declined, carrying a reason
+  that says the person who asked is gone, and then stays with a marker where their identifier was.
+  A request of theirs that had already finished stays with the same marker. A request somebody
+  else asked for that they had joined stays and they come off its list. The switch they may have
+  set about being told is set back to the shipping value. So the queue goes on saying that a title
+  was asked for on a date without saying by whom, and an administrator answering for what was
+  asked and answered still has it. Until now nothing in this plugin was told that an account had
+  gone, so a request record naming a person outlived the account it named until the retention
+  period reached it.
 - A history entry says what kind of caller made a move instead of naming the person who made it.
   An entry now reads as the requester, an administrator or the plugin itself. A queue file written
   by an earlier version is migrated as it is read and the file is not changed until the next write.
   **This costs something and it is permanent:** past decisions can no longer be attributed to an
   individual, in exchange for this plugin not holding identifiers for people who have left the
-  server.
+  server. **A queue file this version has written cannot be read by `0.2.0.0`**, which above
+  `1.0.0.0` would be a `MAJOR` bump; below it, this entry is the notice the scheme asks for. A
+  server put back on `0.2.0.0` after this version has written the file finds a queue that plugin
+  refuses to read: it changes nothing, keeps the bytes as they are, and says so in the server
+  log.
 
 ## 0.2.0.0
 
