@@ -20,7 +20,6 @@ The other board:
     build
     ABI floor build
     Package (JPRM) / Build package
-    Package (JPRM) / Generate SBOM
     CodeQL
     Analyze (csharp)
     DCO sign-off
@@ -39,12 +38,31 @@ This one:
     call / build
     call / test
     Reject Trojan Source Unicode
+    Audit workflows (zizmor)
+    Check formatting
+    Deterministic pull request hygiene checks
+    DCO sign-off
+    dependency-review
+    Enforce greppable invariants
+    Analyze (actions, none)
+    Analyze (csharp, manual)
+    Analyze (javascript-typescript, none)
+    lines
 
-Thirteen contexts against three, and the gap is not the same as the gap in what
-runs. Most of the thirteen have a counterpart running here already and are
-simply not required, which is a repository setting rather than a file in this
-tree. What ran on `55f1ad2`, the head of the change that added the invariant
-lint:
+**Twelve contexts there against thirteen here, and this sentence read "thirteen
+contexts against three" until 2026-09-02.** Both numbers moved after they were
+written and they moved in opposite directions, so the sentence describing the
+gap outlived the gap closing and then reversing, and a reader who trusts it
+concludes this board is where it was three weeks ago. That is the
+failure this page opens by warning about, arriving in the one place a reader
+has been told to trust over the prose around it: both pastes are presented as
+a command's output, and no reader in this tree resolves either, because
+`scripts/check-pasted-evidence.sh` reads `path:line:text` lines and an API
+response is not one.
+
+The gap is still not the same as the gap in what runs, and that half is
+unchanged. What ran on `55f1ad2`, the head of the change that added the
+invariant lint:
 
     $ gh api repos/Flowfin/jellyfin-plugin-requests/commits/55f1ad2/check-runs \
         --jq '.check_runs[].name' | sort -u
@@ -66,12 +84,16 @@ lint:
     Reject Trojan Source Unicode
     zizmor
 
-One of the thirteen has no counterpart running here at all, and it is the bill of
-materials, #109. It was four until the hygiene job landed under #26, three until
-the invariant lint landed under #28, and two until the package build landed under
-#108, which is `package-lines` and one `package` job per claimed line rather than
-the single context the other board has. The rest run and are not required, and
-the section below is the set that says which of them should be.
+One context in the other board's set had no counterpart running here at all, and
+it was the bill of materials, #109. It was four until the hygiene job landed
+under #26, three until the invariant lint landed under #28, and two until the
+package build landed under #108, which is `package-lines` and one `package` job
+per claimed line rather than the single context the other board has. It is none
+of the twelve now, because `Package (JPRM) / Generate SBOM` left that board's
+required set rather than because anything here answered it: that context still
+reports there, nothing answering it reports on a pull request here, and #109 is
+where the absence is held. The rest run and are not required, and the section
+below is the set that says which of them should be.
 
 ## The set to require
 
@@ -183,9 +205,18 @@ above read out of this page rather than retyped:
     Analyze (actions, none)
     Analyze (csharp, manual)
     Analyze (javascript-typescript, none)
-    floor 10.11.0.0
-    floor 12.0.0.0
+    floor build-jf12.yaml
+    floor build.yaml
     lines
+
+**The two floor names in that output are the names this page declares today,
+not the names `36eccab` reported.** Only one side of the comparison is pinned:
+`reported.txt` is that head's check runs and cannot move, while `declared.txt`
+is read out of `origin/master`, so the rename of 2026-09-01 changed the output
+of a command whose subject is a head from August. At `36eccab` the two
+contexts that did not report were called `floor 10.11.0.0` and
+`floor 12.0.0.0`. The count, the reason and the six jobs are the same either
+way.
 
 A required context that does not report leaves a pull request pending rather than
 failing it, so requiring those six as they stood would have held every
@@ -298,14 +329,24 @@ command is right:
     Audit workflows (zizmor)
     Check formatting
     Deterministic pull request hygiene checks
+    DCO sign-off
+    dependency-review
+    Enforce greppable invariants
+    Analyze (actions, none)
+    Analyze (csharp, manual)
+    Analyze (javascript-typescript, none)
+    lines
 
-Six of the fifteen. This paste read five until the reading above, and the sixth
-arrived without anything on this page or on #30 moving, which is the way every
-previous one arrived too. The rest of the set above is not applied: a ruleset is
-a repository setting rather than a file in this tree, and nothing in this change
-touches one.
+Thirteen of the fifteen. This paste read five, then six, and then thirteen, and
+no arrival moved anything on this page or on #30 on the day it happened, which
+is both why it goes stale in silence and why it has now gone stale twice. The
+rest of the set above is not applied: a ruleset is a repository setting rather
+than a file in this tree, and nothing in this change touches one.
 
-Nine are missing and nothing is required that this page has not declared, which
+Two are missing, and they are the two floor contexts. They carried a matrix
+value until the rename of 2026-09-01, which is the reason they were held back,
+and that reason is gone. Nothing is required that this page has not declared,
+which
 is the direction worth checking rather than assuming, because a name required
 here and absent above would be a gate nobody wrote a line for:
 
@@ -332,7 +373,10 @@ merge.
   contexts: the lines are read out of the packaging files rather than listed in a
   job. They are not in the set above, because the set is what #30 applies and
   this pair arrived after it was written down.
-- `Package (JPRM) / Generate SBOM` has no counterpart running here; #109.
+- `Package (JPRM) / Generate SBOM` was in that set and is not any more, so it is
+  no longer a difference from it. It still reports there, nothing answering it
+  reports on a pull request here, and the bill of materials this board builds
+  runs on the publish route rather than as a check. #109 holds that.
 - `CodeQL` there is required and is not here, because it is the code-scanning
   tab's check rather than a job, and the three `Analyze` legs are required
   instead.
