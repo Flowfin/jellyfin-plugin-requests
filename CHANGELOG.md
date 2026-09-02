@@ -13,6 +13,16 @@ not need an entry; the git history is where that is read.
 
 ## Unreleased
 
+Nothing has landed since the entries below were collected under `0.3.0.0`.
+
+## 0.3.0.0
+
+One of the entries below changes what a server already doing its work does, which
+is the kind of change the scheme reserves for a `MAJOR` bump. Below `1.0.0.0` a
+`MINOR` bump is allowed to carry one and the entry says so, which is what the
+marked entry does. What each part of a number means is in
+[docs/versioning.md](docs/versioning.md).
+
 - The 10.11 package now installs on every server of the line it claims, and not only on the newest
   one. `0.2.0.0` was compiled against `10.11.11` while its packaging metadata claimed `10.11.0.0`,
   so a server below `10.11.11` downloaded it, failed to bind five assembly references, and reported
@@ -35,7 +45,11 @@ not need an entry; the git history is where that is read.
   by an earlier version is migrated as it is read and the file is not changed until the next write.
   **This costs something and it is permanent:** past decisions can no longer be attributed to an
   individual, in exchange for this plugin not holding identifiers for people who have left the
-  server.
+  server. **A queue file this version has written cannot be read by `0.2.0.0`**, which above
+  `1.0.0.0` would be a `MAJOR` bump; below it, this entry is the notice the scheme asks for. A
+  server put back on `0.2.0.0` after this version has written the file finds a queue that plugin
+  refuses to read: it changes nothing, keeps the bytes as they are, and says so in the server
+  log.
 
 ## 0.2.0.0
 
