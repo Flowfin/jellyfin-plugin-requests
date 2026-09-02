@@ -360,8 +360,8 @@ references are the two Jellyfin assemblies and nothing else, and neither is adde
     Directory.Build.props:85:        <PackageReference Include="SerilogAnalyzer" Version="0.15.0" PrivateAssets="All" />
     Directory.Build.props:86:        <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="All" />
     Directory.Build.props:87:        <PackageReference Include="SmartAnalyzers.MultithreadingAnalyzer" Version="1.1.31" PrivateAssets="All" />
-    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:23:    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)">
-    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:26:    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)">
+    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:35:    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)">
+    Jellyfin.Plugin.Requests/Jellyfin.Plugin.Requests.csproj:38:    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)">
 
 The three analyzers are `PrivateAssets="All"` and are build-time only. The two Jellyfin references
 differ in version between the lines, which is what `JellyfinVersion` is for and what makes the point:

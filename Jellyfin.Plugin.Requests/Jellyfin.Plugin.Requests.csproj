@@ -9,10 +9,22 @@
          runs. -->
     <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
     <RootNamespace>Jellyfin.Plugin.Requests</RootNamespace>
-    <!-- The Jellyfin SDK the plugin compiles against, per target. Overridable from the command line so
-         an ABI floor build can lower it to the targetAbi each package claims and prove that every API
-         the plugin calls also exists on the oldest server of that line. -->
-    <JellyfinVersion Condition="'$(JellyfinVersion)' == '' and '$(TargetFramework)' == 'net9.0'">10.11.11</JellyfinVersion>
+    <!-- The Jellyfin SDK the plugin compiles against, per target, and it is the floor each package
+         claims rather than the newest SDK of that line. An assembly's reference table is stamped
+         with the versions it was compiled against, and a reference above what the host carries does
+         not bind: the assembly loads, GetTypes() throws, and the server reports the plugin
+         NotSupported. Compiling against 10.11.11 while build.yaml claims 10.11.0.0 is what shipped
+         0.2.0.0 unloadable on every 10.11 server below 10.11.11, measured on #152.
+
+         net10.0 stays on the release candidate because 12.0.0 is not published. The reference table
+         that produces is already 12.0.0.0, which is what build-jf12.yaml claims, so that line is at
+         its claim today; the version below it is a package version and never an assembly version.
+
+         Still overridable from the command line, which is what the floor build in abi-floor.yaml
+         uses to resolve the declared floor from the feed rather than trusting this number.
+         scripts/check-package-abi.sh is what refuses the two drifting apart again, on the routes
+         that produce a package. -->
+    <JellyfinVersion Condition="'$(JellyfinVersion)' == '' and '$(TargetFramework)' == 'net9.0'">10.11.0</JellyfinVersion>
     <JellyfinVersion Condition="'$(JellyfinVersion)' == '' and '$(TargetFramework)' == 'net10.0'">12.0.0-rc4</JellyfinVersion>
   </PropertyGroup>
 

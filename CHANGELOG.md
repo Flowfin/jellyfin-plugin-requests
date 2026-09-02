@@ -13,6 +13,13 @@ not need an entry; the git history is where that is read.
 
 ## Unreleased
 
+- The 10.11 package now installs on every server of the line it claims, and not only on the newest
+  one. `0.2.0.0` was compiled against `10.11.11` while its packaging metadata claimed `10.11.0.0`,
+  so a server below `10.11.11` downloaded it, failed to bind five assembly references, and reported
+  the plugin `NotSupported` with nothing saying why. The package is built against the floor it
+  claims from now on, and a packaging run that asks a server for more than the claim is refused
+  before a tag can be spent on it. **This does not repair an installed `0.2.0.0`:** that release
+  keeps the references it shipped with until a later release replaces it.
 - Deleting a Jellyfin user now takes their requests with them. A request they asked for is removed,
   a request somebody else asked for that they had joined stays with them off its list, and the
   switch they may have set about being told is set back to the shipping value. Until now nothing in
