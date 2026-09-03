@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Requests.Notify;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
+using MediaBrowser.Model.Session;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Jellyfin.Plugin.Requests.Tests.Notify;
@@ -128,6 +130,181 @@ public sealed class RecordingFromSeveralThreadsTests
         Assert.Single(earlier);
         Assert.Equal(2, recording.Told.Count);
     }
+
+    /// <summary>
+    /// Every line written from several threads at once is kept, exactly once each.
+    /// <para>
+    /// The same claim as the leg above, over the double every one of those background paths writes
+    /// to rather than over the one that only the requester path does. What the count separates is
+    /// the same three ways an unguarded append is wrong, and the text of each line names the thread
+    /// and the position so a short count and a full count with fewer distinct texts are different
+    /// failures.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task EveryLineFromSeveralThreadsAtOnceIsKeptExactlyOnce()
+    {
+        var log = new RecordingLogger();
+        using var ready = new Barrier(Tellers);
+
+        var writing = new Task[Tellers];
+
+        for (var writer = 0; writer < Tellers; writer++)
+        {
+            var mine = writer;
+
+            writing[mine] = Task.Factory.StartNew(
+                () =>
+                {
+                    ready.SignalAndWait();
+
+                    for (var position = 0; position < EachTells; position++)
+                    {
+                        Write(log, mine, position);
+                    }
+                },
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
+        }
+
+        await Task.WhenAll(writing).ConfigureAwait(true);
+
+        var kept = log.Lines;
+
+        Assert.Equal(Tellers * EachTells, kept.Count);
+        Assert.Equal(
+            Tellers * EachTells,
+            kept.Select(line => line.Message).Distinct(StringComparer.Ordinal).Count());
+    }
+
+    /// <summary>
+    /// What was logged is answered as a copy rather than as the list itself, by both readers.
+    /// <para>
+    /// <see cref="RecordingLogger.At"/> is the reader most of this suite uses and it filters, so it
+    /// hands back a new list either way and the direction that matters there is that it does not
+    /// walk the live one while a delivery is still writing to it. That is the same defect as the
+    /// one this leg names for <see cref="RecordingLogger.Lines"/> and is not decidable from one
+    /// thread, so what is asserted here is the half that is: an answer already handed out does not
+    /// move when the next line arrives.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void WhatWasLoggedIsAnsweredAsACopyRatherThanAsTheListItself()
+    {
+        var log = new RecordingLogger();
+
+        Write(log, 0, 0);
+
+        var earlier = log.Lines;
+
+        Write(log, 0, 1);
+
+        Assert.Single(earlier);
+        Assert.Equal(2, log.Lines.Count);
+    }
+
+    /// <summary>
+    /// Every push made from several threads at once is kept, exactly once each.
+    /// <para>
+    /// <c>ServerRequesterNotice</c> and <c>ServerArrivalNotice</c> each start a task per message and
+    /// call the session manager from whichever one runs, so two messages handed over without a wait
+    /// between them reach this double concurrently. The lists it keeps them in are what every leg
+    /// asserting who was reached reads.
+    /// </para>
+    /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
+    [Fact]
+    public async Task EveryPushFromSeveralThreadsAtOnceIsKeptExactlyOnce()
+    {
+        var sessions = new ASessionManagerThatOnlyDelivers();
+        using var ready = new Barrier(Tellers);
+
+        var pushing = new Task[Tellers];
+
+        for (var pusher = 0; pusher < Tellers; pusher++)
+        {
+            var mine = pusher;
+
+            pushing[mine] = Task.Factory.StartNew(
+                () =>
+                {
+                    ready.SignalAndWait();
+
+                    for (var position = 0; position < EachTells; position++)
+                    {
+                        Push(sessions, mine, position);
+                    }
+                },
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
+        }
+
+        await Task.WhenAll(pushing).ConfigureAwait(true);
+
+        var kept = sessions.Delivered;
+
+        Assert.Equal(Tellers * EachTells, kept.Count);
+        Assert.Equal(
+            Tellers * EachTells,
+            kept.Select(delivery => delivery.Payload as string).Distinct(StringComparer.Ordinal).Count());
+    }
+
+    /// <summary>
+    /// What was delivered is answered as a copy rather than as the list itself.
+    /// <para>
+    /// The reader's direction, decidable from one thread, exactly as for the notice double. A leg
+    /// that read this list while a push was still in flight would walk a collection another thread
+    /// is appending to and fail as though the plugin had thrown.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void WhatWasDeliveredIsAnsweredAsACopyRatherThanAsTheListItself()
+    {
+        var sessions = new ASessionManagerThatOnlyDelivers();
+
+        Push(sessions, 0, 0);
+
+        var earlier = sessions.Delivered;
+
+        Push(sessions, 0, 1);
+
+        Assert.Single(earlier);
+        Assert.Equal(2, sessions.Delivered.Count);
+    }
+
+    /// <summary>
+    /// One line, named so that a lost one and a doubled one are different failures.
+    /// </summary>
+    /// <param name="log">The logger to write to.</param>
+    /// <param name="writer">Which thread is writing it.</param>
+    /// <param name="position">Where in that thread's run it sits.</param>
+    private static void Write(RecordingLogger log, int writer, int position)
+    {
+        // Named into a local rather than composed in the call: CA1873 refuses an argument a
+        // disabled logger would have paid for, and this double enables every level anyway.
+        var text = string.Create(CultureInfo.InvariantCulture, $"{writer}/{position}");
+
+        log.Log(LogLevel.Information, default, text, null, static (state, _) => state);
+    }
+
+    /// <summary>
+    /// One push, named the same way and addressed to the one person these doubles allow.
+    /// </summary>
+    /// <param name="sessions">The session manager to push through.</param>
+    /// <param name="pusher">Which thread is pushing it.</param>
+    /// <param name="position">Where in that thread's run it sits.</param>
+    private static void Push(ASessionManagerThatOnlyDelivers sessions, int pusher, int position)
+        => sessions
+            .SendMessageToUserSessions(
+                [Asker],
+                SessionMessageType.GeneralCommand,
+                string.Create(CultureInfo.InvariantCulture, $"{pusher}/{position}"),
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
 
     /// <summary>
     /// One message, named so that a lost one and a doubled one are different failures.
