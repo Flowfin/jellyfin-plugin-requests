@@ -1,0 +1,14 @@
+<Project>
+
+    <!-- INHERITANCE STOPS HERE, DELIBERATELY, for the reason the full disk probe's copy of this
+         file gives: MSBuild walks up until it finds one of these, and the repository root's
+         properties belong to the artefact somebody installs. This reader is an instrument. It is
+         built only by the routes that judge a package, it ships to nobody, and inheriting the
+         plugin's version number would make a second thing claim to be that version.
+
+         It also inherits no analyzer posture and no lock file, which matters more here than it does
+         for the probe: this reader is built on the release route, and a restore that reaches a feed
+         for three analyzer packages is three more things that can be unavailable at the moment a
+         tag goes out. -->
+
+</Project>

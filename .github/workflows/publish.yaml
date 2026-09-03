@@ -390,6 +390,31 @@ jobs:
         with:
           dotnet-target: ${{ needs.gate.outputs.framework }}
 
+      - name: Check the package asks a server for no more than its targetAbi claims
+        env:
+          ARTIFACT: ${{ steps.jprm.outputs.artifact }}
+        # THE ARTEFACT, NOT THE SOURCE, AND ON THE ROUTE THAT SHIPS IT. `abi-floor.yaml` compiles the
+        # source against the floor SDK and says nothing about what was packaged, so `0.2.0.0` went out
+        # asking a `10.11.0` server for five assemblies at `10.11.11.0` with every route green: that
+        # server carries them at `10.11.0.0`, the reference does not bind, and the server reports the
+        # plugin `NotSupported` after a download that looked like it worked. `package.yaml` runs the
+        # same check on every pull request; this is the copy that stands between a bad build and a tag,
+        # and a tag cannot be spent twice.
+        #
+        # Before the bill of materials and before anything is uploaded, for the reason the step below
+        # gives about itself: a release that exists is never touched again.
+        #
+        # The claim is read out of the packaging file this run put in place for the line the tag names,
+        # which is the file the package was built from.
+        run: |
+          set -euo pipefail
+          abi=$(sed -n 's/^targetAbi: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' build.yaml | head -1)
+          if [ -z "${abi}" ]; then
+            echo "::error::build.yaml declares no targetAbi, so there is no claim for the package's references to be compared against."
+            exit 1
+          fi
+          ./scripts/check-package-abi.sh "${ARTIFACT}" "${abi}"
+
       - name: Write the bill of materials
         id: bom
         env:

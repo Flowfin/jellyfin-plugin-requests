@@ -741,8 +741,8 @@
       "jellyfin.plugin.requests": {
         "type": "Project",
         "dependencies": {
-          "Jellyfin.Controller": "[10.11.11, )",
-          "Jellyfin.Model": "[10.11.11, )"
+          "Jellyfin.Controller": "[10.11.0, )",
+          "Jellyfin.Model": "[10.11.0, )"
         }
       }
     }

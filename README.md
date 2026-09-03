@@ -78,7 +78,10 @@ server does not carry is not a member, it is the version: the archive's five
 Jellyfin references are stamped `10.11.11.0` and `10.11.0` carries all five at
 `10.11.0.0`, and a reference above what the host carries does not bind. Which of
 the two moves, the SDK the package is built against or the floor it claims, is
-#152. **Do not install this on a `10.11.0` server: it will not run.**
+answered on #360: the package is built against the floor from now on and the
+floor stands, because moving the claim would drop every server below `10.11.11`
+without saying so. That answer does not reach a release that already exists.
+**Do not install this on a `10.11.0` server: it will not run.**
 
 Two further things neither run covers: the bytes are copied into the plugin
 directory rather than fetched and unpacked by the server itself, and the 12.0
@@ -105,10 +108,10 @@ an edit to either shows up as a difference between this table and what the
 command prints:
 
     git grep -nE '^(version|targetAbi|framework):' -- build.yaml build-jf12.yaml
-    build-jf12.yaml:13:version: "0.2.0.0"
+    build-jf12.yaml:13:version: "0.3.0.0"
     build-jf12.yaml:15:targetAbi: "12.0.0.0"
     build-jf12.yaml:16:framework: "net10.0"
-    build.yaml:5:version: "0.2.0.0"
+    build.yaml:5:version: "0.3.0.0"
     build.yaml:10:targetAbi: "10.11.0.0"
     build.yaml:11:framework: "net9.0"
 
@@ -118,7 +121,7 @@ disagreement between it and the assembly rather than trusting three copies to be
 edited together:
 
     git grep -n '<PluginVersion>' -- Directory.Build.props
-    Directory.Build.props:42:        <PluginVersion>0.2.0.0</PluginVersion>
+    Directory.Build.props:42:        <PluginVersion>0.3.0.0</PluginVersion>
 
 That test is `PluginVersionMatchesThePackagingMetadata` in
 `Jellyfin.Plugin.Requests.Tests/PackagingMetadataTests.cs`, and

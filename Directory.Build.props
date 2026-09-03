@@ -39,7 +39,7 @@
              scheme this number follows, what each part of it means to somebody who has the plugin
              installed, and why it starts below one, are in docs/versioning.md. Raising it and
              writing the changelog entry are one change. -->
-        <PluginVersion>0.2.0.0</PluginVersion>
+        <PluginVersion>0.3.0.0</PluginVersion>
         <Version>$(PluginVersion)</Version>
         <AssemblyVersion>$(PluginVersion)</AssemblyVersion>
         <FileVersion>$(PluginVersion)</FileVersion>

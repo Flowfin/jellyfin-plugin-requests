@@ -29,7 +29,11 @@
 #
 # THIS IS NOT A REQUIRED CHECK. The required set is a repository setting rather
 # than a file in this tree, and #30 is where it is written down and applied, so
-# a red job here does not by itself hold a merge today.
+# a red job here does not by itself hold a merge today. Two things had to be true
+# before it could become one, and this file now carries both: the contexts report
+# on every head, including one that changes only markdown, and none of their
+# names carries a floor that a bump would move. The second is the change of
+# 2026-09-01 and the reasoning is at the job below.
 #
 # IT RUNS ON EVERY HEAD, INCLUDING ONE THAT CHANGES ONLY MARKDOWN, and that is
 # what makes the three contexts below requirable at all. A `paths-ignore` filter
@@ -140,7 +144,21 @@ jobs:
           echo "matrix=$entries" >> "$GITHUB_OUTPUT"
 
   floor:
-    name: floor ${{ matrix.abi }}
+    # THE NAME CARRIES THE PACKAGING FILE AND NEVER THE FLOOR, and it used to carry
+    # the floor. A ruleset holds a required context as a string and GitHub compares
+    # it to the name a check run reports, with nothing reconciling the two, so a job
+    # named `floor 10.11.0.0` stops existing under that name the day somebody raises
+    # the floor - which this board describes as changing one number in one file.
+    # Every pull request would then hang pending on a context nothing produces, with
+    # no red check to point at, and the gate would read as satisfied while being
+    # absent. That is why these two contexts were left out of the required set on #30
+    # while every other always-reporting context went in.
+    #
+    # A packaging file is the identity of a line here: adding a line is adding a
+    # file, and raising a floor edits a number inside one. So the name survives every
+    # floor bump, and which floor the job actually built against is in the step
+    # output below rather than in the name.
+    name: floor ${{ matrix.metadata }}
     needs: lines
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -158,6 +176,17 @@ jobs:
     # conclusion is a rule nobody on this board has read; a job that runs and
     # does nothing reports `success`, which has one reading.
     steps:
+      - name: Say which line this job is, since its name no longer carries the floor
+        # The check-run name is the packaging file, so the floor it declares is read
+        # here instead. Without this a reader of the run has the name of a file and
+        # no number, which is the half the rename gave up.
+        env:
+          METADATA: ${{ matrix.metadata }}
+          ABI: ${{ matrix.abi }}
+          FRAMEWORK: ${{ matrix.framework }}
+        run: |
+          echo "::notice::$METADATA declares targetAbi $ABI on $FRAMEWORK. That is the floor this job builds against, and it is deliberately not in the check-run name."
+
       - name: Say that this head has nothing for this job to build
         if: needs.lines.outputs.documentation_only == 'true'
         env:
