@@ -156,11 +156,12 @@ public sealed class PluginHealthTests
     /// A bridge that is not answering is on this answer as unreachable, with the moment this server
     /// last saw it answer.
     /// <para>
-    /// This is the second condition of #63 and it is the one the shipped bridge cannot produce: the
-    /// only implementation an install resolves is the one for a server with no service, so it
-    /// answers <see cref="BackendReachability.NotConfigured"/> and can never be unreachable. What is
-    /// measured here is that the endpoint carries the failure when something produces one, using a
-    /// backend that does, and what is not measured is any real service refusing a connection.
+    /// This is the second condition of #63. The bridge an install resolves answers
+    /// <see cref="BackendReachability.NotConfigured"/> until an address is written, and produces
+    /// unreachable only from a service that did not answer, which this suite reaches through an
+    /// in-process handler and never through a socket. What is measured here is that the endpoint
+    /// carries the failure when something produces one, using a backend that does, and what is not
+    /// measured is any real service refusing a connection.
     /// </para>
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>

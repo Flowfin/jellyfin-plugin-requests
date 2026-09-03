@@ -87,11 +87,13 @@ a test endpoint needs its certificate trusted, which means writing to a machine 
 is the third condition and the second one at once.
 
 What replaces it is an in-process HTTP double, so the client under test is exercised through its
-own handler pipeline and no socket is opened. It is
-`Jellyfin.Plugin.Requests.Tests/Doubles/ASinkEndpoint.cs`, and the outbound call it stands in front
-of is the notification sink, which posts a document to the one address an operator typed and reads
-a status back. What no double here reaches is a response body, because nothing in this plugin
-parses one, and the cases that need a client which does are what #35 is still open for.
+own handler pipeline and no socket is opened. There are two, one per outbound path.
+`Jellyfin.Plugin.Requests.Tests/Doubles/ASinkEndpoint.cs` stands in front of the notification sink,
+which posts a document to the one address an operator typed and reads a status back.
+`Jellyfin.Plugin.Requests.Tests/Doubles/AnOverseerrService.cs` stands in front of the bridge adapter,
+which reads a body back, so the two cases #35 named and nothing here could reach before - a body that
+is not JSON, and JSON of the wrong shape - are answers that double gives and legs the adapter is held
+to. Neither double was captured from a running service, and nothing here has ever called one.
 
 This paragraph named an issue rather than a file until #251, and went on saying the double did not
 exist for as long as it took somebody to read both.

@@ -119,7 +119,91 @@ public static class ConfigurationRules
             problems.Add(NothingLeftToAnnounce(nameof(PluginConfiguration.AnnouncesFulfilments)));
         }
 
+        // The bridge address is optional and an unusable one is not, for the reason the notice
+        // address gives: an install with an address nothing can dial reports a bridge an operator
+        // believes in and hands nothing over.
+        var bridgeAddressed = !string.IsNullOrWhiteSpace(configuration.BridgeAddress);
+
+        if (bridgeAddressed && !IsSomewhereANoticeCanBePosted(configuration.BridgeAddress))
+        {
+            problems.Add(new ConfigurationProblem
+            {
+                Setting = nameof(PluginConfiguration.BridgeAddress),
+                Why = "BridgeAddress is not a complete http or https address. It has to be the root of the external request service as a browser would open it, scheme included, or empty to run without one."
+            });
+        }
+
+        // An address with no key is a bridge that answers its status route and refuses every other
+        // one, which reads as up on the health page and hands nothing over. The value is deliberately
+        // not read into this sentence: it is a marked secret, and the sentence becomes the message of
+        // an exception whose destination is the host's business.
+        if (bridgeAddressed && string.IsNullOrWhiteSpace(configuration.BridgeApiKey))
+        {
+            problems.Add(new ConfigurationProblem
+            {
+                Setting = nameof(PluginConfiguration.BridgeApiKey),
+                Why = "BridgeApiKey is empty while BridgeAddress names a service. The service refuses every call this plugin makes without one, so either paste the key the service issued or empty the address to run without a bridge."
+            });
+        }
+
+        // One problem for the whole table rather than one per row, because the field an operator
+        // edits is the table. Every wrong row is named inside it, in the order they were written.
+        var rows = WrongRows(configuration.BridgeAccounts);
+
+        if (rows.Count > 0)
+        {
+            problems.Add(new ConfigurationProblem
+            {
+                Setting = nameof(PluginConfiguration.BridgeAccounts),
+                Why = "BridgeAccounts has a row that cannot be honoured: " + string.Join(" ", rows)
+                    + " A row names a person on this server by their user identifier and the number the external request service knows them by, and a person is left unmapped by having no row rather than a blank one."
+            });
+        }
+
         return problems;
+    }
+
+    private static List<string> WrongRows(System.Collections.ObjectModel.Collection<BridgeAccountRow>? rows)
+    {
+        var wrong = new List<string>();
+
+        if (rows is null)
+        {
+            return wrong;
+        }
+
+        var seen = new HashSet<Guid>();
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            var position = string.Format(CultureInfo.InvariantCulture, "Row {0}", index + 1);
+
+            if (row is null || row.UserId == Guid.Empty)
+            {
+                wrong.Add(position + " names no user.");
+                continue;
+            }
+
+            if (!seen.Add(row.UserId))
+            {
+                wrong.Add(string.Format(CultureInfo.InvariantCulture, "{0} names user {1} a second time, and one person cannot arrive under two accounts.", position, row.UserId));
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(row.Account))
+            {
+                wrong.Add(string.Format(CultureInfo.InvariantCulture, "{0}, for user {1}, has no account on it.", position, row.UserId));
+                continue;
+            }
+
+            if (!long.TryParse(row.Account, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+            {
+                wrong.Add(string.Format(CultureInfo.InvariantCulture, "{0}, for user {1}, has an account that is not a number, and the external request service identifies its users by number.", position, row.UserId));
+            }
+        }
+
+        return wrong;
     }
 
     /// <summary>

@@ -28,10 +28,10 @@ namespace Jellyfin.Plugin.Requests.Configuration;
 /// does rather than ahead of one, and this is that rule applied rather than an exception to it.
 /// </para>
 /// <para>
-/// There is no bridge address and no credential. The only implementation of the bridge in this tree
-/// is the one for a server that has none, so a field for an address would be a place to type
-/// something nothing reads. #315 is the issue that asks for the adapter that would need one, and
-/// #85 decides where a credential is kept and what may be claimed about it once there is one.
+/// The three bridge settings at the end arrived with the adapter that reads them and not before,
+/// which is the rule above applied: until <see cref="Bridge.Overseerr.OverseerrBackend"/> existed, a
+/// field for an address would have been a place to type something nothing reads. Where the credential
+/// is kept and what may be claimed about it is #85, and <c>docs/bridge.md</c> says what is refused.
 /// </para>
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
@@ -189,4 +189,73 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </para>
     /// </summary>
     public bool AnnouncesFulfilments { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets where the external request service is, or nothing to run without one.
+    /// <para>
+    /// Empty on a fresh install, and empty is the whole of how the bridge is off: with nothing here
+    /// every approval stays on this server, nothing is asked about on a schedule, and the health and
+    /// capability endpoints say that no bridge is configured. There is no second switch beside it,
+    /// for the reason the notice address gives.
+    /// </para>
+    /// <para>
+    /// It is the root of the service as an operator would open it in a browser, scheme included, and
+    /// the adapter puts the form's own path under it. The form is the Overseerr form, decided on
+    /// #113; <c>docs/bridge.md</c> is what leaves the server once this is set and what comes back.
+    /// </para>
+    /// <para>
+    /// <b>It is not marked as a secret, and that is a decision.</b> The credential travels in a
+    /// header and never in this address, so the address is the name of a machine and nothing more,
+    /// and an operator has to be able to read back which service their server is pointed at. The
+    /// platform writes it into the exception it raises when the service does not answer, and that
+    /// exception reaches the log, so a log pasted into a public tracker names the host; the sentence
+    /// in <c>docs/bridge.md</c> on who can read the credential says the same about the settings file.
+    /// </para>
+    /// </summary>
+    public string BridgeAddress { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the credential the external request service issued for this server.
+    /// <para>
+    /// The form takes it as a header on every call, so it is never part of an address and never in a
+    /// log line the platform composes. <b>It is marked as a secret</b>, so it may not appear in
+    /// anything this plugin writes for somebody else to read, the settings page cannot show it back,
+    /// and the invariant lint refuses a message that reads it. Where it is stored, who on the machine
+    /// can read it, and what is refused by name are in <c>docs/bridge.md</c>; the claim is exactly as
+    /// strong as the protection the server's own data directory gets and no stronger.
+    /// </para>
+    /// <para>
+    /// An address with no key is refused rather than saved, because the form answers its status
+    /// route without one and every other route with a refusal, which is a bridge that reports itself
+    /// up and hands nothing over.
+    /// </para>
+    /// </summary>
+    [Secret]
+    public string BridgeApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets who is who on the external request service, one row per person the operator has
+    /// chosen to attribute.
+    /// <para>
+    /// Empty on a fresh install, and empty is the shipping answer rather than a state on the way to
+    /// one: every request arrives over there under the service's own account and that service is
+    /// told nothing about the people on this server. Writing a row is what says that person's account
+    /// over there may leave this server, and the account is the service's own numeric identifier for
+    /// them, never a name. <see cref="Bridge.BackendAccounts"/> is the one reader and it looks a
+    /// person up by identifier and nothing else, which <c>docs/bridge.md</c> decides and the suite
+    /// refuses a change to.
+    /// </para>
+    /// <para>
+    /// It is kept here, beside the address it belongs with, because it has the same lifecycle: per
+    /// server, written by whoever runs it, backed up with the rest of the configuration and gone
+    /// with it. A file of its own would be a second place to keep current and a second place to lose.
+    /// </para>
+    /// </summary>
+    // A setter, against the analyzer's advice: the dashboard replaces a plugin configuration whole
+    // from JSON, and a collection with no setter is one the rows are silently dropped from on the
+    // way in.
+#pragma warning disable CA2227 // Collection properties should be read only
+    public System.Collections.ObjectModel.Collection<BridgeAccountRow> BridgeAccounts { get; set; }
+        = new System.Collections.ObjectModel.Collection<BridgeAccountRow>();
+#pragma warning restore CA2227
 }

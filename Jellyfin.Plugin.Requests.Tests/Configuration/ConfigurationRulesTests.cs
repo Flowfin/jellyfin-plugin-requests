@@ -24,6 +24,8 @@ public class ConfigurationRulesTests
     /// </summary>
     private const string SomewhereToPostTo = "https://example.invalid/hook";
 
+    private static readonly Guid Somebody = new Guid("c0000000-0000-0000-0000-000000000001");
+
     /// <summary>
     /// The settings no value of which can be refused, written out by hand.
     /// <para>
@@ -98,6 +100,81 @@ public class ConfigurationRulesTests
                     nameof(PluginConfiguration.AnnouncesDeclines),
                     nameof(PluginConfiguration.AnnouncesFulfilments)
                 ]
+            },
+            {
+                "the bridge address",
+                Fresh(configuration =>
+                {
+                    configuration.BridgeAddress = "https://requests.example.invalid";
+                    configuration.BridgeApiKey = "a-key";
+                }),
+                Fresh(configuration =>
+                {
+                    configuration.BridgeAddress = "requests.example.invalid";
+                    configuration.BridgeApiKey = "a-key";
+                }),
+                [nameof(PluginConfiguration.BridgeAddress)]
+            },
+            {
+                "the bridge credential",
+                Fresh(configuration =>
+                {
+                    configuration.BridgeAddress = "https://requests.example.invalid";
+                    configuration.BridgeApiKey = "a-key";
+                }),
+                Fresh(configuration =>
+                {
+                    configuration.BridgeAddress = "https://requests.example.invalid";
+                    configuration.BridgeApiKey = " ";
+                }),
+                [nameof(PluginConfiguration.BridgeApiKey)]
+            },
+            {
+                "the account mapping",
+                Fresh(configuration => configuration.BridgeAccounts.Add(new BridgeAccountRow { UserId = Somebody, Account = "42" })),
+                Fresh(configuration => configuration.BridgeAccounts.Add(new BridgeAccountRow { UserId = Somebody, Account = "alice" })),
+                [nameof(PluginConfiguration.BridgeAccounts)]
+            }
+        };
+
+    /// <summary>
+    /// Each way a row of the mapping can be wrong is named inside the one problem the table gets,
+    /// so an operator editing the table is told which row and why rather than only that the table
+    /// was refused.
+    /// </summary>
+    /// <param name="rows">The table as written.</param>
+    /// <param name="named">What the refusal has to say about it.</param>
+    [Theory]
+    [MemberData(nameof(EachWrongRow))]
+    public void EachWrongRowOfTheMappingIsNamedInsideTheOneProblemTheTableGets(BridgeAccountRow[] rows, string named)
+    {
+        var configuration = Fresh(candidate =>
+        {
+            foreach (var row in rows)
+            {
+                candidate.BridgeAccounts.Add(row);
+            }
+        });
+
+        var problem = Assert.Single(ConfigurationRules.Problems(configuration));
+
+        Assert.Equal(nameof(PluginConfiguration.BridgeAccounts), problem.Setting);
+        Assert.Contains(named, problem.Why, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Each way a row can be wrong, with the sentence the refusal has to carry for it.
+    /// </summary>
+    /// <returns>The rows and the sentences.</returns>
+    public static TheoryData<BridgeAccountRow[], string> EachWrongRow()
+        => new TheoryData<BridgeAccountRow[], string>
+        {
+            { [new BridgeAccountRow { UserId = Guid.Empty, Account = "42" }], "Row 1 names no user." },
+            { [new BridgeAccountRow { UserId = Somebody, Account = " " }], "Row 1, for user " + Somebody + ", has no account on it." },
+            { [new BridgeAccountRow { UserId = Somebody, Account = "alice" }], "is not a number" },
+            {
+                [new BridgeAccountRow { UserId = Somebody, Account = "42" }, new BridgeAccountRow { UserId = Somebody, Account = "43" }],
+                "Row 2 names user " + Somebody + " a second time"
             }
         };
 
@@ -180,7 +257,10 @@ public class ConfigurationRulesTests
             OutboundNoticeAddress = "example.invalid/hook",
             AnnouncesApprovals = false,
             AnnouncesDeclines = false,
-            AnnouncesFulfilments = false
+            AnnouncesFulfilments = false,
+            BridgeAddress = "requests.example.invalid",
+            BridgeApiKey = string.Empty,
+            BridgeAccounts = [new BridgeAccountRow { UserId = Guid.Empty, Account = string.Empty }]
         };
 
         var declared = typeof(PluginConfiguration)

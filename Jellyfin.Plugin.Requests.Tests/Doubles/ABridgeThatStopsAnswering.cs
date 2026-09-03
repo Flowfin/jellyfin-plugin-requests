@@ -7,13 +7,13 @@ using Jellyfin.Plugin.Requests.Model;
 namespace Jellyfin.Plugin.Requests.Tests.Doubles;
 
 /// <summary>
-/// A bridge whose reachability moves between calls, for the one thing no install can produce today.
+/// A bridge whose reachability moves between calls, for a thing the suite cannot produce with a
+/// socket.
 /// <para>
-/// The only implementation this plugin ships is the one for a server with no external service, so
-/// <see cref="BackendReachability.Unreachable"/> is a value nothing an operator can install answers
-/// with. A health panel that shows a failure has to be provable before an adapter exists, and this
-/// is what provides the failure: it says what it is told to say, and the test decides when it stops
-/// answering.
+/// The adapter answers <see cref="BackendReachability.Unreachable"/> only from a service that did
+/// not answer, and the suite opens no socket to one. A health panel that shows a failure has to be
+/// provable without that, and this is what provides the failure: it says what it is told to say,
+/// and the test decides when it stops answering.
 /// </para>
 /// <para>
 /// It is not <see cref="FakeRequestBackend"/> widened. That one takes its answer once and never

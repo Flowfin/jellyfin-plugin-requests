@@ -12,13 +12,15 @@ server without a service runs is
 over is below, and what happens when the service misbehaves is a separate question this page does not
 answer. Where a credential lives is answered at the end of it.
 
-**There is no adapter in this tree, and #315 is the issue that asks for one.** #82 closed as
-completed on 2026-08-23 having built the submission path behind the interface, and it did not produce
-a client that speaks to a service: the only implementation of the interface is still the one for a
-server without one. Whether such an adapter is written on this board at all was an open call recorded
-on #113, and that call is taken: one is written here, as its own module. So every sentence below that
-says something arrives with the adapter is waiting on work somebody can pick up rather than on a
-decision nobody has taken.
+**There is one adapter in this tree, and it speaks the Overseerr form.**
+[`OverseerrBackend`](../Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs) is the
+implementation every server resolves; with no address written it hands every call to
+`NoRequestBackend` and adds nothing, so a server without a service is still the server this page
+opens with. #82 built the submission path behind the interface, #113 decided the form and that an
+adapter is written here as its own module, and #315 asked for it. What the adapter sends, what it
+makes of what comes back, and what it refuses before sending anything are in the section on it
+below. **Nothing in this tree has ever called a running service**, and the section at the end says
+what a reading of the form's description is worth against a reading of an instance.
 
 ## The mapping
 
@@ -148,9 +150,15 @@ under the service's own account, so the service is told that a request was made 
 Attribution is turned on one person at a time, by writing a row, and writing the row is what says
 that person's account name may leave.
 
-Where the table is kept and how it is edited arrives with the adapter that reads it, which is #315.
-Nothing on this side reads the table today, so a settings field for it now would be somewhere to type
-something nothing uses.
+The table is kept in the plugin's own configuration, as `BridgeAccounts` beside the address it
+belongs with, and edited on the settings page in the bridge section, one line per person. It has the
+same lifecycle as that address: per server, written by whoever runs it, backed up with the rest of the
+configuration, and gone with it; a file of its own would be a second place to keep current and a
+second place to lose. It arrived with the adapter that reads it and not before, because a settings
+field nothing reads is somewhere to type something nothing uses. **The account in a row is the
+service's own numeric identifier for that person**, because the Overseerr form identifies its users by
+number, and a row whose account is not a number is refused when the settings are saved rather than
+discovered at the first handover. [`configuration.md`](configuration.md) carries the field.
 
 ### What leaves the server when a bridge is configured
 
@@ -247,17 +255,19 @@ the bridge, and taking it is a fact about a type that reflection can read; "whic
 service" is a judgement nobody can check. So the check is over what touches it, and the column is
 where the judgement is written down for a reader.
 
-The other half of the same claim is that only one implementation ships. Every server this plugin runs
-on resolves `NoRequestBackend` until an adapter replaces that one registration, and the suite refuses
-a second implementation arriving in the plugin assembly unnamed for the same reason.
+The other half of the same claim is that exactly two implementations ship, and the suite names both:
+`NoRequestBackend`, which is what a server with no service runs, and `OverseerrBackend`, which is what
+every server resolves and which hands every call to the first until an address is written. A third
+implementation arriving in the plugin assembly unnamed reds the suite for the same reason a feature
+taking the bridge unnamed does.
 
 ## Where a credential would live, and what may be claimed about it
 
-**There is no credential today and nothing here holds one.** The only implementation of the bridge in
-this tree is the one for a server that has no service, it makes no call, and the configuration
-carries no bridge address and no credential. Everything below is what will be true the day the
-adapter adds one, written now so that it is a position rather than a description written afterwards
-to fit whatever was built.
+**There is a credential now, and it is `BridgeApiKey`.** The adapter sends it as the `X-Api-Key`
+header on every call to the configured address and nowhere else, and it is empty on every install
+where nobody has pasted one. Everything below was written before the adapter existed, as a position
+rather than a description written afterwards to fit whatever was built, and the adapter was built to
+fit it; where a sentence below has since become enforced rather than claimed, it says so.
 
 **One field for an address does exist and it is not this one.** `OutboundNoticeAddress` is where a
 notice about a request is posted, it is empty on every install where nobody has decided otherwise,
@@ -344,8 +354,8 @@ back in order to render its page. This plugin's own page does exactly that for t
 exist today:
 
     git grep -n "getPluginConfiguration" -- Jellyfin.Plugin.Requests/Configuration/configPage.html
-    Jellyfin.Plugin.Requests/Configuration/configPage.html:220:                                return ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId);
-    Jellyfin.Plugin.Requests/Configuration/configPage.html:233:                        ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId)
+    Jellyfin.Plugin.Requests/Configuration/configPage.html:325:                                return ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId);
+    Jellyfin.Plugin.Requests/Configuration/configPage.html:338:                        ApiClient.getPluginConfiguration(RequestsConfig.pluginUniqueId)
 
 So the protection a credential gets here is the protection the server's data directory gets, and this
 page claims no more than that.
@@ -369,10 +379,85 @@ never written to a log. It is never included in anything a diagnostics route pro
 returned to a page or an endpoint that does not need it. And it is never sent anywhere except the
 service the operator configured.
 
-**None of the four is enforced, because there is nothing yet to enforce them over.** The lint rule
-that would refuse a log or a diagnostics call reaching it, and the test that would assert it does not
-appear in a log written during a bridge failure, are the other two conditions of #85, and both
-quantify over a value that does not exist. They land with the adapter and not before.
+**Two of the four are held by something that runs, and two are held by the shape of the wire.** The
+setting carries `[Secret]`, the invariant lint rule `no-marked-setting-in-a-message` names it in both
+of its pattern lines, and `EveryMarkedSettingIsNamedByARuleInTheInvariantLint` reds if the two ever
+part; that is the first condition of #85. `AFailedHandoverWritesNoPartOfTheKeyToTheLog` drives a
+submission into a refused connection through the real submission path, which logs the whole
+exception, and asserts the key is in no line at any level; that is #85's second. What holds the other
+two is that the key travels only as a header: the platform's exception names the destination and not
+the headers, so nothing this plugin hands a logger can carry it, and the address it is sent to is the
+one the operator wrote. Neither of those two is a check, and `NoCallCarriesTheKeyAnywhereButTheHeader`
+is what stands between them and a change that puts the key in a query string.
+
+## The adapter, and what it sends
+
+[`OverseerrBackend`](../Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs) is the one
+adapter, it speaks the form the section below quotes, and it is configured by three settings on the
+plugin's page: the root of the service, the key the service issued, and the account mapping above.
+[`configuration.md`](configuration.md) carries each one with its default and what a wrong value is
+refused for.
+
+**With no address written it is `NoRequestBackend`.** Every call reads the settings first, and where
+no address is set it hands the call to the bridge with nothing behind it and adds nothing. That is
+what every install runs until an operator types an address, and it is why the register above did not
+grow: nothing that takes the bridge changed.
+
+**What an approval sends, in the form's own field names.** `mediaType`, which is `movie` or `tv`;
+`mediaId`, which is the request's TMDB identifier and nothing else; for a series, `seasons`, which is
+the list that was asked for or the form's own word `all` where the whole show was; and `userId`, only
+for a person with a row in the mapping, carrying the number the operator wrote for them. Nothing else
+this side holds is on the wire: no title, no year, no other provider's identifier, no Jellyfin user
+identifier, no name. `AFilmIsPostedInTheFormAndTheNumberTheServiceAnswersWithIsKept`,
+`ASeriesCarriesTheSeasonsAskedForAndTheWholeShowWhereNoneWereNamed` and
+`AMappedPersonArrivesUnderTheirAccountAndAnUnmappedOneUnderNobodys` read the body back off an
+in-process service and are what hold that list. [`personal-data.md`](personal-data.md) counts the same
+fields as what leaves.
+
+**A request with no TMDB identifier is not handed over, and the queue says so.** That is the first of
+the three answers the section below sets out, taken on #315 on 2026-09-02: the handover is refused
+before anything is sent, the approval stands, the moment is written onto the request on the path
+`HandoverFailedAt` already carries, and the log line beside it names what is missing. The operator's
+queue draws it as approved and not handed over, which is a state a person can read and act on by
+adding the identifier. Not the second answer, because requiring a TMDB identifier at approval rewrites
+the approval rule and every surface that creates a request for the sake of one backend's key space,
+and would refuse requests this side can identify perfectly well. Not the third, because searching a
+title is refused by name by the identity rule, and the form's own description shows why: three
+searches that take text and no route from one number to another. If a route from an IMDb or TVDB
+number to a TMDB one ever exists on that side, it is a lookup and not a search, and it is an issue of
+its own then. `ARequestWithNoTmdbIdentifierIsRefusedBeforeAnythingIsSent` holds the refusal to
+"before anything is sent".
+
+**The number-to-word step lives in
+[`OverseerrWords`](../Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrWords.cs) and nowhere else.**
+The section below records that where that step lives was a decision this adapter had to take rather
+than discover, and the answer is a second table beside the first: five request-status numbers, each
+to the word the mapping table holds it under, read by nothing but the adapter. `OverseerrWordsTests`
+compares the two tables in both directions, so a word this step produces is always a row the mapping
+holds and every request-status row the mapping holds has a number here. A number the step does not
+know is reported as its own digits, so the mapping table's rule for an unseen word is what fires, and
+the reconciliation's log line then carries a number an operator can look up rather than a word this
+side guessed.
+
+**What a report carries is the request's status and not the media's.** A report is one word, the
+reconciliation looks it up in both vocabularies, and the request's own status is the fact that says
+what happened to the request; the media status beside it in the same answer is read by nothing. So
+the `MediaStatus` row of the mapping above is one this adapter never produces, which is stated here
+so that nobody reads its presence as a claim about this form.
+
+**What the adapter refuses to carry, and where a failure goes.** The credential is a header on every
+call and never part of an address or a body, which `NoCallCarriesTheKeyAnywhereButTheHeader` asserts
+over all four calls. A refused call is an exception naming the status the service answered and never
+the body it answered with, because the body is whatever the thing at that address chose to send. A
+body that is not JSON, and JSON with no identifier or no status in it, are failures and never a
+reference or a word; those are the two cases #35 named and could not reach before something here read
+a body. A call that runs past ten seconds is given up on as a timeout and not as a cancellation,
+because the reconciliation stops its whole run on a cancellation and one slow answer is one request
+left as it is. Which of those failures are told apart, and what a bound retry is, is still #86.
+
+**`Reachable` still means the status route answered**, and the section below says what that does not
+say: that route takes no credential, so a green answer is a service that is up and nothing about
+whether the key is accepted.
 
 ## Where the list of words came from
 

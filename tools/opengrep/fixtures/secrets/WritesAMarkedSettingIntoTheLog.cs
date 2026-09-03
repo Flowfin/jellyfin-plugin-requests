@@ -46,6 +46,21 @@ internal sealed class WritesAMarkedSettingIntoTheLog
         logger.LogDebug($"The sink is set to {configuration.OutboundNoticeAddress} on this install.");
     }
 
+    // The second marked setting, in the same three spellings. It is the one somebody
+    // reaches for while debugging a refused call, because the natural sentence to
+    // write is "the key that was refused was this one".
+    public static void QuotesTheKeyBack(PluginConfiguration configuration, ILogger logger)
+    {
+        var why = string.Format(
+            CultureInfo.InvariantCulture,
+            "The service refused the key \"{0}\".",
+            configuration.BridgeApiKey);
+
+        logger.LogWarning("The bridge was refused with key {Key}.", configuration.BridgeApiKey);
+
+        logger.LogDebug($"The bridge authenticates with {configuration.BridgeApiKey} on this install.");
+    }
+
     // The regression the rule above cannot see: nothing here names the address,
     // and the exception carries it anyway.
     public static void HandsOverThePlatformsException(Exception reason, Guid requestId)
