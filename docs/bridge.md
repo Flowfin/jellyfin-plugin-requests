@@ -19,8 +19,11 @@ implementation every server resolves; with no address written it hands every cal
 opens with. #82 built the submission path behind the interface, #113 decided the form and that an
 adapter is written here as its own module, and #315 asked for it. What the adapter sends, what it
 makes of what comes back, and what it refuses before sending anything are in the section on it
-below. **Nothing in this tree has ever called a running service**, and the section at the end says
-what a reading of the form's description is worth against a reading of an instance.
+below. **One procedure in this tree calls a running service, and nothing in the suite does.**
+`scripts/verify-bridge-round-trip.sh` walks one request onto a Jellyseerr started beside a server of
+each claimed line, and `.github/workflows/bridge-round-trip.yaml` runs it; the section on the adapter
+says what that run measured on 2026-09-03 and what it did not, and the section at the end says what a
+reading of the form's description is worth against a reading of an instance.
 
 ## The mapping
 
@@ -222,10 +225,13 @@ gave a moment ago.
 **On the ordinary install this does nothing and costs one call.** Most servers have no service, the
 run ends at the reachability check, and it says nothing above debug.
 
-**What is not claimed.** No run of this task on a server has been watched, and no service was
-reached: what the suite measures is the reconciliation against a double, on both claimed target
-frameworks. Which failures an adapter tells apart, and what each of them then does, is #86 and is
-not decided here. And **the person who asked is not told when their request fails this way** - no
+**What is not claimed.** One run of this task on a server has been watched, against a running
+Jellyseerr, in the round trip the adapter's section below records: it asked about one approved
+request, was answered `APPROVED`, and left the request as it was. That is the inert row and nothing
+else; no run against a service has ever moved a request, because no service has ever answered
+`DECLINED` or `FAILED` here, and what the suite measures for those is the reconciliation against a
+double, on both claimed target frameworks. Which failures an adapter tells apart, and what each of
+them then does, is #86 and is not decided here. And **the person who asked is not told when their request fails this way** - no
 sentence is written for that state, so they find out on their own page. That is a gap rather than a
 decision, and `RequesterMessage.ForMove` is where it is written down.
 
@@ -459,12 +465,45 @@ left as it is. Which of those failures are told apart, and what a bound retry is
 say: that route takes no credential, so a green answer is a service that is up and nothing about
 whether the key is accepted.
 
+**One request has made the round trip against a running service, on both claimed lines.**
+`scripts/verify-bridge-round-trip.sh` starts Jellyseerr `2.7.3`, pinned by digest in the script,
+beside a server of each line, walks its own first sign-in against an administrator made on that
+server, reads the key it issued, points the plugin at it through the server's configuration route,
+has a person ask for a film by TMDB number and an operator approve it, and reads the request back out
+of the service's own list; then it runs `ReconciliationTask` and reads the request here again. Run
+`33731657684` on this board, jobs `100572739356` for 10.11 and `100572739618` for 12.0, is the first
+green one, and the two lines that carry the measurement read the same on both:
+
+    id=1  type=movie  status=2  media.tmdbId=550  media.status=3  requestedBy.id=1
+    state=Approved  backend={"Service": "overseerr", "Id": "1"}  handoverFailedAt=None
+
+So the submission's field names are the ones a real service takes, the number it answers with is the
+one this side keeps, the status it reports is `2`, which `OverseerrWords` turns into `APPROVED` and
+the table above holds as inert, and the request stays approved here after the reconciliation. The
+media status `3` beside it is `PROCESSING` in the form's own enumeration below and is read by
+nothing here, as the paragraph above says.
+
+**What that run does not say.** It is Jellyseerr and not Overseerr proper, because Overseerr's only
+described route creating the first user takes a Plex account token, and Jellyseerr's takes a Jellyfin
+username and password the job makes and forgets; whether Overseerr proper behaves the same is not
+measured. The service has no download client, so its own log says the request is skipped rather than
+fetched, and nothing downstream of the service is exercised. No failure path is walked: a refused
+key, a service that goes away and a word the table has not seen are the suite's legs and #86's
+question. And one server setting is turned on for the service on the 12.0 line: Jellyseerr `2.7.3`
+names its client in the `X-Emby-Authorization` header, which a 12.0 server reads only while
+`EnableLegacyAuthorization` is on, and it is off there by default. The first run of the procedure met
+that as a `400` on the service's sign-in, the procedure now turns the switch on where the server has
+it and prints what it found, and an operator running that pair of versions meets the same wall.
+
 ## Where the list of words came from
 
 The words above are the ones issue #81 names for the Overseerr form, which is the form the first
 adapter is written against, decided on #113. **They were not read off a running service, and nothing
-in this tree can read one.** No fixture here was captured from a service and the suite makes no
-outbound call.
+in the suite can read one.** No fixture here was captured from a service and the suite makes no
+outbound call. One of the six has since been met on a running Jellyseerr, in the round trip the
+adapter's section above records: the service reported `2` and `OverseerrWords` turned it into
+`APPROVED`. The other five have not been seen from a service, and the rule below is what stands
+between that and a wrong answer.
 
 What has been read is that form's own published description, and the comparison against it is the
 section below. That is a weaker reading than a running service and a stronger one than this table had
@@ -710,9 +749,11 @@ here recognises.
 
 ### What was not read
 
-Nothing off a running instance, and that is the same disclosure as the one above rather than a softer
-version of it. No call has ever been made from this tree to a service of this form and no response of
-one has ever been captured here. Every reading above is of a branch of that project's own
-repository, which is what that project intends to ship rather than what any operator is running:
-the two disagreeing about the request-status alphabet is the demonstration that a document and a
-service are different things, and a numbering read from source is subject to the same gap.
+Nothing in this section is off a running instance. Every reading above is of a branch of that
+project's own repository, which is what that project intends to ship rather than what any operator
+is running: the two disagreeing about the request-status alphabet is the demonstration that a
+document and a service are different things, and a numbering read from source is subject to the
+same gap. What has been read off an instance is the round trip in the adapter's section above, and
+its reach is exactly the calls it makes: one submission, one report answering `2`, and the status
+route. No response of a service is captured in this tree; the run's log is where the answers are,
+and the section above quotes the two lines that carry the measurement.

@@ -93,7 +93,11 @@ which posts a document to the one address an operator typed and reads a status b
 `Jellyfin.Plugin.Requests.Tests/Doubles/AnOverseerrService.cs` stands in front of the bridge adapter,
 which reads a body back, so the two cases #35 named and nothing here could reach before - a body that
 is not JSON, and JSON of the wrong shape - are answers that double gives and legs the adapter is held
-to. Neither double was captured from a running service, and nothing here has ever called one.
+to. Neither double was captured from a running service. What does call one is outside the suite,
+in the shape of the first-load procedure below: `scripts/verify-bridge-round-trip.sh` starts a
+Jellyseerr beside a server of each claimed line and walks one request onto it, and
+`.github/workflows/bridge-round-trip.yaml` runs it on the paths it names and nightly. `docs/bridge.md`
+carries what that run measured and what it did not.
 
 This paragraph named an issue rather than a file until #251, and went on saying the double did not
 exist for as long as it took somebody to read both.

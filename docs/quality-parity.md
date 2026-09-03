@@ -801,9 +801,10 @@ workflow that ran on it succeeded:
     32603611353  success  110abde  🧾 PR hygiene
 
 Two names appear twice because two triggers fired on one head, and two of the sixteen belong to the
-inherited section above rather than to this one. Three workflows do not appear at all: `mutation.yaml`
-runs on a schedule, `seam-probe.yaml` on a push that touches the probe, and `full-disk.yaml`
-arrived after that head, so their green runs are their own and carry their own head.
+inherited section above rather than to this one. Four workflows do not appear at all: `mutation.yaml`
+runs on a schedule, `seam-probe.yaml` on a push that touches the probe, and `full-disk.yaml` and
+`bridge-round-trip.yaml` arrived after that head, so their green runs are their own and carry their
+own head.
 
 | Workflow                      | Red run                                                                                                                                               | Green run                 |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
@@ -822,6 +823,7 @@ arrived after that head, so their green runs are their own and carry their own h
 | `manifest-freshness.yaml`     | none of this kind, below                                                                                                                              | 33246667212, at `12182bf` |
 | `release-install.yaml`        | none of this kind, below                                                                                                                              | 33357925338, at `501a943` |
 | `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                       | 32623457801, at `d154ab3` |
+| `bridge-round-trip.yaml`      | 33732017937, `throwaway/315-a-submission-in-the-wrong-field`, both lines red at `Does a request made here arrive on the service`, at the approval     | 33731657684, at `234daed` |
 
 The job and step of each red run are read off the run rather than off a log:
 
