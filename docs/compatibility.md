@@ -266,11 +266,17 @@ nothing here is one that can be skipped over.
 
 ## What is not promised at all
 
-- **The seam to the sibling browsing plugin.** Which side owns what, and how each finds the other,
-  are #88, #89 and #92, and none of them has landed. Nothing about that surface is stable and nothing
-  should be built against it yet.
-- **Anything about a bridge to an external request service.** There is none; #80 is where the
-  interface behind it is defined.
+- **The seam to the sibling browsing plugin, beyond what its contract says.** The contract is the
+  sibling board's, [Flowfin/jellyfin-plugin-discover#94](https://github.com/Flowfin/jellyfin-plugin-discover/issues/94),
+  and [seam.md](seam.md) is this side's pointer at it and says what this side owes against it. Its
+  shape is decided on that board and moves on that board's schedule, so nothing here promises what
+  crosses or when it changes. #88, #89 and #92 landed the pointer, the probe each side uses to find
+  the other, and which side owns the catalogue, and all three are closed.
+- **A bridge to any external request service other than the one form it speaks.** The bridge exists:
+  [bridge.md](bridge.md) carries the interface #80 defined, the null implementation every server
+  without a service runs, and the one adapter, which speaks the Overseerr form. What is promised
+  about it is what that page says and no more, and that page says one procedure in this tree calls a
+  running service and nothing in the suite does.
 - **What a server does with a version it reads from a manifest.** A manifest is published at the
   address [catalogue.md](catalogue.md) names, and how a server orders its entries is read there at the
   server's own source rather than measured; no run of this repository has watched a server install
