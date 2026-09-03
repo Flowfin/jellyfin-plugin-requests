@@ -105,8 +105,13 @@ public sealed class BridgeSubmission
             // would stop is a submission rather than the approval, so the honest answer is the
             // approved request with no reference on it.
             //
-            // Which failures an adapter distinguishes, and what each of them then does, is #86. What
-            // is decided here is only that none of them loses the approval.
+            // Every failure the adapter raises lands here the same way, which #86 decided: a
+            // service that is down, a key it refused and a title it does not know are all one
+            // handover that did not happen, marked on the request and never retried on its own,
+            // because an approval is one operator act and one call. Which of the three it was is
+            // in the exception's own sentence, and the operator's page says which of the first two
+            // the bridge is in without the log. What is decided here is only that none of them
+            // loses the approval.
             _logger.LogError(
                 reason,
                 "Request {RequestId} was approved and could not be handed to the external request service. The approval stands and nothing was undone; it carries no reference, so it has not been fetched and can be submitted again.",

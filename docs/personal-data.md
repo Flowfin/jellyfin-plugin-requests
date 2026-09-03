@@ -340,7 +340,7 @@ a raw identifier. It was found by reading the page against the tree rather than 
     211b90c 2026-08-27 Draw who last moved a request, and keep a deleted account apart from an unanswered call
 
     git grep -n 'queue.movedBy.deleted' -- Jellyfin.Plugin.Requests/
-    Jellyfin.Plugin.Requests/Localisation/Strings/en.json:135:  "queue.movedBy.deleted": "A person who has been deleted",
+    Jellyfin.Plugin.Requests/Localisation/Strings/en.json:137:  "queue.movedBy.deleted": "A person who has been deleted",
     Jellyfin.Plugin.Requests/Web/queue.html:564:                        return RequestsShell.word("queue.movedBy.deleted");
 
 What the page draws is an identifier the dashboard's user list does not hold, and it says so only
@@ -398,8 +398,8 @@ server that has no backend and the adapter that speaks the Overseerr form, and t
 every call to the first until an address is written:
 
     git grep -n ': IRequestBackend' -- Jellyfin.Plugin.Requests/
-    Jellyfin.Plugin.Requests/Bridge/NoRequestBackend.cs:23:public sealed class NoRequestBackend : IRequestBackend
-    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs:70:public sealed class OverseerrBackend : IRequestBackend, IDisposable
+    Jellyfin.Plugin.Requests/Bridge/NoRequestBackend.cs:24:public sealed class NoRequestBackend : IRequestBackend
+    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs:83:public sealed class OverseerrBackend : IRequestBackend, IDisposable
 
 What it sends when it is on is one submission per approval, in the form's own field names: the kind
 of thing as `movie` or `tv`, the request's TMDB identifier and no other provider's, the seasons asked

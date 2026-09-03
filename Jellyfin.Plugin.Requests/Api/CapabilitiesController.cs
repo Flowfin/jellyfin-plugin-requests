@@ -70,11 +70,11 @@ public sealed class CapabilitiesController : RequestsControllerBase
         // Asked of the bridge rather than decided from which implementation the container handed
         // back, because "nothing is configured" is the interface's own answer to this question and a
         // type comparison here would be a second way of asking it. On every install today this is
-        // the null bridge answering without leaving the process. Where an adapter makes the call
-        // slow or makes it fail, what a bound on it looks like is #86, and this endpoint follows
-        // that rather than swallowing the failure: an answer that claimed no bridge because the
-        // bridge threw would be a lie about the install, and the operator would read it as proof
-        // their configuration never took.
+        // the null bridge answering without leaving the process until an address is written. With
+        // one, the adapter bounds every call it makes and answers a failure as a value rather than
+        // throwing, which #86 decided, and this endpoint follows that rather than swallowing
+        // anything: an answer that claimed no bridge because the bridge failed would be a lie about
+        // the install, and the operator would read it as proof their configuration never took.
         var reachability = await _backend.CheckReachableAsync(cancellationToken).ConfigureAwait(false);
 
         return Ok(new InstallCapabilities

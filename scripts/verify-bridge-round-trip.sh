@@ -33,8 +33,8 @@
 #
 # WHAT IS NOT. Nothing downstream of the service: it has no download client configured, so its own
 # log says the request is skipped rather than fetched, and no library here ever fills. The failure
-# paths - a refused key, a service that goes away, a word the table has not seen - are the suite's
-# and #86's, not this script's.
+# paths - a refused key, a service that goes away, a version the adapter does not know, a word the
+# table has not seen - are the suite's, in WhenTheServiceMisbehavesTests, not this script's.
 #
 # ONE SERVER SETTING IS TURNED ON FOR THE SERVICE, AND THE TRANSCRIPT SAYS WHETHER IT WAS OFF. The
 # pinned service names its client in the `X-Emby-Authorization` header, which a 12.0 server reads

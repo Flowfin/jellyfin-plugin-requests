@@ -211,7 +211,7 @@ are read at both moments a configuration reaches this plugin, from the same list
 | OutboundNoticeAddress                                       | set to something that is not http or https                                        | a notice cannot be posted there, so the sink would send nothing while the page shows an address             |
 | AnnouncesApprovals, AnnouncesDeclines, AnnouncesFulfilments | all three off while an address is set                                             | nothing would ever be posted to the address, which is a second way of saying off and the one nobody can see |
 | BridgeAddress                                               | set to something that is not http or https                                        | nothing can be dialled there, so the bridge would report itself configured and hand nothing over            |
-| BridgeApiKey                                                | empty while BridgeAddress is set                                                  | the service answers its status route without a key and refuses every other call, which reads as up          |
+| BridgeApiKey                                                | empty while BridgeAddress is set                                                  | the service refuses every call that needs a key, and the panel would report a refused key nobody typed      |
 | BridgeAccounts                                              | a row names no user, a user twice, no account, or an account that is not a number | a request would arrive under an account nobody chose, or under two, and the refusal names the row           |
 
 **Nothing is corrected on the way in.** A quota of zero is not raised to one and a retention of five

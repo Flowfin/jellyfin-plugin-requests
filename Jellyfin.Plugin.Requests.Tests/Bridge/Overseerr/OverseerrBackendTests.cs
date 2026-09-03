@@ -63,8 +63,11 @@ public sealed class OverseerrBackendTests
     }
 
     /// <summary>
-    /// The status route answering is what reachable means, and it is asked at the form's own path
-    /// under the address the operator wrote, with the credential in the header the form reads.
+    /// The status route is asked first, at the form's own path under the address the operator
+    /// wrote, with the credential in the header the form reads, and a service that answers it with a
+    /// version this adapter knows is asked whether the key is accepted next. Both answering is what
+    /// reachable means; what each failure on the way is instead is
+    /// <c>WhenTheServiceMisbehavesTests</c>.
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
@@ -76,10 +79,12 @@ public sealed class OverseerrBackendTests
         var reachability = await backend.CheckReachableAsync(CancellationToken.None).ConfigureAwait(true);
 
         Assert.Equal(BackendReachability.Reachable, reachability);
-        var call = Assert.Single(service.Calls);
+        Assert.Equal(2, service.Calls.Count);
+        var call = service.Calls[0];
         Assert.Equal(HttpMethod.Get, call.Method);
         Assert.Equal("/api/v1/status", call.Path);
         Assert.Equal(Key, call.Key);
+        Assert.Equal("/api/v1/auth/me", service.Calls[1].Path);
     }
 
     /// <summary>
@@ -93,12 +98,13 @@ public sealed class OverseerrBackendTests
     [InlineData(Address + "/")]
     public async Task ATrailingSlashOnTheAddressChangesNothing(string written)
     {
-        var service = AnOverseerrService.ThatAnswers(HttpStatusCode.OK);
+        var service = AnOverseerrService.ThatAnswers(HttpStatusCode.OK, "{\"version\":\"2.7.3\"}");
         using var backend = Backend(service, Configured(configuration => configuration.BridgeAddress = written));
 
         await backend.CheckReachableAsync(CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal(Address + "/api/v1/status", Assert.Single(service.Calls).Address?.ToString());
+        Assert.Equal(Address + "/api/v1/status", service.Calls[0].Address?.ToString());
+        Assert.Equal(Address + "/api/v1/auth/me", service.Calls[1].Address?.ToString());
     }
 
     /// <summary>
@@ -337,7 +343,8 @@ public sealed class OverseerrBackendTests
     /// credential or the body of the answer. The status is what an operator acts on: a refused key
     /// and a service that fell over are two different numbers, which is why #35 names the 401 and
     /// the 500 as two cases for a client that reads an answer. What is done with the difference is
-    /// #86; what is asserted here is that the difference survives to the caller.
+    /// decided on #86 and held in <c>WhenTheServiceMisbehavesTests</c>; what is asserted here is
+    /// that the difference survives to the caller.
     /// </summary>
     /// <param name="status">What the service answered.</param>
     /// <param name="digits">The same status as the digits the sentence has to carry.</param>
@@ -517,16 +524,17 @@ public sealed class OverseerrBackendTests
     }
 
     /// <summary>
-    /// Across all four calls the credential is in the header and nowhere else: not in an address,
+    /// Across all five calls the credential is in the header and nowhere else: not in an address,
     /// not in a body. This is the guard that keeps the platform's own exception, which names the
     /// destination, from carrying the key into a log, and it is asserted over every call rather
-    /// than the one somebody thought of.
+    /// than the one somebody thought of. The status answer carries a version so the check goes on
+    /// to ask about the key, which is the fifth call and the one this leg would otherwise not see.
     /// </summary>
     /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
     public async Task NoCallCarriesTheKeyAnywhereButTheHeader()
     {
-        var service = AnOverseerrService.ThatAnswers(HttpStatusCode.OK, "{\"id\":1,\"status\":2}");
+        var service = AnOverseerrService.ThatAnswers(HttpStatusCode.OK, "{\"id\":1,\"status\":2,\"version\":\"2.7.3\"}");
         using var backend = Backend(service);
 
         await backend.CheckReachableAsync(CancellationToken.None).ConfigureAwait(true);
@@ -534,7 +542,7 @@ public sealed class OverseerrBackendTests
         await backend.ReportAsync(Issued("1"), CancellationToken.None).ConfigureAwait(true);
         await backend.WithdrawAsync(Issued("1"), CancellationToken.None).ConfigureAwait(true);
 
-        Assert.Equal(4, service.Calls.Count);
+        Assert.Equal(5, service.Calls.Count);
         Assert.All(service.Calls, call =>
         {
             Assert.Equal(Key, call.Key);

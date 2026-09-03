@@ -22,10 +22,11 @@ namespace Jellyfin.Plugin.Requests.Bridge;
 /// </para>
 /// <para>
 /// <b>What this interface does not decide.</b> What an approval means when a submission fails is
-/// #82. What happens when the service is unreachable, refuses the credential, or is asked about a
-/// title it has never heard of is #86. How a Jellyfin user is named to the service is #84, and
-/// where the credential lives is #85. This is the shape those answers have to fit through, and it
-/// names no service, no protocol and no address on purpose.
+/// #82. What happens when the service is unreachable, refuses the credential, reports a version the
+/// adapter does not know, or is asked about a title it has never heard of was decided on #86 and is
+/// carried by <see cref="BackendReachability"/> and by <c>docs/bridge.md</c>. How a Jellyfin user
+/// is named to the service is #84, and where the credential lives is #85. This is the shape those
+/// answers have to fit through, and it names no service, no protocol and no address on purpose.
 /// </para>
 /// <para>
 /// <b>Cancellation.</b> A cancelled call throws <see cref="System.OperationCanceledException"/>,
@@ -40,8 +41,9 @@ public interface IRequestBackend
     /// </summary>
     /// <param name="cancellationToken">Cancels the check.</param>
     /// <returns>
-    /// Which of the three states the bridge is in. Nothing configured is an answer rather than a
-    /// failure.
+    /// Which state the bridge is in. Nothing configured is an answer rather than a failure, and a
+    /// failure is a value here rather than an exception, so a scheduled task asking this cannot die
+    /// on the answer.
     /// </returns>
     Task<BackendReachability> CheckReachableAsync(CancellationToken cancellationToken);
 
@@ -53,7 +55,8 @@ public interface IRequestBackend
     /// <returns>
     /// What the service called it, or <see langword="null"/> where nothing was handed over and
     /// there is therefore nothing to keep. A null answer is the ordinary one on a server with no
-    /// service configured, and it is not a failure: a failure is an exception, in #86.
+    /// service configured, and it is not a failure: a failure is an exception, which the caller
+    /// marks on the request and never retries, decided on #86.
     /// </returns>
     Task<BackendReference?> SubmitAsync(MediaRequest request, CancellationToken cancellationToken);
 

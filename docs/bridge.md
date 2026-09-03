@@ -231,9 +231,82 @@ request, was answered `APPROVED`, and left the request as it was. That is the in
 else; no run against a service has ever moved a request, because no service has ever answered
 `DECLINED` or `FAILED` here, and what the suite measures for those is the reconciliation against a
 double, on both claimed target frameworks. Which failures an adapter tells apart, and what each of
-them then does, is #86 and is not decided here. And **the person who asked is not told when their request fails this way** - no
+them then does, is the section below, and none of the four has been produced by a running service. And **the person who asked is not told when their request fails this way** - no
 sentence is written for that state, so they find out on their own page. That is a gap rather than a
 decision, and `RequesterMessage.ForMove` is where it is written down.
+
+## When the service misbehaves
+
+Four things go wrong with a service that exists, and #86 decided on 2026-08-28 what each one does
+here. This is what was built against that ruling, one row per failure, each driven through
+`OverseerrBackend` and the real submission or reconciliation path against the in-process service in
+[`WhenTheServiceMisbehavesTests`](../Jellyfin.Plugin.Requests.Tests/Bridge/Overseerr/WhenTheServiceMisbehavesTests.cs).
+**Nothing in this section has been walked against a running service.**
+
+| The service                                                  | The adapter answers                | The reconciliation                                                                         | An approval                                                                                  | The operator's page says                                            |
+| ------------------------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| does not answer, or answers a failure to `GET /status`       | `Unreachable`                      | walks nothing, says so at warning, and the next run asks again                             | fails once and is marked on the request; nothing retries it                                  | that it is not answering, and when it last did                      |
+| refuses the key on `GET /auth/me`                            | `CredentialRefused`                | walks nothing, says so at error, and nothing is reconciled until the key is corrected      | fails once and is marked on the request, because the service refuses the call too            | that the key was refused, and that the settings are where to fix it |
+| reports a version whose major is not in `KnownMajorVersions` | `Incompatible`                     | walks nothing, says so at error, and nothing is reconciled until one of the two is updated | is not gated: one operator act is one call, and whatever it answers is marked on the request | that the version is unknown                                         |
+| does not know the title, or the reference                    | a refused submission, or no report | leaves that one request as it is and carries on with the others                            | fails that one handover and is marked on it; the next approval goes through                  | the handover column on that row, from #283                          |
+
+**"Retried with a bound" is the next call, and the bound is on every call.** An unreachable service
+is asked again by the next scheduled run and by the next approval, because outages end, and nothing
+here remembers it as down: the adapter keeps no state between calls, so a service that comes back is
+found back by the first thing that asks. The bound is the ten seconds every call is given, which is
+what makes the retry safe: a service that hangs costs a run ten seconds and not the night. What is
+deliberately not built is a retry inside one call, because the health panel asks on every turn of the
+queue and would wait that many times over, and because the schedule already is the retry.
+`AServiceThatIsDownIsUnreachableAndIsAskedAgainOnTheNextRun` holds the first half and
+`AServiceThatNeverAnswersIsGivenUpOnWithinTheBound` the second.
+
+**"Stop" is the reconciliation, said at error, and the page.** A refused key and an unknown version
+are not temporary, and retrying either would hide the problem behind a log line at warning that reads
+like an outage. So the run walks nothing, the line for it is at error and says what ends it, and the
+health panel carries a sentence of its own for each rather than "not answering". The run still asks
+the two questions again next hour, because the operator may have corrected the key by then and
+nothing else would notice; two bounded calls an hour is the whole of that, and no request is asked
+about until the answer is `Reachable`. An approval made meanwhile is not held back: it is one
+operator act and one call, its failure is marked on the request the way every failed handover is, and
+the panel says why. `ARefusedKeyStopsTheRunAtErrorAndLeavesEveryHandedOverRequestAsItIs` and
+`AnUnknownVersionStopsTheRunAsAnIncompatibility` hold the run's half;
+`TheOperatorPageIsToldWhichOfTheTwoStoppedTheBridge` holds the page's.
+
+**Which versions are known, and why by major.** `KnownMajorVersions` names `1` and `2`: Overseerr's
+line, whose description the section below quotes, and Jellyseerr's, which the round trip below was
+measured on. The check reads the digits before the first dot of what `GET /status` reports and
+nothing else, so a development build, which names itself with a word first, is unknown on purpose,
+and so is a version that is missing or not text. What that bound does not catch is a breaking change
+inside a major the list names, and no reading of a version string could; the round trip is what
+catches that, on the day it runs red. `AVersionThisAdapterDoesNotKnowIsIncompatibleAndTheKeyIsNotEvenTried`
+holds the four shapes of unknown, and `EveryMajorTheAdapterDeclaresIsOneTheCheckAccepts` keeps the
+list and the check from drifting apart.
+
+**No failure loses a request or moves it**, which is the second condition, and it is held by shape
+rather than by a check inside the loop. A run that asks nothing can change nothing, and every leg in
+that file reads the store back afterwards and compares the revision: a request handed over before
+the key was refused is at the same revision after the run that met the refusal. On the submission
+side the approval was written before the service was asked, so no answer can cost it, which
+[`BridgeSubmission`](../Jellyfin.Plugin.Requests/Bridge/BridgeSubmission.cs) says about itself.
+
+**What the form answers a title it does not know with.** The submission route hands the number to
+its TMDB client and maps anything that client throws to a `500` carrying the client's message; read
+off the same file on the measured line, fetched 2026-09-03:
+
+    curl -sS -o request.ts -w "http=%{http_code} bytes=%{size_download}\n" \
+      https://raw.githubusercontent.com/fallenbagel/jellyseerr/v2.7.3/server/routes/request.ts
+    http=200 bytes=20249
+
+    grep -n -B 1 'status: 500, message: error.message' request.ts
+    313-        default:
+    314:          return next({ status: 500, message: error.message });
+
+So a title the service does not know is one refused submission, and the message in that body is not
+quoted into any log here, because it is whatever the thing at that address chose to send.
+`ATitleTheServiceDoesNotKnowFailsThatHandoverAndTheNextOneGoesThrough` holds both halves, and
+`AReferenceTheServiceNoLongerKnowsLeavesThatRequestAloneAndTheOthersStillMove` holds the same rule on
+the reconciliation side, where a reference the service answers `404` to is no report rather than a
+failure.
 
 ## What needs a bridge
 
@@ -453,17 +526,20 @@ so that nobody reads its presence as a claim about this form.
 
 **What the adapter refuses to carry, and where a failure goes.** The credential is a header on every
 call and never part of an address or a body, which `NoCallCarriesTheKeyAnywhereButTheHeader` asserts
-over all four calls. A refused call is an exception naming the status the service answered and never
+over all five calls. A refused call is an exception naming the status the service answered and never
 the body it answered with, because the body is whatever the thing at that address chose to send. A
 body that is not JSON, and JSON with no identifier or no status in it, are failures and never a
 reference or a word; those are the two cases #35 named and could not reach before something here read
 a body. A call that runs past ten seconds is given up on as a timeout and not as a cancellation,
 because the reconciliation stops its whole run on a cancellation and one slow answer is one request
-left as it is. Which of those failures are told apart, and what a bound retry is, is still #86.
+left as it is. Which of those failures are told apart, and what each of them then does, is
+[When the service misbehaves](#when-the-service-misbehaves) above.
 
-**`Reachable` still means the status route answered**, and the section below says what that does not
-say: that route takes no credential, so a green answer is a service that is up and nothing about
-whether the key is accepted.
+**`Reachable` means three things were answered, in order**: `GET /status` succeeded, the version it
+reports has a major in `KnownMajorVersions`, and `GET /auth/me` did not refuse the key. Each question
+is asked only once the one before it is answered, so a service that is down is reported as down and
+never as a refused key. The section below quotes why the first alone was never enough: `/status`
+takes no credential, and which route answers the second question is written there.
 
 **One request has made the round trip against a running service, on both claimed lines.**
 `scripts/verify-bridge-round-trip.sh` starts Jellyseerr `2.7.3`, pinned by digest in the script,
@@ -488,8 +564,9 @@ described route creating the first user takes a Plex account token, and Jellysee
 username and password the job makes and forgets; whether Overseerr proper behaves the same is not
 measured. The service has no download client, so its own log says the request is skipped rather than
 fetched, and nothing downstream of the service is exercised. No failure path is walked: a refused
-key, a service that goes away and a word the table has not seen are the suite's legs and #86's
-question. And one server setting is turned on for the service on the 12.0 line: Jellyseerr `2.7.3`
+key, a service that goes away, a version the adapter does not know and a word the table has not seen
+are the suite's legs, in `WhenTheServiceMisbehavesTests` and `ReconcilingWithTheServiceTests`, and
+none of them has been produced by a running service. And one server setting is turned on for the service on the 12.0 line: Jellyseerr `2.7.3`
 names its client in the `X-Emby-Authorization` header, which a 12.0 server reads only while
 `EnableLegacyAuthorization` is on, and it is off there by default. The first run of the procedure met
 that as a `400` on the service's sign-in, the procedure now turns the switch on where the server has
@@ -554,14 +631,16 @@ authenticated by a route putting the value in a URL would put the leak back wher
 
 ### The four operations, against the four this side has
 
-`IRequestBackend` has four and no more, and each one lands on a path item in that document.
+`IRequestBackend` has four and no more, and each one lands on a path item in that document; the first
+lands on two, for the reason under the table.
 
-| This side             | The form                      | What it answers                                   |
-| --------------------- | ----------------------------- | ------------------------------------------------- |
-| `CheckReachableAsync` | `GET /status`                 | that the service is up, and nothing about the key |
-| `SubmitAsync`         | `POST /request`               | `201` with the request the service created        |
-| `ReportAsync`         | `GET /request/{requestId}`    | `200` with that request                           |
-| `WithdrawAsync`       | `DELETE /request/{requestId}` | `204` and no body                                 |
+| This side             | The form                      | What it answers                                       |
+| --------------------- | ----------------------------- | ----------------------------------------------------- |
+| `CheckReachableAsync` | `GET /status`                 | that the service is up and which version it is        |
+| `CheckReachableAsync` | `GET /auth/me`                | whoever the key stands for, or `403` when it is wrong |
+| `SubmitAsync`         | `POST /request`               | `201` with the request the service created            |
+| `ReportAsync`         | `GET /request/{requestId}`    | `200` with that request                               |
+| `WithdrawAsync`       | `DELETE /request/{requestId}` | `204` and no body                                     |
 
 **`/status` is answered without a credential**, and for the first row that is a problem rather than a
 convenience:
@@ -572,8 +651,47 @@ convenience:
         security: []
 
 A green answer from it says the service is up and says nothing about whether the key is accepted, so
-`Reachable` read off `/status` alone reports a working bridge on an install whose credential is
-wrong. Which call answers the second question is #86's and is not decided here.
+`Reachable` read off `/status` alone would report a working bridge on an install whose credential is
+wrong. What answers the second question, decided on #86, is the route that returns whoever the key
+stands for. It declares no `security` of its own, so the document's default applies, which is the
+session cookie or the `X-Api-Key` header, and it asks for no permission beyond the key being accepted:
+
+    /auth/me:
+      get:
+        summary: Get logged-in user
+        description: Returns the currently logged-in user.
+
+The form refuses it, and every other route under that default, with one status when the key is
+wrong. That is read off the middleware every such route sits behind rather than off the description,
+which does not say, and it reads the same in both lines the adapter knows. Fetched 2026-09-03:
+
+    curl -sS -o auth.ts -w "http=%{http_code} bytes=%{size_download}\n" \
+      https://raw.githubusercontent.com/sct/overseerr/develop/server/middleware/auth.ts
+    http=200 bytes=1560
+
+    grep -n -A 4 'if (!req.user' auth.ts
+    48:    if (!req.user || !req.user.hasPermission(permissions ?? 0, options)) {
+    49-      res.status(403).json({
+    50-        status: 403,
+    51-        error: 'You do not have permission to access this endpoint',
+    52-      });
+
+    curl -sS -o auth.ts -w "http=%{http_code} bytes=%{size_download}\n" \
+      https://raw.githubusercontent.com/fallenbagel/jellyseerr/v2.7.3/server/middleware/auth.ts
+    http=200 bytes=1560
+
+    grep -n -A 4 'if (!req.user' auth.ts
+    48:    if (!req.user || !req.user.hasPermission(permissions ?? 0, options)) {
+    49-      res.status(403).json({
+    50-        status: 403,
+    51-        error: 'You do not have permission to access this endpoint',
+    52-      });
+
+So the adapter reads a `403` from that route as the key being refused, and a `401` the same way, for
+a proxy in front of the service that answers before the service does. The body is not read: who the
+key stands for is the service's business, and what this side wants to know is answered by the status
+alone. Nothing here runs that route against a service, and a service that has moved the refusal to
+another status is not something this page can know about.
 
 **A submission has two required fields and every other one is optional:**
 
