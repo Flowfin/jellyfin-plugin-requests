@@ -184,10 +184,10 @@ the entries name rather than against the `.md5` published beside them:
 Both equal the `checksum` of their entry, so a server that downloads either one and hashes it gets
 the value the manifest promised.
 
-### Both entries claim the 10.11 line, and the 12.0 line has none
+### Both entries the manifest serves claim the 10.11 line, and the 12.0 line's package is not in it
 
-The scheme is one entry per server line, each carrying its line's `targetAbi`. What is published is
-two entries for one line. This board claims two:
+The scheme is one entry per server line, each carrying its line's `targetAbi`. What the manifest
+serves is two entries for one line. This board claims two:
 
     grep -nE '^(version|targetAbi|framework):' build.yaml build-jf12.yaml
     build.yaml:5:version: "0.3.0.0"
@@ -197,9 +197,11 @@ two entries for one line. This board claims two:
     build-jf12.yaml:15:targetAbi: "12.0.0.0"
     build-jf12.yaml:16:framework: "net10.0"
 
-and the release route builds the one `build.yaml` names, which is why there is no second package for
-an entry to point at. `publish.yaml` says so about itself in its own header and refuses a `framework`
-that is not the one it builds.
+and since `0.3.0.0` the release route publishes a package per line, deriving the line from the tag,
+which `publish.yaml` says about itself in its own header. `0.3.0.0-jf12-stable` names
+`targetAbi 12.0.0.0` in the metadata published beside it; read on 2026-09-03, the manifest carries no
+entry for it and none for the 10.11 line's `0.3.0.0` either, and nothing on this board writes the
+manifest.
 
 **So a server on the 12.0 line is offered the `net9.0` build.** A server keeps every entry whose
 `targetAbi` is at or below its own version and then takes the highest version number of what is

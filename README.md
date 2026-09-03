@@ -37,18 +37,27 @@ directly, and carries the fixture it is watched refusing.
 
 ## This is not finished
 
-Two releases exist, and a manifest under Flowfin's control serves both:
+Four releases exist, two per server line, and the manifest under Flowfin's
+control serves two of them:
 
     gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName --jq '.[].tagName'
+    0.3.0.0-jf12-stable
+    0.3.0.0-stable
     0.2.0.0-stable
     0.1.0.0-stable
 
+    curl -sS https://flowfin.dev/manifest.json | jq -r '.[] | select(.name == "Requests") | .versions[] | "\(.version) \(.targetAbi)"'
+    0.2.0.0 10.11.0.0
+    0.1.0.0 10.11.0.0
+
+Read on 2026-09-03, after both `0.3.0.0` tags were published. A server that has
+added the address is offered `0.2.0.0` until the manifest moves, and nothing on
+this board moves it: the release route here publishes a GitHub release and feeds
+no catalogue, which [docs/RELEASING.md](docs/RELEASING.md) says about itself.
 The address an operator adds, what the entries carry and the checksums read back
 against the archives are in [docs/catalogue.md](docs/catalogue.md), which is the
-authority for all of it. Nothing on this board writes that document: the release
-route here publishes a GitHub release and feeds no catalogue, which
-[docs/RELEASING.md](docs/RELEASING.md) says about itself, and what this tree does
-with the published manifest is read it back against the releases once a day.
+authority for all of it, and what this tree does with the published manifest is
+read it back against the releases once a day.
 
 Three things belong here rather than behind the link, because they decide whether
 this is worth installing.
@@ -58,18 +67,32 @@ filled by enumerating one organisation's repositories, this repository does not
 move into it, and the price of that decision is that an operator reaches this
 plugin only by being told the address.
 
-**Both published entries carry the 10.11 line's package.** The 12.0 line has none,
-because the release route builds the one server line `build.yaml` names, so a
-server on the 12.0 line is offered the `net9.0` build rather than nothing. That
-comparison is read at the server's own source rather than assumed, on the same
-page.
+**Both entries the manifest serves carry the 10.11 line's package, and the 12.0
+line's release is not in it.** A `0.3.0.0` package naming `targetAbi 12.0.0.0`
+exists as a release, read from the metadata published beside it:
 
-**A published release has been installed on a server once, on the 10.11 line
-only.** Run `33357925338`, at `501a943`, downloaded `requests_0.2.0.0.zip`,
-checked it against the digest published beside it, and the server answered that
-the plugin was `Active` at `0.2.0.0`. The server was `10.11.11`.
+    gh release download 0.3.0.0-jf12-stable --repo Flowfin/jellyfin-plugin-requests --pattern 'requests_0.3.0.0.zip.meta.json' --dir jf12
+    jq -r '"\(.version) \(.targetAbi)"' jf12/requests_0.3.0.0.zip.meta.json
+    0.3.0.0 12.0.0.0
 
-**On the floor server it claims, the same release does not load.** `build.yaml`
+Until the manifest carries an entry for it, a server on the 12.0 line is offered
+the `net9.0` build rather than nothing. That comparison is read at the server's
+own source rather than assumed, on the same page.
+
+**A published release has been installed on a server of each line, once each.**
+Run `33744830699`, at `2e83259`, downloaded `requests_0.3.0.0.zip` from each
+release, checked each against the digest published beside it, and both servers
+answered that the plugin was `Active` at `0.3.0.0`:
+
+    gh run view 33744830699 --repo Flowfin/jellyfin-plugin-requests --log | grep -o 'Requests loaded and answered on .*'
+    Requests loaded and answered on jellyfin/jellyfin:10.11.11 (net9.0)
+    Requests loaded and answered on jellyfin/jellyfin:12.0-rc4 (net10.0)
+
+The 12.0 server was a release candidate reporting `12.0.0`; no released 12.0
+server has run this. Before that run, `0.2.0.0` had been installed the same way
+on `10.11.11` alone, in run `33357925338` at `501a943`.
+
+**On the floor server it claims, `0.2.0.0` does not load.** `build.yaml`
 says `targetAbi: "10.11.0.0"`, which names the server `10.11.0`, and putting
 `requests_0.2.0.0.zip` on that server reports
 `Requests is NotSupported rather than Active` - run `33358848505`. Jellyfin sets
@@ -81,11 +104,14 @@ the two moves, the SDK the package is built against or the floor it claims, is
 answered on #360: the package is built against the floor from now on and the
 floor stands, because moving the claim would drop every server below `10.11.11`
 without saying so. That answer does not reach a release that already exists.
-**Do not install this on a `10.11.0` server: it will not run.**
+**Do not install `0.2.0.0` on a `10.11.0` server: it will not run.** Whether
+`0.3.0.0`, the first release built against the floor, loads on that server is
+#382's measurement and is not claimed here.
 
-Two further things neither run covers: the bytes are copied into the plugin
-directory rather than fetched and unpacked by the server itself, and the 12.0
-line has no release for anybody to install.
+Two further things the install run does not cover: the bytes are copied into the
+plugin directory rather than fetched and unpacked by the server itself, and no
+server has installed this from the manifest, which does not yet carry `0.3.0.0`
+for either line.
 
 Nothing here should be pointed at a server you care about.
 
