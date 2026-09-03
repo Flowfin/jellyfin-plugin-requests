@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -27,13 +28,26 @@ namespace Jellyfin.Plugin.Requests.Bridge.Overseerr;
 /// an address gets the next approval handed over rather than the one after the next restart.
 /// </para>
 /// <para>
-/// <b>Four calls, one each.</b> <c>GET /status</c> says whether the service is up, and it is
-/// answered without a credential, so a green answer from it says nothing about whether the key is
-/// accepted; <c>docs/bridge.md</c> records that bound and #86 owns the question of which call would
-/// answer it. <c>POST /request</c> hands an approval over and the number the service answers with
-/// is what is kept. <c>GET /request/{id}</c> asks where something stands, and the number it reports
-/// is turned into the mapping table's word by <see cref="OverseerrWords"/>, which is the one place
-/// that step lives. <c>DELETE /request/{id}</c> takes something back.
+/// <b>Five calls on four operations.</b> Asking whether the service is there is two of them, in
+/// order: <c>GET /status</c> says whether it is up and which version it is, and it is answered
+/// without a credential, so a green answer from it says nothing about whether the key is accepted;
+/// <c>GET /auth/me</c> returns whoever the key stands for and is refused when the key is wrong, which
+/// is the question the first call cannot answer, decided on #86. <c>POST /request</c> hands an
+/// approval over and the number the service answers with is what is kept. <c>GET /request/{id}</c>
+/// asks where something stands, and the number it reports is turned into the mapping table's word by
+/// <see cref="OverseerrWords"/>, which is the one place that step lives. <c>DELETE /request/{id}</c>
+/// takes something back.
+/// </para>
+/// <para>
+/// <b>The four ways a service misbehaves, and what each one is here.</b> #86 decided them and
+/// <c>docs/bridge.md</c> carries the table. A service that does not answer, or answers a failure to
+/// being asked whether it is up, is <see cref="BackendReachability.Unreachable"/>: temporary, nothing
+/// here remembers it, and the next call asks again. A service that refuses the key is
+/// <see cref="BackendReachability.CredentialRefused"/>, and one reporting a major version outside
+/// <see cref="KnownMajorVersions"/> is <see cref="BackendReachability.Incompatible"/>; both stop the
+/// reconciliation until an operator acts, because retrying either hides the problem. A title the
+/// service does not know is a refused submission and a fact about that one request, which
+/// <see cref="BridgeSubmission"/> marks on the request and nothing else is held up by.
 /// </para>
 /// <para>
 /// <b>The credential travels in a header and never in an address.</b> The form takes it as
@@ -58,13 +72,12 @@ namespace Jellyfin.Plugin.Requests.Bridge.Overseerr;
 /// otherwise stop a whole reconciliation run for one slow answer.
 /// </para>
 /// <para>
-/// <b>What is not decided here.</b> Which failures are told apart, and what a bound retry is, is #86.
-/// A submission that the service accepts and that this side then cannot write back is
-/// <see cref="BridgeSubmission"/>'s, and its log line carries the identifier so the two can be
-/// reconciled by hand. Nothing here has been run against a service: every leg that proves this
-/// class drives it through an in-process handler, which is the headless rule in
-/// <c>docs/testing.md</c>, and <c>docs/bridge.md</c> says what a reading of a description is worth
-/// against a reading of an instance.
+/// <b>What is not decided here.</b> A submission that the service accepts and that this side then
+/// cannot write back is <see cref="BridgeSubmission"/>'s, and its log line carries the identifier so
+/// the two can be reconciled by hand. Every leg that proves this class drives it through an
+/// in-process handler, which is the headless rule in <c>docs/testing.md</c>; <c>docs/bridge.md</c>
+/// says what one round trip against a running service measured, and that no failure path has been
+/// walked against one.
 /// </para>
 /// </summary>
 public sealed class OverseerrBackend : IRequestBackend, IDisposable
@@ -92,6 +105,18 @@ public sealed class OverseerrBackend : IRequestBackend, IDisposable
     /// How long one call is given on a server, before it is given up on.
     /// </summary>
     public static readonly TimeSpan DefaultAnswerWithin = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// The major versions of the form this adapter knows how to speak to, which are the two lines it
+    /// was written against: <c>1</c> is Overseerr's, whose own description <c>docs/bridge.md</c>
+    /// quotes, and <c>2</c> is Jellyseerr's, which the round trip in the same document was measured
+    /// on. A service reporting any other major, or a version that does not begin with a number, is
+    /// <see cref="BackendReachability.Incompatible"/>: the bridge stops rather than speaking a form
+    /// it has never been read or measured against, and this list is what grows on the day a new line
+    /// is. A breaking change inside a major this list names is not caught by it, and that bound is
+    /// stated where the list is documented rather than hidden by a longer check.
+    /// </summary>
+    public static readonly IReadOnlyList<int> KnownMajorVersions = new ReadOnlyCollection<int>(new[] { 1, 2 });
 
     private const string Prefix = "api/v1/";
 
@@ -154,19 +179,69 @@ public sealed class OverseerrBackend : IRequestBackend, IDisposable
 
         try
         {
-            using var answer = await SendAsync(bridge, HttpMethod.Get, "status", content: null, cancellationToken)
+            // Up first, then the version, then the key, and each question is asked only once the one
+            // before it is answered: a service that is down is reported as down and never as a
+            // refused key, and a service this adapter cannot speak to is not asked anything in a
+            // form it may not have.
+            using var status = await SendAsync(bridge, HttpMethod.Get, "status", content: null, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (answer.IsSuccessStatusCode)
+            if (!status.IsSuccessStatusCode)
             {
-                return BackendReachability.Reachable;
+                _logger.LogWarning(
+                    "The external request service answered {StatusCode} when asked whether it is up, so it is reported as unreachable. Nothing else was asked of it.",
+                    (int)status.StatusCode);
+
+                return BackendReachability.Unreachable;
             }
 
-            _logger.LogWarning(
-                "The external request service answered {StatusCode} when asked whether it is up, so it is reported as unreachable. Nothing else was asked of it.",
-                (int)answer.StatusCode);
+            var reported = await ReadAsync(status, cancellationToken).ConfigureAwait(false);
 
-            return BackendReachability.Unreachable;
+            if (MajorVersion(reported) is not int major)
+            {
+                // The version is whatever the thing at that address chose to send, so it is not
+                // quoted; the operator reads it off the service itself.
+                _logger.LogError(
+                    "The external request service reports a version this plugin cannot read, so the bridge is stopped: nothing is asked about and nothing is reconciled until one of the two is updated. Nothing else was asked of it.");
+
+                return BackendReachability.Incompatible;
+            }
+
+            if (!KnownMajorVersions.Contains(major))
+            {
+                _logger.LogError(
+                    "The external request service reports major version {Major}, which this plugin does not know how to speak to, so the bridge is stopped: nothing is asked about and nothing is reconciled until one of the two is updated. Nothing else was asked of it.",
+                    major);
+
+                return BackendReachability.Incompatible;
+            }
+
+            // The status route takes no credential, so a green answer from it says nothing about
+            // the key. The route that returns whoever the key stands for is what answers that: the
+            // form refuses it with 403 when the key is wrong, and 401 is read the same way for a
+            // proxy in front of the service that answers first. The body is not read; who the key
+            // stands for is the service's business.
+            using var me = await SendAsync(bridge, HttpMethod.Get, "auth/me", content: null, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (me.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                _logger.LogError(
+                    "The external request service refused this server's key, so the bridge is stopped: nothing is asked about and nothing is reconciled until the key is corrected in the plugin's settings.");
+
+                return BackendReachability.CredentialRefused;
+            }
+
+            if (!me.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "The external request service answered {StatusCode} when asked whether the key is accepted, so it is reported as unreachable. Nothing else was asked of it.",
+                    (int)me.StatusCode);
+
+                return BackendReachability.Unreachable;
+            }
+
+            return BackendReachability.Reachable;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -177,9 +252,10 @@ public sealed class OverseerrBackend : IRequestBackend, IDisposable
 #pragma warning restore CA1031
         {
             // Every way of not answering is the same answer here: configured, and did not answer.
-            // The interface names that state so a caller does not have to tell a refused connection
-            // from a name that does not resolve, and #86 is where the ones worth telling apart are
-            // decided.
+            // A refused connection, a name that does not resolve, a call that ran out of its bound
+            // and a body that is not JSON are one fact to a caller, which is that the service is not
+            // there to be asked; the ones worth telling apart are the answers above, which need the
+            // service to have answered at all.
             _logger.LogWarning(
                 reason,
                 "The external request service could not be asked whether it is up, so it is reported as unreachable. Nothing else was asked of it.");
@@ -394,6 +470,30 @@ public sealed class OverseerrBackend : IRequestBackend, IDisposable
         throw new HandoverRefusedException(
             "The account mapped for user " + Text(user)
             + " is not a number, and the external request service identifies its users by number, so the request was not handed over. The approval stands and nothing was sent; correct the row and hand it over again.");
+    }
+
+    /// <summary>
+    /// The major version out of what the status route reports, or nothing where the version is
+    /// missing, is not text, or does not begin with a number. The digits before the first dot and
+    /// nothing else, because that is what both lines this adapter knows put there; a development
+    /// build of either names itself with a word first, and is unknown here on purpose.
+    /// </summary>
+    /// <param name="body">What the status route answered.</param>
+    /// <returns>The major version, or <see langword="null"/> where none can be read.</returns>
+    private static int? MajorVersion(JsonElement body)
+    {
+        if (body.ValueKind != JsonValueKind.Object
+            || !body.TryGetProperty("version", out var version)
+            || version.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var text = version.GetString() ?? string.Empty;
+        var dot = text.IndexOf('.', StringComparison.Ordinal);
+        var leading = dot < 0 ? text : text[..dot];
+
+        return int.TryParse(leading, NumberStyles.None, CultureInfo.InvariantCulture, out var major) ? major : null;
     }
 
     private static long? Number(JsonElement body, string name)

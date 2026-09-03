@@ -13,8 +13,9 @@ namespace Jellyfin.Plugin.Requests.Bridge;
 /// above has a branch for the absence.
 /// </para>
 /// <para>
-/// Nothing here fails. There is no service to be unreachable, no credential to be refused and no
-/// title to be unknown, so the failures in #86 belong to an adapter and not to this. What it does
+/// Nothing here fails. There is no service to be unreachable, no credential to be refused, no
+/// version to be unknown and no title to be unknown, so the four failures #86 decided belong to an
+/// adapter and not to this. What it does
 /// not do is pretend: it reports that nothing is configured rather than that something answered,
 /// and it hands back no reference rather than one it invented, because a made-up reference is a row
 /// an operator would later try to reconcile against a service that never saw it.

@@ -68,8 +68,8 @@ service, and the six lines below are two paths rather than six: a client each,
 and the socket pipeline each is handed at registration.
 
     git grep -nE 'HttpClient|WebRequest|WebSocket|Socket' -- Jellyfin.Plugin.Requests
-    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs:99:    private readonly HttpClient _client;
-    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs:141:        _client = new HttpClient(handler, disposeHandler: false)
+    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs:124:    private readonly HttpClient _client;
+    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs:166:        _client = new HttpClient(handler, disposeHandler: false)
     Jellyfin.Plugin.Requests/Notify/OutboundSink.cs:61:    private readonly HttpClient _client;
     Jellyfin.Plugin.Requests/Notify/OutboundSink.cs:104:        _client = new HttpClient(handler, disposeHandler: false)
     Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:95:            new SocketsHttpHandler(),

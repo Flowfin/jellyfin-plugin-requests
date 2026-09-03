@@ -121,6 +121,8 @@
   "queue.health.bridge.NotConfigured": "No external request service is set up, so approving is an answer and nothing is fetched.",
   "queue.health.bridge.Reachable": "The external request service answered.",
   "queue.health.bridge.Unreachable": "The external request service is not answering.",
+  "queue.health.bridge.CredentialRefused": "The external request service refused this server's key, so nothing is reconciled until the key is corrected in the plugin's settings.",
+  "queue.health.bridge.Incompatible": "The external request service reports a version this plugin does not know, so nothing is reconciled until one of the two is updated.",
   "queue.health.bridgeLastReachable": "It last answered {0}.",
   "queue.health.bridgeNeverReachable": "Nothing here has seen it answer since this server started.",
   "queue.health.count": "{0}: {1}",

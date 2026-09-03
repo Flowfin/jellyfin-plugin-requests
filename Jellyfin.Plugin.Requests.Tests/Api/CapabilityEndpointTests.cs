@@ -116,6 +116,8 @@ public class CapabilityEndpointTests
     [InlineData(BackendReachability.NotConfigured, false)]
     [InlineData(BackendReachability.Reachable, true)]
     [InlineData(BackendReachability.Unreachable, true)]
+    [InlineData(BackendReachability.CredentialRefused, true)]
+    [InlineData(BackendReachability.Incompatible, true)]
     public async Task ABridgeIsReportedWhenThereIsOneAndNeverHowItIsConfigured(
         BackendReachability reachability,
         bool expected)

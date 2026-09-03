@@ -45,8 +45,16 @@ namespace Jellyfin.Plugin.Requests.Bridge;
 /// <para>
 /// <b>One request's failure never stops the others.</b> A service that cannot answer about one
 /// reference is a fact about that reference - it may have been issued by a service an operator has
-/// since replaced - so the run reports it and carries on. Which failures an adapter tells apart, and
-/// what each of them then does, is #86 and is not decided here.
+/// since replaced - so the run reports it and carries on.
+/// </para>
+/// <para>
+/// <b>A refused key and an unknown version stop the run and are said at error.</b> Those two are
+/// not temporary, which #86 decided: an unreachable service is asked again on the next run because
+/// outages end, and a refused key is asked again on the next run only because the operator may have
+/// corrected it, so the line for it says what the queue is not getting until they do. Two calls an
+/// hour is the whole of that retry. Nothing is walked in either case, and every request handed to
+/// the service is left exactly as it is, which is the second condition of #86 held by the run's
+/// shape: a run that asks nothing can corrupt nothing.
 /// </para>
 /// </summary>
 public sealed class BridgeReconciliation
@@ -247,10 +255,23 @@ public sealed class BridgeReconciliation
                 break;
 
             case BackendReachability.Unreachable:
-                // Said rather than swallowed, which is this issue's fourth condition. One line for
-                // the run and not one per request: the fact is about the service.
+                // Said rather than swallowed, which is #83's fourth condition. One line for the run
+                // and not one per request: the fact is about the service. At warning, because an
+                // outage is temporary and the next run is the retry.
                 _logger.LogWarning(
                     "The external request service did not answer, so nothing was reconciled this run. Every request handed to it is left exactly as it is and the next run will ask again.");
+                break;
+
+            case BackendReachability.CredentialRefused:
+                // Not temporary, so at error rather than warning: the adapter has already written
+                // why, and this line says what it costs the queue and what ends it.
+                _logger.LogError(
+                    "The external request service refused this server's key, so nothing was reconciled this run and nothing will be until the key is corrected. Every request handed to it is left exactly as it is.");
+                break;
+
+            case BackendReachability.Incompatible:
+                _logger.LogError(
+                    "The external request service reports a version this plugin does not know, so nothing was reconciled this run and nothing will be until one of the two is updated. Every request handed to it is left exactly as it is.");
                 break;
 
             default:
