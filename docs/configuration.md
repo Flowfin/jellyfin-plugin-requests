@@ -181,8 +181,9 @@ a header on every call to the address above and nowhere else; it is marked as a 
 appear in anything this plugin writes for somebody else to read, the invariant lint refuses a message
 that reads it, and the settings page shows whether one is set and never the value, the same shape as
 the notice address. An address with no key is refused rather than saved: the form answers its status
-route without a credential and every other route with a refusal, which is a bridge that reports itself
-up on the health page and hands nothing over. A key with no address is allowed and reads by nothing.
+route without a credential and every other route with a refusal, so the health page would report a
+refused key on an install where nobody typed one, and nothing would be handed over. A key with no
+address is allowed and reads by nothing.
 Where it is stored, who on the machine can read it, and what is refused by name are in
 [`bridge.md`](bridge.md), and the claim there is exactly as strong as the protection the server's own
 data directory gets.
