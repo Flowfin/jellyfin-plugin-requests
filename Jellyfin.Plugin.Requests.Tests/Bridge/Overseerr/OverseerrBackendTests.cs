@@ -335,19 +335,25 @@ public sealed class OverseerrBackendTests
     /// <summary>
     /// A refused submission is a failure carrying the status the service answered, and never the
     /// credential or the body of the answer. The status is what an operator acts on: a refused key
-    /// and a title the service does not know are two different numbers.
+    /// and a service that fell over are two different numbers, which is why #35 names the 401 and
+    /// the 500 as two cases for a client that reads an answer. What is done with the difference is
+    /// #86; what is asserted here is that the difference survives to the caller.
     /// </summary>
+    /// <param name="status">What the service answered.</param>
+    /// <param name="digits">The same status as the digits the sentence has to carry.</param>
     /// <returns>A task that completes when the assertions have run.</returns>
-    [Fact]
-    public async Task ARefusedSubmissionCarriesTheStatusAndNeverTheKey()
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, "401")]
+    [InlineData(HttpStatusCode.InternalServerError, "500")]
+    public async Task ARefusedSubmissionCarriesTheStatusAndNeverTheKey(HttpStatusCode status, string digits)
     {
-        using var backend = Backend(AnOverseerrService.ThatAnswers(HttpStatusCode.Unauthorized, "{\"message\":\"the key was refused\"}"));
+        using var backend = Backend(AnOverseerrService.ThatAnswers(status, "{\"message\":\"the key was refused\"}"));
 
         var failure = await Assert.ThrowsAsync<HttpRequestException>(
             () => backend.SubmitAsync(AFilm(), CancellationToken.None)).ConfigureAwait(true);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, failure.StatusCode);
-        Assert.Contains("401", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(status, failure.StatusCode);
+        Assert.Contains(digits, failure.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(Key, failure.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("the key was refused", failure.ToString(), StringComparison.Ordinal);
     }
