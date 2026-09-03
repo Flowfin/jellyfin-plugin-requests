@@ -102,42 +102,114 @@ paraphrase gets wrong.
 
 ## Wiring an external request service
 
-**Nothing in this tree talks to one.** The only bridge that ships is the one for a server that has no
-service, it makes no call, and the settings carry no bridge address and no credential. There is
-nothing to wire today. The address on the settings page is the one in step 2 above, where a notice
-about a request is posted, and it has nothing to do with a request service.
+Most servers run none, and on those this plugin is the whole system: approving is an answer and
+nothing is fetched. Where a service speaking the Overseerr form runs beside the server, three settings
+on the plugin's page point this plugin at it, and from then on an approval is handed to that service
+and the queue is asked about hourly. [bridge.md](bridge.md) is the authority for everything below;
+this section says what to do in which order, what each step costs, and what to read when it stops.
+The address in step 2 of the setup above is a different thing: that one is where a notice about a
+request is posted, and it has nothing to do with a request service.
 
-That is not the same as nothing being decided, and the parts an operator will have to reason about
-are already written down. [bridge.md](bridge.md) is the authority for all three, and this section
-says which part of it answers which question.
+**1. Read what typing the credential in means, before typing it.** It goes in the plugin's
+configuration file under the server's data directory, which means it is in your backups by design,
+readable by anything else loaded into the same server process, and readable by an administrator of
+the server over the API, because that is how the dashboard renders a plugin's settings page.
+Encrypting it at rest with a key on the same disk is refused rather than unimplemented, and the
+reason is under "Where a credential would live, and what may be claimed about it" on that page.
 
-**The credential.** Where it goes, who on the machine can read it, and what is refused by name are
-under "Where a credential would live, and what may be claimed about it". The short version an
-operator needs before agreeing to type one in: it goes in the plugin's configuration file under the
-server's data directory, which means it is in your backups by design, readable by anything else
-loaded into the same server process, and readable by an administrator of the server over the API,
-because that is how the dashboard renders a plugin's settings page. Encrypting it at rest with a key
-on the same disk is refused rather than unimplemented, and the reason is written there.
+**2. Type the address**: the root of the service as a browser opens it, scheme included and with no
+path. The plugin puts the form's own path under it. This one is readable back on the page, on
+purpose: it names a machine and carries nothing that authenticates, and you have to be able to see
+which service your server is pointed at.
 
-**Whose name a request arrives under.** The identity mapping is a table an operator keeps, one row
+**3. Type the key** the service issued for this server, which is the API key on the service's own
+settings page. It travels as a header on every call and nowhere else, and the page shows whether one
+is set and never the value. An address with no key is refused rather than saved.
+
+**4. Decide whose name a request arrives under.** The identity mapping is a table you keep, one row
 per person, and it is empty on a fresh install. That is the shipping answer rather than a state on
-the way to one: with no rows, every request arrives at the service under the service's own account
+the way to one: with no rows, every request arrives at the service under the service's own account,
 and it is told that a request was made and not by whom. Attribution is turned on one person at a time
-by writing a row, and writing that row is what says that person's account name may leave this server.
-Matching people by name is refused rather than built and switched off, because it is wrong in the
-direction that credits one person with another's request.
+by writing a row, which is the person's identifier on this server, a space, and the number the
+service knows them by, and writing that row is what says that person's account over there may leave
+this server. Matching people by name is refused rather than built and switched off, because it is
+wrong in the direction that credits one person with another's request.
 
-**What each failure looks like.** This is the part no document can answer yet, and the reason moved
-on 2026-08-28. The four failures now have decided behaviours: unreachable is temporary and retried
-with a bound, a refused credential stops the bridge and tells the operator rather than being retried
-until somebody notices, a service version the adapter does not know is surfaced as an incompatibility
-and not retried either, and a title the service has never heard of is a fact about one request and
-never stops the rest. Those are the ruling on issue #86 and they are written here as an address
-rather than as a sequence, because nothing implements them: the only bridge that ships is still the
-one for a server with no service, so none of the four can occur. Issue #315 is the adapter that makes
-them real, and this section is written against what it does on the day it lands. A sequence written
-before then would be an account of intentions rather than of behaviour, which is the one thing
-somebody reading a page like this under pressure cannot afford.
+**5. Read the panel.** From the moment the address is saved, the panel at the top of the queue asks
+the service on every turn of the page, and the queue gains a column saying whether each approved
+request was handed over. The sentence on the panel is the first thing to read when something is
+wrong, and the sequence below is what to do about each one.
+
+### When the bridge stops
+
+Read in this order and stop at the first line that matches. Every one of these is a sentence on the
+panel or a cell in the queue; none of them needs the log to be found, and where the log holds the
+detail the step says so.
+
+**1. The panel says the service is not answering.** That is a fact about the service or the network
+between, not about this plugin, and the moment beside it is when this server last saw it answer.
+Check that the service is up and that the address in step 2 is the one a browser reaches it at.
+There is nothing to reset here: nothing remembers the service as down, the next approval and the
+next hourly run ask again on their own, and every call gives up after ten seconds rather than
+hanging.
+
+**2. The panel says the service refused this server's key.** The bridge is stopped: nothing is asked
+about until the key is corrected, and the server's log says so at error as well. An approval made
+meanwhile fails and shows so on its row. Take a key from the service's own settings page and type it
+at step 3; the panel asks again on the next turn of the page, so the sentence changes without a
+restart, and the hourly run picks up from there.
+
+**3. The panel says the service reports a version this plugin does not know.** The bridge is stopped
+the same way. This plugin knows Overseerr's 1.x line and Jellyseerr's 2.x line by major version and
+stops on anything else, a development build included, because it has never been read or measured
+against that form. Nothing on this server fixes it: either the service or this plugin has to move,
+and [bridge.md](bridge.md) says which versions are known today.
+
+**4. The panel says the service answered, and one row says handing it over failed.** That is a fact
+about that one request, and nothing else is held up by it. Three things produce it: the service does
+not know the title by the TMDB number this side holds, the request carries no TMDB identifier at all,
+or the mapped account for the person who asked is not a number. The server's log names which, by
+request identifier; the row does not. A request in this state is approved and not handed over, and
+nothing hands it over again on its own. To hand it over again, decline it with a reason and approve
+it again: the second approval is a fresh handover, and the history keeps both moves.
+
+**5. The panel says the service answered, no row says failed, and an approved request sits still.**
+The service holds it and has not finished, and its own queue is where to look. The hourly run moves a
+request here to failed only when the service says it declined or gave up; a title the service is
+still fetching stays approved here until this server's library sees it arrive, which is step 5 of the
+sequence below.
+
+### Jellyseerr 2.7.3 on the 12.0 line signs in with the legacy header
+
+If the service is Jellyseerr `2.7.3` and this server is on the 12.0 line, the service's own first
+sign-in against this server fails with a `400` before a password is looked at, and nothing in this
+plugin is involved. Jellyseerr `2.7.3` names its client in the `X-Emby-Authorization` header, and a
+12.0 server reads that header only while `EnableLegacyAuthorization` is on, which it is not by
+default there; with the header unread the sign-in names no client and the server refuses it. The
+plugin's own calls to the service carry the key in `X-Api-Key` and are unaffected, and the plugin
+never signs in to the server. Neither line's web client carries a label for the switch in its string
+catalogue, so expect to set it outside the dashboard: it is `EnableLegacyAuthorization` in the
+server's `system.xml` under its configuration directory, or the same field read and written on
+`/System/Configuration`, which is how `scripts/verify-bridge-round-trip.sh` turns it on for the
+server it starts. A later Jellyseerr may send the `Authorization` header instead, and this paragraph
+is then about a version range rather than a switch. Read on 2026-09-03, so that a reader on a later
+server re-runs it rather than trusting the sentence:
+
+    gh api 'repos/jellyfin/jellyfin/contents/MediaBrowser.Model/Configuration/ServerConfiguration.cs?ref=v12.0-rc7' --jq .content | base64 -d | grep -n 'EnableLegacyAuthorization'
+    290:    public bool EnableLegacyAuthorization { get; set; }
+
+    gh api 'repos/jellyfin/jellyfin/contents/MediaBrowser.Model/Configuration/ServerConfiguration.cs?ref=v10.11.11' --jq .content | base64 -d | grep -n 'EnableLegacyAuthorization'
+    290:    public bool EnableLegacyAuthorization { get; set; } = true;
+
+    gh api 'repos/jellyfin/jellyfin/contents/Jellyfin.Server.Implementations/Security/AuthorizationContext.cs?ref=v12.0-rc7' --jq .content | base64 -d | grep -n 'X-Emby-Authorization'
+    235:                auth = httpReq.Headers["X-Emby-Authorization"];
+
+    curl -sS https://raw.githubusercontent.com/fallenbagel/jellyseerr/v2.7.3/server/api/jellyfin.ts | grep -n "X-Emby-Authorization"
+    147:          'X-Emby-Authorization': authHeaderVal,
+
+    for line in release-10.11.z master; do curl -sS "https://raw.githubusercontent.com/jellyfin/jellyfin-web/$line/src/strings/en-us.json" | grep -c -i 'LegacyAuthorization'; done
+    0
+    0
 
 ## When requests stop moving
 
@@ -174,8 +246,10 @@ approval.
 
 **6. What does the bridge say?** On most servers this reads that no external request service is set
 up, and that is the ordinary answer rather than a fault: approving is an answer and nothing is
-fetched. Where one is configured, a line saying it is not answering is a fact about that service and
-not about this plugin, and the moment it last answered is beside it.
+fetched. Where one is configured, the line is one of four sentences and "When the bridge stops" above
+is the sequence for them: not answering is a fact about that service with the moment it last answered
+beside it, a refused key and an unknown version are the bridge stopped until you act, and a service
+that answered while a row says its handover failed is a fact about that one request.
 
 ### What the sequence does not reach
 
@@ -187,6 +261,10 @@ this plugin puts no path and no credential on that panel. That is the same rule 
 what one person learns about another's request is nothing, and a diagnostics surface is not an
 exception to it.
 
-**Nothing here was read on a running server.** The panel, its sentences and the order above are read
-off the page and the endpoint behind it in this repository. A session in front of a real install
-answering these six questions in this order is a different statement and is not made here.
+**Nothing here was read on a running server, with one exception.** The panel, its sentences and the
+order above are read off the page and the endpoint behind it in this repository, and so is the
+sequence for the bridge: none of its four failures has been produced by a running service, which
+[bridge.md](bridge.md) says beside the legs that hold them. The exception is the `400` and the switch
+in the paragraph on Jellyseerr `2.7.3`, which the round-trip procedure met and measured on a server it
+started, in run `33730767209` on this board. A session in front of a real install answering these
+questions in this order is a different statement and is not made here.
