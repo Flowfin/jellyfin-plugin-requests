@@ -1,0 +1,117 @@
+# A request made here arrives on a running service that speaks the Overseerr form, on a real server
+# of each claimed line.
+#
+# #315 asks for the adapter and, as its last clause, for a round trip against a real instance rather
+# than a stub alone. The suite drives the adapter through an in-process double, which is the
+# headless rule in `docs/testing.md`, and every answer that double gives is a shape quoted out of the
+# form's description. A description is not a service, and `docs/bridge.md` says twice what the gap
+# between the two is worth. This job is the reading of the service.
+#
+# So it starts a Jellyfin of each line with the plugin installed, starts Jellyseerr beside it on a
+# network of their own, walks Jellyseerr's own first sign-in against an administrator account made on
+# that Jellyfin, reads the key Jellyseerr issued, points the plugin at it, has a person ask for a film
+# and an operator approve it, and reads the request back out of Jellyseerr's own list with the status
+# the mapping table predicts. Then it runs the reconciliation task and reads the request here again.
+# `scripts/verify-bridge-round-trip.sh` is the procedure and says what is asserted and what is not.
+#
+# THE SERVICE IS JELLYSEERR AND NOT OVERSEERR PROPER. Both speak the form; Overseerr's only described
+# route that creates the first user takes a Plex account token, which nobody on this board holds and
+# nothing here should hold. Jellyseerr's takes a Jellyfin username and password, so the credential
+# lives and dies with the containers. The image is pinned by tag and by digest in the script.
+#
+# It runs on a pull request or a push that touches the bridge, the procedure or the shared server
+# scripts, and nightly. Not on every pull request, because it pulls a third party's image and
+# Jellyseerr fetches the film's metadata from TMDB, which are two outbound dependencies more than the
+# other container checks carry, and a defect this job catches is in the paths it names. The cost is
+# two containers per line.
+name: A request arrives on a running service
+
+on:
+  pull_request:
+    paths:
+      - "Jellyfin.Plugin.Requests/Bridge/**"
+      - "Jellyfin.Plugin.Requests/Configuration/**"
+      - "scripts/verify-bridge-round-trip.sh"
+      - "scripts/server-under-test.sh"
+      - "scripts/server-image-for.sh"
+      - "scripts/server-lines.tsv"
+      - ".github/workflows/bridge-round-trip.yaml"
+  push:
+    paths:
+      - "Jellyfin.Plugin.Requests/Bridge/**"
+      - "Jellyfin.Plugin.Requests/Configuration/**"
+      - "scripts/verify-bridge-round-trip.sh"
+      - "scripts/server-under-test.sh"
+      - "scripts/server-image-for.sh"
+      - "scripts/server-lines.tsv"
+      - ".github/workflows/bridge-round-trip.yaml"
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+# Explicit deny-all at workflow level; the job grants what it needs.
+permissions: {}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  round-trip:
+    name: round trip ${{ matrix.line }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    strategy:
+      # Both lines run whatever the other one does. A failure on one is a fact about that line, and
+      # cancelling the other would leave nobody knowing whether it is a fact about both.
+      fail-fast: false
+      matrix:
+        include:
+          # The server image is not written here. It is one half of a pair several checks need, and
+          # two copies of that pair disagree the first time a line moves, so it lives in
+          # `scripts/server-lines.tsv` and the step below asks for it by framework. The service
+          # image is the script's own: one service, one place it is pinned.
+          - line: "10.11"
+            framework: "net9.0"
+            port: "18102"
+            service_port: "15055"
+          - line: "12.0"
+            framework: "net10.0"
+            port: "18103"
+            service_port: "15056"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes, so do not leave the token in .git/config.
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Restore in locked mode
+        run: dotnet restore Jellyfin.Plugin.Requests.sln --locked-mode
+
+      - name: Does a request made here arrive on the service
+        # The matrix values arrive as environment variables rather than as expressions inside the
+        # script. They are written in this file and are not somebody's input, so nothing here is
+        # injectable today; what the shape buys is that it stays that way when a later matrix takes
+        # a value from somewhere else.
+        env:
+          FRAMEWORK: ${{ matrix.framework }}
+          PORT: ${{ matrix.port }}
+          SERVICE_PORT: ${{ matrix.service_port }}
+        run: |
+          set -euo pipefail
+          IMAGE=$(./scripts/server-image-for.sh "$FRAMEWORK")
+          ./scripts/verify-bridge-round-trip.sh "$IMAGE" "$FRAMEWORK" "$PORT" "$SERVICE_PORT"
