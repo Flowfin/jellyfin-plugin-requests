@@ -336,7 +336,7 @@ public sealed class OverseerrBackend : IRequestBackend, IDisposable
                 _ => throw new HandoverRefusedException(
                     "Request " + Text(request.Id) + " is of a kind the external request service has no word for, so it was not handed over. The approval stands and nothing was sent.")
             },
-            ["mediaId"] = TmdbIdentifier(request)
+            ["tmdbId"] = TmdbIdentifier(request)
         };
 
         if (request.Kind == RequestedItemKind.Series)
