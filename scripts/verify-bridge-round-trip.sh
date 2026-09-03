@@ -36,6 +36,12 @@
 # paths - a refused key, a service that goes away, a word the table has not seen - are the suite's
 # and #86's, not this script's.
 #
+# ONE SERVER SETTING IS TURNED ON FOR THE SERVICE, AND THE TRANSCRIPT SAYS WHETHER IT WAS OFF. The
+# pinned service names its client in the `X-Emby-Authorization` header, which a 12.0 server reads
+# only while `EnableLegacyAuthorization` is on, and it is off there by default. The first run of this
+# met that as a 400 on the service's sign-in. The step that turns it on is the same thing an operator
+# on that line does, and it is a fact about the pair of versions rather than about this plugin.
+#
 # The server, the install, the wizard and the administrator account are scripts/server-under-test.sh,
 # which the other container checks source too. Everything else is this script's own, lives for the
 # length of two containers, and is reachable only from loopback ports.
@@ -260,6 +266,36 @@ if not user["Policy"].get("IsAdministrator"):
 print("{0} ({1}) is an administrator".format(user.get("Name"), user.get("Id")))
 '
 
+step "let the server read the header the service signs in with"
+# Jellyseerr 2.7.3 names its client in `X-Emby-Authorization`, which a 10.11 server reads and a 12.0
+# server reads only while `EnableLegacyAuthorization` is on; it is off by default there, and a
+# sign-in with no client named is refused with 400 before a password is looked at. So the switch is
+# turned on where the server has it, and the transcript says which it found. An operator on the 12.0
+# line meets the same wall with this version of the service and turns the same switch.
+system=$(api GET /System/Configuration)
+printf '%s' "$system" | python3 -c '
+import json, sys
+configuration = json.load(sys.stdin)
+if "EnableLegacyAuthorization" not in configuration:
+    print("the server has no EnableLegacyAuthorization setting; nothing to turn on")
+else:
+    print("EnableLegacyAuthorization was {0}".format(configuration["EnableLegacyAuthorization"]))
+'
+if printf '%s' "$system" | python3 -c 'import json, sys; sys.exit(0 if json.load(sys.stdin).get("EnableLegacyAuthorization") is False else 1)'; then
+    api POST /System/Configuration "$(printf '%s' "$system" | python3 -c '
+import json, sys
+configuration = json.load(sys.stdin)
+configuration["EnableLegacyAuthorization"] = True
+print(json.dumps(configuration))
+')"
+    api GET /System/Configuration | python3 -c '
+import json, sys
+if json.load(sys.stdin).get("EnableLegacyAuthorization") is not True:
+    sys.exit("EnableLegacyAuthorization is still off after being written.")
+print("EnableLegacyAuthorization is on now")
+'
+fi
+
 step "the service's first sign-in, which creates its administrator"
 # Its own route: username and password against the server it is told about, and the first user it
 # ever sees becomes its administrator. The port and the empty base path are written out rather than
@@ -360,7 +396,15 @@ created=$(as "$ASKER_TOKEN" POST "$prefix/Requests" "$(printf '{
 }' "$TITLE" "$YEAR" "$TMDB_ID")")
 printf '%s\n' "$created"
 REQUEST_ID=$(printf '%s' "$created" | python3 -c "$FIELD" id)
-REVISION=$(printf '%s' "$created" | python3 -c "$FIELD" revision)
+# The creation answers with the identifier and the outcome and not the row, so the revision an
+# operator decides against is read off the queue, which is where an operator reads it too.
+REVISION=$(api GET "$prefix/Requests/Queue?take=200" | REQUEST_ID="$REQUEST_ID" python3 -c "$PYFIELD"'
+import json, os, sys
+rows = [row for row in field(json.load(sys.stdin), "requests") if str(field(row, "id")) == os.environ["REQUEST_ID"]]
+if len(rows) != 1:
+    sys.exit("the queue holds {0} row(s) for the request just made.".format(len(rows)))
+print(field(rows[0], "revision"))
+')
 echo "request $REQUEST_ID at revision $REVISION"
 
 step "the administrator approves it, which is the handover"
