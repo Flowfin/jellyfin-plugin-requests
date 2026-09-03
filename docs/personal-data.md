@@ -257,7 +257,7 @@ when an account is deleted and this plugin consumes it:
 
     git grep -n 'IEventConsumer<UserDeletedEventArgs>' -- Jellyfin.Plugin.Requests/
     Jellyfin.Plugin.Requests/People/RemovedAccounts.cs:30:public sealed class RemovedAccounts : IEventConsumer<UserDeletedEventArgs>
-    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:241:        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:247:        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, RemovedAccounts>();
 
 There are three rules and they are not one rule.
 
@@ -340,7 +340,7 @@ a raw identifier. It was found by reading the page against the tree rather than 
     211b90c 2026-08-27 Draw who last moved a request, and keep a deleted account apart from an unanswered call
 
     git grep -n 'queue.movedBy.deleted' -- Jellyfin.Plugin.Requests/
-    Jellyfin.Plugin.Requests/Localisation/Strings/en.json:123:  "queue.movedBy.deleted": "A person who has been deleted",
+    Jellyfin.Plugin.Requests/Localisation/Strings/en.json:135:  "queue.movedBy.deleted": "A person who has been deleted",
     Jellyfin.Plugin.Requests/Web/queue.html:564:                        return RequestsShell.word("queue.movedBy.deleted");
 
 What the page draws is an identifier the dashboard's user list does not hold, and it says so only
@@ -377,25 +377,38 @@ when the record is old, whoever it names.
 **Nothing goes to anybody else's machine on a fresh install, and one path can be turned on.** What
 does travel on a fresh install is a person's own request, to that person, over the connection the
 server already holds to whatever they are signed in on; the table at the end of this section is
-where that sits. Beyond that the plugin makes exactly one outbound call, and it is the notification
-sink:
+where that sits. Beyond that the plugin has exactly two outbound paths, the notification sink and the
+bridge to an external request service, and each is a client in one file:
 
     git grep -ln 'HttpClient\|IHttpClientFactory\|WebRequest' -- Jellyfin.Plugin.Requests/
+    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs
     Jellyfin.Plugin.Requests/Notify/OutboundSink.cs
 
-It sends nothing until an operator sets `OutboundNoticeAddress`, which is empty on every install
-where nobody has decided otherwise, and there is no other way to turn it on. What it sends when it is
-on is a small JSON document per movement in the queue: the request's identifier, what happened to it,
-when, the title and year, and the identifiers of the person who asked and the person who answered. It
-carries neither note, no provider identifiers, nobody else waiting on the request, and no user name of
-any kind, because this plugin holds none. [notifications.md](notifications.md) is where that document
-is written out field by field.
+The sink sends nothing until an operator sets `OutboundNoticeAddress`, which is empty on every
+install where nobody has decided otherwise, and there is no other way to turn it on. What it sends
+when it is on is a small JSON document per movement in the queue: the request's identifier, what
+happened to it, when, the title and year, and the identifiers of the person who asked and the person
+who answered. It carries neither note, no provider identifiers, nobody else waiting on the request,
+and no user name of any kind, because this plugin holds none. [notifications.md](notifications.md) is
+where that document is written out field by field.
 
-The bridge to an external request service has exactly one implementation in this tree, and it is the
-one for a server that has no backend:
+The bridge sends nothing until an operator sets `BridgeAddress`, which is empty on every install for
+the same reason, and there is no other way to turn it on. It has two implementations, the one for a
+server that has no backend and the adapter that speaks the Overseerr form, and the adapter hands
+every call to the first until an address is written:
 
     git grep -n ': IRequestBackend' -- Jellyfin.Plugin.Requests/
     Jellyfin.Plugin.Requests/Bridge/NoRequestBackend.cs:23:public sealed class NoRequestBackend : IRequestBackend
+    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs:70:public sealed class OverseerrBackend : IRequestBackend, IDisposable
+
+What it sends when it is on is one submission per approval, in the form's own field names: the kind
+of thing as `movie` or `tv`, the request's TMDB identifier and no other provider's, the seasons asked
+for where it is a series, and, only for a person the operator has written a row for, the number the
+service knows that person by. No title, no year, no Jellyfin user identifier and no name of any kind
+are on the wire, and a person with no row is not named to the service at all. After that it asks the
+service, hourly, where each handed-over request stands, sending the number the service issued and
+nothing about the person. [bridge.md](bridge.md) is where the submission is written out field by
+field with the legs that read it back off an in-process service.
 
 There is no metadata lookup either. This plugin calls no metadata source at all, which is a lint rule
 rather than a habit:
@@ -406,15 +419,15 @@ rather than a habit:
 And nothing reports anything to this project, at any setting, by design and with no opt-in. That is
 recorded in [notifications.md](notifications.md) with the decision behind it.
 
-Four paths would carry something outward once they are built, and each is named here so that an
-operator can find out what turning one on would mean before it exists:
+Four paths carry something outward, and each is named here with what turning it on means, so that an
+operator can find that out before typing a value rather than after:
 
-| Path                  | Issue | What leaves, or would                                                           | Off until          | Built |
-| --------------------- | ----- | ------------------------------------------------------------------------------- | ------------------ | ----- |
-| The outbound sink     | #78   | the identifiers of the asker and the answerer, the title, the year, the request | an address is set  | yes   |
-| The bridge            | #82   | a title, and an external account for the person who asked                       | a backend is set   | no    |
-| The session message   | #77   | nothing off the machine, a message to the asker's own signed-in clients         | never off          | yes   |
-| The arrival to admins | #76   | nothing off the machine, one arrival to whoever administers the server          | a switch is set on | yes   |
+| Path                  | Issue | What leaves, or would                                                                            | Off until          | Built |
+| --------------------- | ----- | ------------------------------------------------------------------------------------------------ | ------------------ | ----- |
+| The outbound sink     | #78   | the identifiers of the asker and the answerer, the title, the year, the request                  | an address is set  | yes   |
+| The bridge            | #315  | the TMDB identifier, the kind, the seasons, and the service's own number for a person with a row | an address is set  | yes   |
+| The session message   | #77   | nothing off the machine, a message to the asker's own signed-in clients                          | never off          | yes   |
+| The arrival to admins | #76   | nothing off the machine, one arrival to whoever administers the server                           | a switch is set on | yes   |
 
 The bridge names a person to the external service by an account the operator wrote into a table, and
 never by their name. That is the decision in [bridge.md](bridge.md), and the table is empty on a
@@ -431,7 +444,8 @@ reaches only sessions the server itself counts as administering it. It is off on
 `TellsAdministratorsAboutArrivals` in [configuration.md](configuration.md) is what turns it on, and
 [notifications.md](notifications.md) says why nothing reads it today.
 
-**The bridge row is the one that is not built.** The other two say what happens today.
+**Every row in that table is built now.** The bridge row was the last, and the table's fourth column
+says what has to be set before each path carries anything.
 
 ## What arrives from another plugin, and what this side trusts
 

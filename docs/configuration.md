@@ -21,6 +21,9 @@ without this page moving with it, and again if the page cannot reach one of them
 | AnnouncesApprovals               | true    |
 | AnnouncesDeclines                | true    |
 | AnnouncesFulfilments             | true    |
+| BridgeAccounts                   |         |
+| BridgeAddress                    |         |
+| BridgeApiKey                     |         |
 | FinishedRequestRetentionDays     | 365     |
 | OpenRequestsPerUser              | 10      |
 | OutboundNoticeAddress            |         |
@@ -86,8 +89,8 @@ be known, and one cleared by accident removes the limit silently. A quota that f
 is worse than a quota somebody has to work around.
 
 **OutboundNoticeAddress** is empty, and empty is the whole of how the outbound notification path is
-turned off. It is the only setting on this page that causes anything to leave this server, and it is
-the only one that holds text rather than a number or a switch.
+turned off. It is one of the two settings on this page that cause anything to leave this server; the
+other is `BridgeAddress` below, and each is off by being empty.
 
 With an address in it, each movement the three switches below leave on is posted there as a small
 JSON document. What that document carries, what it deliberately does not, and what an operator is
@@ -117,7 +120,8 @@ made for any other setting.
 plugin's configuration from the server's own endpoint, which serialises the whole object, and this
 page fetches it from there like every other. So the address still reaches anybody who may read that
 endpoint, which is an administrator. What changed is that it is no longer drawn, and
-`TheSettingsPageNeverDrawsTheStoredOutboundAddress` in the suite is what holds it to that. The
+`TheSettingsPageNeverDrawsAStoredSecret` in the suite is what holds it to that, for this address and
+for the bridge credential alike. The
 sentence a reader is owed is that this is a narrowing of where the value appears, not a promise
 that it stays on the machine.
 
@@ -157,6 +161,41 @@ It is a switch of its own rather than a fourth on the list above. Those three na
 machine, and turning off what a chat service receives should not also turn off what an operator's own
 client is handed.
 
+**BridgeAddress** is empty, and empty is the whole of how the bridge to an external request service
+is turned off: with nothing here every approval stays on this server, nothing is asked about on a
+schedule, and the health and capability endpoints say that no bridge is configured. It is the root of
+the service as a browser would open it, scheme included and with no path, and the adapter puts the
+form's own path under it. The form is the Overseerr form, decided on #113. What leaves the server
+once this is set, and what comes back, are in [`bridge.md`](bridge.md); the same fields are counted
+in [`personal-data.md`](personal-data.md).
+
+It is not write-only on the settings page, and that is a decision rather than an oversight. The
+credential travels in a header and never in this address, so the address is the name of a machine
+and carries nothing that authenticates, and an operator has to be able to read back which service
+their server is pointed at. What that costs is stated in `bridge.md` beside the credential: the
+platform writes the destination into the exception it raises when the service does not answer, that
+exception reaches the log, and a log pasted into a public tracker then names the host.
+
+**BridgeApiKey** is empty, and it is the credential the service issued for this server. It is sent as
+a header on every call to the address above and nowhere else; it is marked as a secret, so it may not
+appear in anything this plugin writes for somebody else to read, the invariant lint refuses a message
+that reads it, and the settings page shows whether one is set and never the value, the same shape as
+the notice address. An address with no key is refused rather than saved: the form answers its status
+route without a credential and every other route with a refusal, which is a bridge that reports itself
+up on the health page and hands nothing over. A key with no address is allowed and reads by nothing.
+Where it is stored, who on the machine can read it, and what is refused by name are in
+[`bridge.md`](bridge.md), and the claim there is exactly as strong as the protection the server's own
+data directory gets.
+
+**BridgeAccounts** is empty, and empty is the shipping answer rather than a state on the way to one:
+every request arrives at the service under the service's own account, and the service is told nothing
+about the people on this server. A row names a person by this server's user identifier and the number
+the service knows them by, written on purpose one person at a time, and writing the row is what says
+that person's account over there may leave this server with a request. On the settings page it is one
+line per row, the identifier, a space and the number. A row naming no user, naming a user twice, with
+no account, or with an account that is not a number is refused rather than saved, and the refusal
+names the row. [`bridge.md`](bridge.md) carries the decision and the two shapes it was chosen over.
+
 ## What is refused
 
 A plugin configuration is an XML file on the server, and the dashboard is not the only way one
@@ -164,13 +203,16 @@ arrives: an operator can edit that file, and a restore can put an older one back
 are read at both moments a configuration reaches this plugin, from the same list, in
 [`ConfigurationRules`](../Jellyfin.Plugin.Requests/Configuration/ConfigurationRules.cs).
 
-| Setting                                                     | Refused when                               | Because                                                                                                     |
-| ----------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| OpenRequestsPerUser                                         | below 1                                    | nobody may have a request open, so every ask is refused by an install that still offers itself              |
-| AcceptsMovies, AcceptsSeries                                | both off                                   | there is nothing anybody can ask for                                                                        |
-| FinishedRequestRetentionDays                                | below 30                                   | the history is removed while people are still asking about it                                               |
-| OutboundNoticeAddress                                       | set to something that is not http or https | a notice cannot be posted there, so the sink would send nothing while the page shows an address             |
-| AnnouncesApprovals, AnnouncesDeclines, AnnouncesFulfilments | all three off while an address is set      | nothing would ever be posted to the address, which is a second way of saying off and the one nobody can see |
+| Setting                                                     | Refused when                                                                      | Because                                                                                                     |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| OpenRequestsPerUser                                         | below 1                                                                           | nobody may have a request open, so every ask is refused by an install that still offers itself              |
+| AcceptsMovies, AcceptsSeries                                | both off                                                                          | there is nothing anybody can ask for                                                                        |
+| FinishedRequestRetentionDays                                | below 30                                                                          | the history is removed while people are still asking about it                                               |
+| OutboundNoticeAddress                                       | set to something that is not http or https                                        | a notice cannot be posted there, so the sink would send nothing while the page shows an address             |
+| AnnouncesApprovals, AnnouncesDeclines, AnnouncesFulfilments | all three off while an address is set                                             | nothing would ever be posted to the address, which is a second way of saying off and the one nobody can see |
+| BridgeAddress                                               | set to something that is not http or https                                        | nothing can be dialled there, so the bridge would report itself configured and hand nothing over            |
+| BridgeApiKey                                                | empty while BridgeAddress is set                                                  | the service answers its status route without a key and refuses every other call, which reads as up          |
+| BridgeAccounts                                              | a row names no user, a user twice, no account, or an account that is not a number | a request would arrive under an account nobody chose, or under two, and the refusal names the row           |
 
 **Nothing is corrected on the way in.** A quota of zero is not raised to one and a retention of five
 days is not raised to thirty. An install running a value it substituted does something other than
@@ -190,16 +232,16 @@ an operator sees it in the queue and answers it, and the library is what says a 
 fulfilled.
 
 Nothing leaves the server. The outbound notification sink exists and has nowhere to send to, because
-`OutboundNoticeAddress` is empty until an operator types one; there is no credential to hold and no
-other path that could carry anything, since no adapter to a request service is built here. Two things do
-happen on a fresh install and neither is a path off the machine. Every transition is written to the
-server's own activity log, which is a record rather than a message. And the person who asked is told
-on whatever they are signed in on when their own request is answered, down the connection the server
-already holds to their client. Both are [`notifications.md`](notifications.md). The third session
-path, which tells a live administrator that something arrived, is off on a fresh install and is
-`TellsAdministratorsAboutArrivals` above.
-`NoRequestBackend` is what a server without an external request service runs, and it is what every
-server runs today.
+`OutboundNoticeAddress` is empty until an operator types one; the bridge to an external request
+service exists and has nowhere to send to, because `BridgeAddress` is empty until an operator types
+one, and the credential beside it is empty until one is pasted. Two things do happen on a fresh
+install and neither is a path off the machine. Every transition is written to the server's own
+activity log, which is a record rather than a message. And the person who asked is told on whatever
+they are signed in on when their own request is answered, down the connection the server already
+holds to their client. Both are [`notifications.md`](notifications.md). The third session path, which
+tells a live administrator that something arrived, is off on a fresh install and is
+`TellsAdministratorsAboutArrivals` above. `NoRequestBackend` is what a server without an external
+request service runs: the adapter hands every call to it until an address is written.
 
 ## What is deliberately not a setting
 
@@ -232,10 +274,10 @@ and it is on by default so an install nobody has touched behaves as it always di
 this page overrides it**, and none ever will. [`notifications.md`](notifications.md) carries where it
 lives, what the two endpoints are, and why neither of them takes an identifier.
 
-**A bridge address and a credential.** The only bridge in this tree is the one for a server that has
-none. A field for an address would be somewhere to type something nothing reads. No issue
-on this board asks for the adapter that would read one; where a credential is kept when there is one,
-who on the machine can read it, and what is refused by name are in [`bridge.md`](bridge.md).
+**A switch saying whether to use the bridge.** The bridge is off by having nowhere to send to, which
+is `BridgeAddress` above, for the same reason the sink has no second switch. There is no field for
+which form the service speaks either: one form is written against, decided on #113, and a selector
+with one entry would be a setting nobody can change.
 
 ## What an uninstall leaves behind
 

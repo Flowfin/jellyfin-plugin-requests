@@ -62,17 +62,34 @@ public class PluginServiceRegistrationTests
     }
 
     /// <summary>
-    /// A fresh install gets the bridge that has no external service behind it. That is the shipping
-    /// default and the one most servers run, so a registration pointing anywhere else, or missing,
-    /// would leave the majority case resolving nothing while every test handing its own bridge in
-    /// went on passing.
+    /// A fresh install gets the adapter, and the adapter with no address written is the bridge that
+    /// has no external service behind it. That is the shipping default and the one most servers run,
+    /// so a registration pointing anywhere else, or missing, would leave the majority case resolving
+    /// nothing while every test handing its own bridge in went on passing. Both halves are asserted:
+    /// which type is resolved, and that with nothing configured it answers as nothing configured
+    /// rather than dialling anything.
     /// </summary>
+    /// <returns>A task that completes when the assertions have run.</returns>
     [Fact]
-    public void ServerGetsTheBridgeWithNoServiceBehindIt()
+    public async Task ServerGetsTheAdapterWhichWithNoAddressIsTheBridgeWithNoServiceBehindIt()
     {
-        using var provider = Registered();
+        var services = new ServiceCollection();
+        new PluginServiceRegistrator().RegisterServices(services, null!);
 
-        Assert.IsType<NoRequestBackend>(provider.GetRequiredService<IRequestBackend>());
+        // The adapter takes the server's log, which the server registers and this bare collection
+        // does not, and it reads the settings the host holds, which no plugin instance holds here.
+        // Both are stood in for so that what is measured is the registration and not the host.
+        services.AddLogging();
+        services.AddSingleton<IInstallSettings>(new FakeInstallSettings(new PluginConfiguration()));
+
+        using var provider = services.BuildServiceProvider();
+
+        var bridge = Assert.IsType<Jellyfin.Plugin.Requests.Bridge.Overseerr.OverseerrBackend>(
+            provider.GetRequiredService<IRequestBackend>());
+
+        Assert.Equal(
+            BackendReachability.NotConfigured,
+            await bridge.CheckReachableAsync(CancellationToken.None).ConfigureAwait(true));
     }
 
     /// <summary>

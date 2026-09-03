@@ -39,6 +39,9 @@ public class PluginConfigurationTests
             { "AnnouncesApprovals", "true" },
             { "AnnouncesDeclines", "true" },
             { "AnnouncesFulfilments", "true" },
+            { "BridgeAccounts", string.Empty },
+            { "BridgeAddress", string.Empty },
+            { "BridgeApiKey", string.Empty },
             { "FinishedRequestRetentionDays", "365" },
             { "OpenRequestsPerUser", "10" },
             { "OutboundNoticeAddress", string.Empty },
@@ -106,7 +109,7 @@ public class PluginConfigurationTests
     /// </para>
     /// </summary>
     [Fact]
-    public void TheOnlySettingThatHoldsTextIsTheAddressANoticeIsPostedTo()
+    public void TheOnlySettingsThatHoldMoreThanANumberOrASwitchAreTheTwoAddressesTheKeyAndTheMapping()
     {
         var carrying = Settings()
             .Where(setting => setting.PropertyType != typeof(int) && setting.PropertyType != typeof(bool))
@@ -114,7 +117,14 @@ public class PluginConfigurationTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["OutboundNoticeAddress is String"], carrying);
+        Assert.Equal(
+            [
+                "BridgeAccounts is Collection`1",
+                "BridgeAddress is String",
+                "BridgeApiKey is String",
+                "OutboundNoticeAddress is String"
+            ],
+            carrying);
     }
 
     /// <summary>
@@ -140,18 +150,20 @@ public class PluginConfigurationTests
 
         var page = SettingsPage();
 
-        // The one setting whose reachability has a different shape, because it is write-only:
-        // decided on #113 as the answer to #100. There is no element carrying its value and no
-        // entry in the map that reads one back, so what makes it reachable is the box a new
-        // address is typed into, the checkbox that removes the stored one, and the two writes on
-        // save. TheSettingsPageNeverDrawsTheStoredOutboundAddress holds the other half, that
-        // nothing puts the stored value on the screen.
-        if (string.Equals(setting, "OutboundNoticeAddress", StringComparison.Ordinal))
+        // A marked setting has a different shape of reachability, because it is write-only: decided
+        // on #113 as the answer to #100 for the notice address, and the same shape for the bridge
+        // credential. There is no element carrying its value and no entry in the map that reads one
+        // back, so what makes it reachable is the box a new value is typed into, the checkbox that
+        // removes the stored one, and the two writes on save.
+        // TheSettingsPageNeverDrawsAStoredSecret holds the other half, that nothing puts the stored
+        // value on the screen. Read off the mark rather than off a name, so a marked setting added
+        // later meets this shape rather than the ordinary one.
+        if (Setting(setting).GetCustomAttribute<SecretAttribute>() is not null)
         {
-            Assert.Contains("id=\"RequestsOutboundNoticeAddressEntry\"", page, StringComparison.Ordinal);
-            Assert.Contains("id=\"RequestsOutboundNoticeAddressRemove\"", page, StringComparison.Ordinal);
-            Assert.Contains("config.OutboundNoticeAddress = typed;", page, StringComparison.Ordinal);
-            Assert.Contains("config.OutboundNoticeAddress = \"\";", page, StringComparison.Ordinal);
+            Assert.Contains(string.Concat("id=\"Requests", setting, "Entry\""), page, StringComparison.Ordinal);
+            Assert.Contains(string.Concat("id=\"Requests", setting, "Remove\""), page, StringComparison.Ordinal);
+            Assert.Contains(string.Concat("config.", setting, " = typed;"), page, StringComparison.Ordinal);
+            Assert.Contains(string.Concat("config.", setting, " = \"\";"), page, StringComparison.Ordinal);
 
             return;
         }
@@ -210,6 +222,10 @@ public class PluginConfigurationTests
         {
             bool switched => switched ? "true" : "false",
             null => throw new InvalidOperationException("A setting with no value has no default to document."),
+            // An empty table prints as an empty cell, the way an empty address does: what a fresh
+            // install runs is nothing written, and the document shows that as nothing.
+            System.Collections.ICollection { Count: 0 } => string.Empty,
+            System.Collections.ICollection => throw new InvalidOperationException("A fresh install runs an empty table, and one with rows in it has no single value to document."),
             _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty
         };
 

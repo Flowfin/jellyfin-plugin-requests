@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using Jellyfin.Plugin.Requests.Configuration;
 using Jellyfin.Plugin.Requests.Tests.Doubles;
 using MediaBrowser.Model.Plugins;
 using Xunit;
@@ -239,7 +241,7 @@ public class DashboardPagesTests
     /// </para>
     /// </summary>
     [Fact]
-    public void TheSettingsPageNeverDrawsTheStoredOutboundAddress()
+    public void TheSettingsPageNeverDrawsAStoredSecret()
     {
         using var host = new PluginHost();
 
@@ -248,15 +250,28 @@ public class DashboardPagesTests
             .Single(entry => string.Equals(entry.Name, host.Plugin.Name, StringComparison.Ordinal))
             .EmbeddedResourcePath);
 
-        var drawn = page
-            .Split('\n')
-            .Select(line => line.Trim())
-            .Where(line => line.Contains(".value =", StringComparison.Ordinal))
-            .Where(line => line.Contains("OutboundNoticeAddress", StringComparison.Ordinal))
+        // Every marked setting, read off the mark, so a secret added later is held to the same
+        // shape as the two that exist rather than to a name written here.
+        var marked = typeof(PluginConfiguration)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(setting => setting.GetCustomAttribute<SecretAttribute>() is not null)
+            .Select(setting => setting.Name)
             .ToArray();
 
-        Assert.Contains("config.OutboundNoticeAddress =", page, StringComparison.Ordinal);
-        Assert.Empty(drawn);
+        Assert.NotEmpty(marked);
+
+        foreach (var setting in marked)
+        {
+            var drawn = page
+                .Split('\n')
+                .Select(line => line.Trim())
+                .Where(line => line.Contains(".value =", StringComparison.Ordinal))
+                .Where(line => line.Contains(setting, StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.Contains(string.Concat("config.", setting, " ="), page, StringComparison.Ordinal);
+            Assert.Empty(drawn);
+        }
     }
 
     /// <summary>

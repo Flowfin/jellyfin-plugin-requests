@@ -83,12 +83,18 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // reaching for the static.
         serviceCollection.AddSingleton<IInstallSettings, ServerInstallSettings>();
 
-        // The bridge to an external request service, which on most servers is the one that has no
-        // service behind it. Registered like the others because it is the shipping default rather
-        // than a placeholder: a fresh install resolves this and no caller above it asks whether a
-        // service exists before deciding what to do. An adapter, when there is one, replaces this
-        // registration and nothing else.
-        serviceCollection.AddSingleton<IRequestBackend, NoRequestBackend>();
+        // The bridge to an external request service. One registration for every server: the adapter
+        // reads the settings per call, and on the many servers with no address written it hands
+        // every call to the bridge with nothing behind it, so a fresh install resolves this and no
+        // caller above it asks whether a service exists before deciding what to do. The socket
+        // pipeline is built here and never shared, for the reason the outbound sink's is: it is a
+        // constructor argument so the suite can put a service in the same process, which is what
+        // keeps the bridge testable under the headless rule.
+        serviceCollection.AddSingleton<IRequestBackend>(provider => new Bridge.Overseerr.OverseerrBackend(
+            provider.GetRequiredService<IInstallSettings>(),
+            new SocketsHttpHandler(),
+            provider.GetRequiredService<ILogger<Bridge.Overseerr.OverseerrBackend>>(),
+            Bridge.Overseerr.OverseerrBackend.DefaultAnswerWithin));
 
         // What an approval hands over and what it keeps of the answer. Registered rather than built
         // inside the controller, because it takes the bridge and the server's log, and because it

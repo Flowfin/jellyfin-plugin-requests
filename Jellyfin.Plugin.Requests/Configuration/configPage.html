@@ -5,7 +5,7 @@
         <title data-i18n="config.title"></title>
     </head>
     <body>
-        <div id="RequestsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div id="RequestsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox,emby-textarea">
             <div data-role="content">
                 <div class="content-primary">
                     <div class="requestsShell"></div>
@@ -87,6 +87,37 @@
                             </label>
                         </div>
 
+                        <h3 data-i18n="config.bridge.heading"></h3>
+
+                        <p class="fieldDescription" data-i18n="config.bridge.description"></p>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsBridgeAddress" data-i18n="config.bridgeAddress.label"></label>
+                            <input is="emby-input" type="url" id="RequestsBridgeAddress" autocomplete="off" />
+                            <div class="fieldDescription" data-i18n="config.bridgeAddress.description"></div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsBridgeApiKeyEntry" data-i18n="config.bridgeApiKey.label"></label>
+                            <input is="emby-input" type="password" id="RequestsBridgeApiKeyEntry" autocomplete="off" />
+                            <div class="fieldDescription" id="RequestsBridgeApiKeyState"></div>
+                            <div class="fieldDescription" data-i18n="config.bridgeApiKey.description"></div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="RequestsBridgeApiKeyRemove" />
+                                <span data-i18n="config.bridgeApiKey.remove.label"></span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription" data-i18n="config.bridgeApiKey.remove.description"></div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="RequestsBridgeAccounts" data-i18n="config.bridgeAccounts.label"></label>
+                            <textarea is="emby-textarea" id="RequestsBridgeAccounts" rows="4" autocomplete="off" spellcheck="false"></textarea>
+                            <div class="fieldDescription" data-i18n="config.bridgeAccounts.description"></div>
+                        </div>
+
                         <div>
                             <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                                 <span data-i18n="config.save"></span>
@@ -160,6 +191,51 @@
                     var removal = "#RequestsOutboundNoticeAddressRemove";
                     var state = "#RequestsOutboundNoticeAddressState";
 
+                    // The bridge address is text an operator has to be able to read back: it is the
+                    // name of the machine their server is pointed at and carries no credential,
+                    // which `docs/bridge.md` decides. The credential beside it is write-only, the
+                    // same shape as the outbound address and for the same reason.
+                    var texts = {
+                        BridgeAddress: "#RequestsBridgeAddress",
+                    };
+
+                    var keyEntry = "#RequestsBridgeApiKeyEntry";
+                    var keyRemoval = "#RequestsBridgeApiKeyRemove";
+                    var keyState = "#RequestsBridgeApiKeyState";
+
+                    // The account mapping is a table drawn as text, one row per line: the person's
+                    // user identifier on this server, a space, and the number the external service
+                    // knows them by. A line an operator removes is a person left unmapped, and the
+                    // server refuses a line it cannot honour rather than saving a corrected one.
+                    var tables = {
+                        BridgeAccounts: "#RequestsBridgeAccounts",
+                    };
+
+                    function rowsToText(rows) {
+                        return (rows || [])
+                            .map(function (row) {
+                                return row.UserId + " " + row.Account;
+                            })
+                            .join("\n");
+                    }
+
+                    function textToRows(text) {
+                        return text
+                            .split("\n")
+                            .map(function (line) {
+                                return line.trim();
+                            })
+                            .filter(function (line) {
+                                return line.length > 0;
+                            })
+                            .map(function (line) {
+                                var split = line.search(/\s/);
+                                // A line with no space is a row with no account on it, which the
+                                // server names as such rather than this page guessing at a value.
+                                return split < 0 ? { UserId: line, Account: "" } : { UserId: line.slice(0, split), Account: line.slice(split).trim() };
+                            });
+                    }
+
                     function show(config) {
                         Object.keys(numbers).forEach(function (setting) {
                             page.querySelector(numbers[setting]).value = config[setting];
@@ -169,12 +245,24 @@
                             page.querySelector(switches[setting]).checked = config[setting];
                         });
 
+                        Object.keys(texts).forEach(function (setting) {
+                            page.querySelector(texts[setting]).value = config[setting] || "";
+                        });
+
+                        Object.keys(tables).forEach(function (setting) {
+                            page.querySelector(tables[setting]).value = rowsToText(config[setting]);
+                        });
+
                         // Presence, never the value. An empty entry box on every load is what
                         // makes "sent only when newly entered" readable to somebody using the
                         // page: there is nothing in it to leave alone by accident.
                         page.querySelector(entry).value = "";
                         page.querySelector(removal).checked = false;
                         page.querySelector(state).textContent = config.OutboundNoticeAddress ? RequestsShell.word("config.outboundNoticeAddress.set") : RequestsShell.word("config.outboundNoticeAddress.notSet");
+
+                        page.querySelector(keyEntry).value = "";
+                        page.querySelector(keyRemoval).checked = false;
+                        page.querySelector(keyState).textContent = config.BridgeApiKey ? RequestsShell.word("config.bridgeApiKey.set") : RequestsShell.word("config.bridgeApiKey.notSet");
                     }
 
                     function read(config) {
@@ -184,6 +272,14 @@
 
                         Object.keys(switches).forEach(function (setting) {
                             config[setting] = page.querySelector(switches[setting]).checked;
+                        });
+
+                        Object.keys(texts).forEach(function (setting) {
+                            config[setting] = page.querySelector(texts[setting]).value.trim();
+                        });
+
+                        Object.keys(tables).forEach(function (setting) {
+                            config[setting] = textToRows(page.querySelector(tables[setting]).value);
                         });
 
                         // Three cases and they are ordered, because removal has to beat a value
@@ -201,6 +297,15 @@
                             config.OutboundNoticeAddress = "";
                         } else if (typed) {
                             config.OutboundNoticeAddress = typed;
+                        }
+
+                        // The same three cases for the credential, in the same order.
+                        typed = page.querySelector(keyEntry).value;
+
+                        if (page.querySelector(keyRemoval).checked) {
+                            config.BridgeApiKey = "";
+                        } else if (typed) {
+                            config.BridgeApiKey = typed;
                         }
 
                         return config;

@@ -797,8 +797,8 @@ rules:
       value out (#100).
     patterns:
       - pattern-either:
-          - pattern-regex: '(?s)(string\.Format|\.Log[A-Z][A-Za-z]*)\([^;]{0,800}?(?<!nameof\(PluginConfiguration)\.OutboundNoticeAddress'
-          - pattern-regex: '\$"[^"]*\{[^}"]*(?<!nameof\(PluginConfiguration)\.OutboundNoticeAddress'
+          - pattern-regex: '(?s)(string\.Format|\.Log[A-Z][A-Za-z]*)\([^;]{0,800}?(?<!nameof\(PluginConfiguration)\.(OutboundNoticeAddress|BridgeApiKey)'
+          - pattern-regex: '\$"[^"]*\{[^}"]*(?<!nameof\(PluginConfiguration)\.(OutboundNoticeAddress|BridgeApiKey)'
     paths:
       include:
         - "Jellyfin.Plugin.Requests/**/*.cs"

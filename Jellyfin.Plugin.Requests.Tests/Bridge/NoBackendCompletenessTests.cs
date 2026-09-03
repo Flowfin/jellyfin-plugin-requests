@@ -79,13 +79,15 @@ public class NoBackendCompletenessTests
     }
 
     /// <summary>
-    /// One implementation of the bridge ships, and it is the one for a server that has none. That is
-    /// the other half of the same claim: a second implementation in this assembly would be something
-    /// an install could resolve instead, and the register above says nothing about which one a
-    /// server got.
+    /// Two implementations of the bridge ship: the one for a server that has none, and the adapter
+    /// that speaks the Overseerr form and hands every call to the first where no address is set. That
+    /// is the other half of the same claim: a third implementation in this assembly would be
+    /// something an install could resolve instead, and the register above says nothing about which
+    /// one a server got. <c>docs/bridge.md</c> names both, and a reader who finds a name here that the
+    /// page does not carry has found the page wrong.
     /// </summary>
     [Fact]
-    public void TheOnlyBridgeThisPluginShipsIsTheOneWithNothingBehindIt()
+    public void TheBridgesThisPluginShipsAreTheOneWithNothingBehindItAndTheOverseerrForm()
     {
         var implementations = typeof(IRequestBackend).Assembly
             .GetTypes()
@@ -95,7 +97,7 @@ public class NoBackendCompletenessTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([nameof(NoRequestBackend)], implementations);
+        Assert.Equal([nameof(NoRequestBackend), nameof(Jellyfin.Plugin.Requests.Bridge.Overseerr.OverseerrBackend)], implementations);
     }
 
     /// <summary>

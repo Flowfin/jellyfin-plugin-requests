@@ -62,21 +62,37 @@ There is no telemetry. Nothing about use is collected and nothing is sent
 anywhere for this project's benefit, without exception and without a later
 review of that.
 
-The plugin makes one outbound call and an operator has to turn it on. It is the
-notification sink, and the three lines below are one path rather than three: the
-client, and the socket pipeline it is handed at registration.
+The plugin makes two kinds of outbound call and an operator has to turn each on.
+One is the notification sink and the other is the bridge to an external request
+service, and the six lines below are two paths rather than six: a client each,
+and the socket pipeline each is handed at registration.
 
     git grep -nE 'HttpClient|WebRequest|WebSocket|Socket' -- Jellyfin.Plugin.Requests
+    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs:99:    private readonly HttpClient _client;
+    Jellyfin.Plugin.Requests/Bridge/Overseerr/OverseerrBackend.cs:141:        _client = new HttpClient(handler, disposeHandler: false)
     Jellyfin.Plugin.Requests/Notify/OutboundSink.cs:61:    private readonly HttpClient _client;
     Jellyfin.Plugin.Requests/Notify/OutboundSink.cs:104:        _client = new HttpClient(handler, disposeHandler: false)
-    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:151:            new SocketsHttpHandler(),
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:95:            new SocketsHttpHandler(),
+    Jellyfin.Plugin.Requests/PluginServiceRegistrator.cs:157:            new SocketsHttpHandler(),
 
-It posts nothing until an operator sets `OutboundNoticeAddress`, which is empty
-on every install where nobody has decided otherwise, and there is no other way to
-turn it on. What it posts then is one small document per movement in the queue.
-[docs/notifications.md](docs/notifications.md) writes that document out field by
-field, and [docs/personal-data.md](docs/personal-data.md) is the account of
+The sink posts nothing until an operator sets `OutboundNoticeAddress`, and the
+bridge sends nothing until an operator sets `BridgeAddress`; both are empty on
+every install where nobody has decided otherwise, and there is no other way to
+turn either on. What the sink posts is one small document per movement in the
+queue, and what the bridge sends is one submission per approval and one question
+per handed-over request on a schedule.
+[docs/notifications.md](docs/notifications.md) writes the sink's document out
+field by field, [docs/bridge.md](docs/bridge.md) does the same for the
+submission, and [docs/personal-data.md](docs/personal-data.md) is the account of
 everything that leaves the server.
+
+The bridge holds a credential, `BridgeApiKey`, and it is the one value in this
+plugin's configuration that authenticates anything. It travels in a header to the
+configured address and nowhere else, it is never written to a log or shown back on
+the settings page, and it is stored in the plugin's settings file with the
+protection the server's data directory gets and no more; that claim, who on the
+machine can read the file, and what is refused by name are in
+[docs/bridge.md](docs/bridge.md).
 
 **This section said the plugin makes no outbound call at all, and that stopped
 being true on 2026-08-16.** The sentence is corrected here rather than quietly
@@ -86,6 +102,7 @@ its switch off and has never been on by default. What was wrong is that this pag
 went on asserting the tree of six days earlier, and the pasted command under it
 went on being quoted with an output it no longer produced.
 
-A bridge to an external request service would be a second such path and does not
-exist yet. What goes to one is what the operator configured it to receive, and it
-is documented where that is built.
+**This page then said a bridge to an external request service would be a second
+such path and did not exist yet, and that stopped being true with #315.** The
+paragraph above is the corrected one, for the same reason as the correction
+before it: somebody who read the sentence took it from this page.
