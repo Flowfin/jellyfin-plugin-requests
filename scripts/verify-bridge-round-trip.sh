@@ -119,13 +119,22 @@ else:
     sys.exit("no {0} in {1}".format(name, sorted(holder)))
 '
 
-# The same lookup, as a prelude the verdicts below start with.
+# The same lookup, as a prelude the verdicts below start with, and beside it the one for a field the
+# server leaves out when it is null: the failed-handover mark and the reference are both absent
+# from a row that has neither, and absent is the answer rather than a missing field.
 PYFIELD='
 def field(holder, name):
     for key, value in holder.items():
         if key.lower() == name.lower():
             return value
     raise SystemExit("no {0} in {1}".format(name, sorted(holder)))
+
+
+def optional(holder, name):
+    for key, value in holder.items():
+        if key.lower() == name.lower():
+            return value
+    return None
 '
 
 # One call to the service with the key it issued. The key is a header and nothing else, which is the
@@ -371,7 +380,7 @@ api GET "$prefix/Health" | python3 -c "$PYFIELD"'
 import json, sys
 health = json.load(sys.stdin)
 bridge = field(health, "bridge")
-print("Bridge={0}  BridgeLastReachableAt={1}".format(bridge, field(health, "bridgeLastReachableAt")))
+print("Bridge={0}  BridgeLastReachableAt={1}".format(bridge, optional(health, "bridgeLastReachableAt")))
 if str(bridge).lower() != "reachable":
     sys.exit("the plugin reports the bridge as {0!r} with the service up and configured.".format(bridge))
 '
@@ -420,9 +429,9 @@ row = json.load(sys.stdin)
 state = field(row, "state")
 if str(state).lower() != "approved":
     sys.exit("the request is {0!r} after approval.".format(state))
-if field(row, "handoverFailedAt") is not None:
-    sys.exit("the handover failed at {0}: the approval stands and the service has nothing.".format(field(row, "handoverFailedAt")))
-backend = field(row, "backend")
+if optional(row, "handoverFailedAt") is not None:
+    sys.exit("the handover failed at {0}: the approval stands and the service has nothing.".format(optional(row, "handoverFailedAt")))
+backend = optional(row, "backend")
 if not backend:
     sys.exit("the approval carries no reference, so nothing was handed over and nothing failed either, which is the answer a server with no bridge gives.")
 if str(field(backend, "service")).lower() != "overseerr":
@@ -506,8 +515,8 @@ if len(rows) != 1:
     sys.exit("the queue holds {0} row(s) for the request.".format(len(rows)))
 row = rows[0]
 state = field(row, "state")
-backend = field(row, "backend") or {}
-print("state={0}  backend={1}  handoverFailedAt={2}".format(state, json.dumps(backend), field(row, "handoverFailedAt")))
+backend = optional(row, "backend") or {}
+print("state={0}  backend={1}  handoverFailedAt={2}".format(state, json.dumps(backend), optional(row, "handoverFailedAt")))
 if str(state).lower() != "approved":
     sys.exit("the request is {0!r} after the reconciliation, and APPROVED moves nothing.".format(state))
 if str(field(backend, "id")) != os.environ["REFERENCE"]:
@@ -516,8 +525,8 @@ if str(field(backend, "id")) != os.environ["REFERENCE"]:
 api GET "$prefix/Health" | python3 -c "$PYFIELD"'
 import json, sys
 health = json.load(sys.stdin)
-print("Bridge={0}  BridgeLastReachableAt={1}".format(field(health, "bridge"), field(health, "bridgeLastReachableAt")))
-if field(health, "bridgeLastReachableAt") is None:
+print("Bridge={0}  BridgeLastReachableAt={1}".format(field(health, "bridge"), optional(health, "bridgeLastReachableAt")))
+if optional(health, "bridgeLastReachableAt") is None:
     sys.exit("nothing recorded the service as reachable, after the health endpoint and the reconciliation both asked it.")
 '
 
