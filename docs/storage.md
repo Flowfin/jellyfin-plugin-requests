@@ -203,7 +203,7 @@ captured is `0.1.0.0-stable`, and the commit that one was built from carries no 
 anything:
 
     gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName,createdAt
-    [{"createdAt":"2026-08-27T06:50:36Z","tagName":"0.2.0.0-stable"},{"createdAt":"2026-08-08T09:38:30Z","tagName":"0.1.0.0-stable"}]
+    [{"createdAt":"2026-09-03T10:24:47Z","tagName":"0.3.0.0-jf12-stable"},{"createdAt":"2026-09-03T10:24:39Z","tagName":"0.3.0.0-stable"},{"createdAt":"2026-08-27T06:50:36Z","tagName":"0.2.0.0-stable"},{"createdAt":"2026-08-08T09:38:30Z","tagName":"0.1.0.0-stable"}]
     git rev-parse 0.1.0.0-stable^{commit}
     c44552645f0dba120c49599deedbc0244b59dcec
     git ls-tree -r --name-only c445526 -- Jellyfin.Plugin.Requests/Storage
@@ -214,8 +214,8 @@ anything:
 
 The contract and its two exceptions, and no implementation. So the shape that fixture holds is what a
 server running the mainline between `7b62877` and the change that landed the version has on its disk.
-The other release in that listing does ship a store, and its own output is the section below rather
-than a second thing this paragraph is about.
+The later releases in that listing do ship a store; the output of the first of them is the section
+below rather than a second thing this paragraph is about.
 
 ### The version 1 fixtures, which are a shipped version's output
 

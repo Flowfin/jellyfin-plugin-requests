@@ -92,16 +92,18 @@ files:
 - **The 12.0 evidence is against a release candidate.** The image was `jellyfin/jellyfin:12.0-rc4`
   and the server reported `12.0.0`. Listing 12.0 as supported without saying that would be a
   statement about a server nobody has run this on.
-- **A published release has been installed once, and not the way a server installs.** This bullet
-  said no run recorded here had installed from either release. One has since #152:
-  `.github/workflows/release-install.yaml` downloads the newest release of every claimed line,
-  checks the archive against the digest published beside it, and puts the unpacked bytes on a server
-  of that line. Run `33357925338` at `501a943` did it for `0.2.0.0-stable` on `10.11.11`, and the
-  server answered `Requests is Active at 0.2.0.0`. What that still does not cover: the archive is
-  unpacked by the run rather than fetched and unpacked by the server, and the 12.0 line has no
-  release to install at all. The sibling in the set arrives as its own published package and is
-  unpacked whole, so the set half of the run exercises the server's own path and the half about this
-  plugin still does not.
+- **A published release has been installed once per line, and not the way a server installs.** This
+  bullet said no run recorded here had installed from either release, and then that one had for the
+  10.11 line alone. `.github/workflows/release-install.yaml` downloads the newest release of every
+  claimed line, checks the archive against the digest published beside it, and puts the unpacked
+  bytes on a server of that line. Run `33744830699` at `2e83259` did it for `0.3.0.0-stable` on
+  `10.11.11` and for `0.3.0.0-jf12-stable` on `12.0-rc4`, and each server answered
+  `Requests is Active at 0.3.0.0`; run `33357925338` at `501a943` had done it for `0.2.0.0-stable`
+  on `10.11.11` before. What that still does not cover: the archive is unpacked by the run rather
+  than fetched and unpacked by the server, and the manifest a server would fetch from carries no
+  `0.3.0.0` entry for either line. The sibling in the set arrives as its own published package and
+  is unpacked whole, so the set half of the run exercises the server's own path and the half about
+  this plugin still does not.
 - **The floor server of the 10.11 line refuses the published release, and this is the bullet above
   it read against the claim.** `build.yaml` declares `targetAbi: "10.11.0.0"`, which names the
   server `10.11.0`. The same archive on that server ends the run at its verdict step with
@@ -180,13 +182,24 @@ the section below.
 
 ## Upgrading from one shipped version to the next
 
-Two versions have shipped, so there is one hop an operator can actually perform:
+Three versions have shipped on the 10.11 line and one on the 12.0 line, so there are two hops an
+operator can actually perform, both on the 10.11 line:
 
 ```
 gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName --jq '.[].tagName'
+0.3.0.0-jf12-stable
+0.3.0.0-stable
 0.2.0.0-stable
 0.1.0.0-stable
 ```
+
+The hop from `0.1.0.0` to `0.2.0.0` is the one written out below, and it is the one with a test
+behind it. The hop from `0.2.0.0` to `0.3.0.0` carries a queue file forward from shape version 1 to
+shape version 2, which the section above describes, and the two fixtures under
+`Jellyfin.Plugin.Requests.Tests/Storage/Fixtures/` whose names carry `written-by-0.2.0.0` are what
+the shipped store actually wrote. No fixture under `Jellyfin.Plugin.Requests.Tests/Configuration/Fixtures/`
+was written by `0.2.0.0`, so what that hop does with the settings file is expected to follow the rule
+under "Whether a version can be skipped" and has not been measured against the shipped serialisation.
 
 **What `0.1.0.0` left on a disk is its settings file and nothing else.** That version carried the
 store contract and no implementation of it, so an install of it wrote no requests anywhere:
@@ -258,8 +271,10 @@ nothing here is one that can be skipped over.
   should be built against it yet.
 - **Anything about a bridge to an external request service.** There is none; #80 is where the
   interface behind it is defined.
-- **What a server does with a version it reads from a manifest.** No manifest is published, which is
-  #110, and how a server compares versions in one is not measured by this repository.
+- **What a server does with a version it reads from a manifest.** A manifest is published at the
+  address [catalogue.md](catalogue.md) names, and how a server orders its entries is read there at the
+  server's own source rather than measured; no run of this repository has watched a server install
+  from it.
 - **An upgrade watched on a running server.** The hop from `0.1.0.0-stable` is set out above and is
   measured against what the older version's own type writes, not against an installation. Nothing in
   this repository has installed one version of this plugin on a server and then replaced it with the

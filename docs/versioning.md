@@ -80,12 +80,12 @@ promised from then on is #105.
 
 `0.1.0.0`, and the reading that chose it does not reproduce any more. On the day
 the number was picked the template's `1.0.0.0` claimed a released first version
-and nothing had been released. Two releases exist now, so the command returns a
+and nothing had been released. Four releases exist now, so the command returns a
 different number and is written here as the current reading rather than as the
 one that decided anything:
 
     $ gh release list --repo Flowfin/jellyfin-plugin-requests --json tagName --jq 'length'
-    2
+    4
 
 A version that said 1.0 to a catalogue, to a dashboard and to an operator, for a
 tree that then held no request API and no store behind it, was a claim it could
