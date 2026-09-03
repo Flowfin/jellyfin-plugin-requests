@@ -457,12 +457,12 @@ Thirteen files here map onto a file there and are placed by the table above:
 `dco.yml`, `dependency-review.yml`, `invariant-lint.yaml`, `mutation.yaml`,
 `package.yaml`, `prettier.yml`, `pr-hygiene.yaml`,
 `publish-failure-alert.yaml`, `publish.yaml`, `scan-codeql.yaml`,
-`scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Eleven of the rows below
-name a file that is present, and thirteen plus eleven is what the directory
+`scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Twelve of the rows below
+name a file that is present, and thirteen plus twelve is what the directory
 holds:
 
     $ ls .github/workflows/ | wc -l
-    24
+    25
 
 THIS PARAGRAPH SAID TWELVE AND NINE AND PASTED 21 WHILE THE DIRECTORY HELD 23,
 and it was found by running the pasted command before adding a file to that
@@ -501,6 +501,7 @@ longer tracks it.
 | `gate.yaml`               | adopted, landed   | The build and test legs, in this repository rather than called from another organisation, because a called workflow knows nothing about this tree's lockfiles.                                                                                                                                                                                                                                                                                                                                           |
 | `seam-probe.yaml`         | adopted, landed   | What a second plugin in the same server process can see of this one, measured on a real server of each line with `tools/seam-probe` as the second plugin. It records an answer rather than holding a merge, so what reds it is a run that produced no answer at all. #117.                                                                                                                                                                                                                               |
 | `user-isolation.yaml`     | adopted, landed   | Two ordinary accounts on a real server of each line, each asking for something and reading back what they are given, with the queue asked as somebody who is not an administrator. The server's own evaluation of a policy is the half no double here reaches. #67.                                                                                                                                                                                                                                      |
+| `bridge-round-trip.yaml`  | adopted, landed   | A request made here walked onto a running Jellyseerr beside a real server of each line, read back out of the service's own list with the status the mapping table predicts, and read back here again by the reconciliation task. The suite drives the adapter through a double whose answers are quoted from the form's description; this is the reading of an instance, which #315's last clause asks for. Jellyseerr rather than Overseerr proper, because its first sign-in takes no Plex token.      |
 | `full-disk.yaml`          | adopted, landed   | What a caller sees when the volume the store writes to runs out of room, on a mount with a hard size, on the runtime of each line. The suite cannot ask it: filling a filesystem needs one to fill, and the headless rule refuses a test that needs a container engine. #46.                                                                                                                                                                                                                             |
 | `manifest.yaml`           | adopted, landed   | The manifest generator watched refusing what it says it refuses, over one manifest per defect, with a clean pair of packages beside them. A generator that has never said no writes a manifest for a clean pair, which is also what a generator with no rules does. #110.                                                                                                                                                                                                                                |
 | `manifest-freshness.yaml` | adopted, landed   | The document a server fetches, read back against the releases that exist, once a day and on its own files. It is not the publish checking itself: the incident behind #111 is a publish whose manifest write failed while the run stayed green, so the step that failed would have been the step reporting it. A claimed line with no release is reported rather than passed over. What it finds is raised by `publish-failure-alert.yaml`, which sweeps every workflow here rather than this one. #111. |
@@ -800,9 +801,10 @@ workflow that ran on it succeeded:
     32603611353  success  110abde  🧾 PR hygiene
 
 Two names appear twice because two triggers fired on one head, and two of the sixteen belong to the
-inherited section above rather than to this one. Three workflows do not appear at all: `mutation.yaml`
-runs on a schedule, `seam-probe.yaml` on a push that touches the probe, and `full-disk.yaml`
-arrived after that head, so their green runs are their own and carry their own head.
+inherited section above rather than to this one. Four workflows do not appear at all: `mutation.yaml`
+runs on a schedule, `seam-probe.yaml` on a push that touches the probe, and `full-disk.yaml` and
+`bridge-round-trip.yaml` arrived after that head, so their green runs are their own and carry their
+own head.
 
 | Workflow                      | Red run                                                                                                                                               | Green run                 |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
@@ -821,6 +823,7 @@ arrived after that head, so their green runs are their own and carry their own h
 | `manifest-freshness.yaml`     | none of this kind, below                                                                                                                              | 33246667212, at `12182bf` |
 | `release-install.yaml`        | none of this kind, below                                                                                                                              | 33357925338, at `501a943` |
 | `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                       | 32623457801, at `d154ab3` |
+| `bridge-round-trip.yaml`      | 33732017937, `throwaway/315-a-submission-in-the-wrong-field`, both lines red at `Does a request made here arrive on the service`, at the approval     | 33731657684, at `234daed` |
 
 The job and step of each red run are read off the run rather than off a log:
 
