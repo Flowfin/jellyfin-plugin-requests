@@ -86,30 +86,35 @@ files:
 
 ### What that leaves untested, and it is more than it sounds
 
-- **One server version per line has ever run this.** `10.11.11` and `12.0-rc4`. Every other patch
-  release of either line is expected to work because the floor build says the plugin calls nothing
-  newer than the oldest claimed server offers, and expected is not tested.
+- **Three server versions across the two lines have ever run this.** `10.11.0` and `10.11.11` on
+  the 10.11 line, `12.0-rc4` on the 12.0 line. Every other patch release of either line is expected
+  to work because the floor build says the plugin calls nothing newer than the oldest claimed server
+  offers, and expected is not tested.
 - **The 12.0 evidence is against a release candidate.** The image was `jellyfin/jellyfin:12.0-rc4`
   and the server reported `12.0.0`. Listing 12.0 as supported without saying that would be a
   statement about a server nobody has run this on.
-- **A published release has been installed once per line, and not the way a server installs.** This
-  bullet said no run recorded here had installed from either release, and then that one had for the
-  10.11 line alone. `.github/workflows/release-install.yaml` downloads the newest release of every
-  claimed line, checks the archive against the digest published beside it, and puts the unpacked
-  bytes on a server of that line. Run `33744830699` at `2e83259` did it for `0.3.0.0-stable` on
-  `10.11.11` and for `0.3.0.0-jf12-stable` on `12.0-rc4`, and each server answered
-  `Requests is Active at 0.3.0.0`; run `33357925338` at `501a943` had done it for `0.2.0.0-stable`
-  on `10.11.11` before. What that still does not cover: the archive is unpacked by the run rather
-  than fetched and unpacked by the server, and the manifest a server would fetch from carries no
-  `0.3.0.0` entry for either line. The sibling in the set arrives as its own published package and
-  is unpacked whole, so the set half of the run exercises the server's own path and the half about
-  this plugin still does not.
-- **The floor server of the 10.11 line refuses the published release, and this is the bullet above
-  it read against the claim.** `build.yaml` declares `targetAbi: "10.11.0.0"`, which names the
-  server `10.11.0`. The same archive on that server ends the run at its verdict step with
-  `Requests is NotSupported rather than Active`, in run `33358848505`. Jellyfin sets that status in
-  exactly one place, catching a `TypeLoadException` or a `ReflectionTypeLoadException` while loading
-  the assembly's types. **What that server does not carry is not a member, it is the version.** The
+- **A published release has been installed on every server the run names, and not the way a server
+  installs.** This bullet said no run recorded here had installed from either release, and then that
+  one had for the 10.11 line alone. `.github/workflows/release-install.yaml` downloads the newest
+  release of every claimed line, checks the archive against the digest published beside it, and puts
+  the unpacked bytes on a server of that line. Run `33744830699` at `2e83259` did it for
+  `0.3.0.0-stable` on `10.11.11` and for `0.3.0.0-jf12-stable` on `12.0-rc4`, and each server
+  answered `Requests is Active at 0.3.0.0`; run `33899055343` at `333559f` added the floor of each
+  claimed line and did `0.3.0.0-stable` on `10.11.0` as well, printing on the same run that no
+  `jellyfin/jellyfin:12.0.0` image is published, so the 12.0 line's floor was not installed on; run
+  `33357925338` at `501a943` had done `0.2.0.0-stable` on `10.11.11` before. What that still does
+  not cover: the archive is unpacked by the run rather than fetched and unpacked by the server, and
+  the manifest a server would fetch offers `0.3.0.0` for the 10.11 line and no entry at all for the
+  12.0 line, read on 2026-09-05. The sibling in the set arrives as its own published package and is
+  unpacked whole, so the set half of the run exercises the server's own path and the half about this
+  plugin still does not.
+- **The floor server of the 10.11 line refused `0.2.0.0` and takes `0.3.0.0`, and this is the
+  bullet above it read against the claim.** `build.yaml` declares `targetAbi: "10.11.0.0"`, which
+  names the server `10.11.0`. The `0.2.0.0` archive on that server ends the run at its verdict step
+  with `Requests is NotSupported rather than Active`, in run `33358848505` and again in run
+  `33899055343` at `333559f`, whose floor job puts that same archive on `jellyfin/jellyfin:10.11.0`
+  in order to require the refusal. Jellyfin sets that status in exactly one place, catching a
+  `TypeLoadException` or a `ReflectionTypeLoadException` while loading the assembly's types. **What that server does not carry is not a member, it is the version.** The
   archive's five Jellyfin references are stamped `10.11.11.0` and the `10.11.0` server carries all
   five at `10.11.0.0`; a reference above what the host carries does not bind, so nothing has to be
   called for the load to fail. That measurement, and the type graph resolving clean against the
@@ -122,9 +127,14 @@ files:
   because moving the claim would narrow every server this plugin reaches in order to accommodate a
   packaging accident, silently, for anybody on `10.11.4`. So the plugin compiles against the floor
   each packaging file names, and `scripts/check-package-abi.sh` refuses a package whose references
-  rise above that claim on both routes that produce one. **This does not repair the published
-  release.** `0.2.0.0` carries the references it shipped with, and the run above stays the answer for
-  it until a later release replaces it, which is #152's.
+  rise above that claim on both routes that produce one. **`0.3.0.0` is the release that carries
+  that move, and the floor server takes it.** In run `33899055343` the release-install job put
+  `0.3.0.0-stable` on `jellyfin/jellyfin:10.11.0`, the server answered
+  `{"LocalAddress":"http://172.17.0.2:8096",...,"Version":"10.11.0",...}` and the verdict step
+  answered `Requests is Active at 0.3.0.0`. **That repairs the release and not the one before it.**
+  `0.2.0.0` carries the references it shipped with and is refused by that server in the same run, so
+  the answer above stays the answer for it. And it is one server of the floor rather than the line:
+  what has been installed on is the bullet at the head of this section, not every 10.11 patch.
 - **The supported set is one board, and it is not the one the seam is written against.** A board
   joins the set for a line on the day it publishes a release for that line, and every candidate
   besides `jellyfin-plugin-sso` has published nothing. So a green run says nothing about the sibling
