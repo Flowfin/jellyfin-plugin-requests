@@ -29,6 +29,10 @@ cd "$root"
 # should be accepted stays accepted on the day a floor moves.
 base_abi=$(sed -n 's/^targetAbi: *"\([^"]*\)".*/\1/p' build.yaml | head -1)
 base_framework=$(sed -n 's/^framework: *"\([^"]*\)".*/\1/p' build.yaml | head -1)
+# The floor server that claim names, derived the same way the reader derives it. Written out here so
+# the expectation moves with the claim rather than naming a version this file would have to be
+# edited for.
+base_floor=${base_abi%.*}
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -110,19 +114,22 @@ archive good.zip
 sidecar good.sha256 good.zip
 metadata good.json "{\"version\":\"1.2.3.4\",\"targetAbi\":\"${base_abi}\"}"
 
-accepts "the shape a publish attaches is read and answers which line it is for" \
-    "which is the line ${base_framework} packages for" \
+accepts "the shape a publish attaches is read and answers which line it is for and which server is its floor" \
+    "which is the line ${base_framework} packages for and the floor server ${base_floor}" \
     -- "$reader" "$work/good.zip" "$work/good.sha256" "$work/good.json" "$work/answers.txt"
 
 # The answers are what the install step is handed, so a reader that passed and wrote nothing usable
-# would leave the step after it installing at a floor nobody derived.
+# would leave the step after it installing at a floor nobody derived. `floor=` is the one the install
+# step cannot recover on its own: it decides which server the package is put on, and a missing line
+# there is an install that silently runs at the newest server of the line and reads afterwards as one
+# that ran at the oldest.
 printf '\n== what the accepted run wrote for the step after it\n'
 if [ ! -f "$work/answers.txt" ]; then
     echo "  it wrote no answers file at all, so the step after it has no floor to install at."
     failures=$((failures + 1))
 else
     sed 's/^/  /' "$work/answers.txt"
-    for expected in "version=1.2.3.4" "targetAbi=${base_abi}" "framework=${base_framework}"; do
+    for expected in "version=1.2.3.4" "targetAbi=${base_abi}" "framework=${base_framework}" "floor=${base_floor}"; do
         if ! grep -qxF "$expected" "$work/answers.txt"; then
             echo "  the answers file does not carry ${expected}."
             failures=$((failures + 1))
@@ -148,6 +155,14 @@ metadata no-abi.json '{"version":"1.2.3.4"}'
 refuses "the release metadata names no server line" \
     "names no targetAbi" \
     -- "$reader" "$work/good.zip" "$work/good.sha256" "$work/no-abi.json" "$work/answers.txt"
+
+# Three parts rather than four, which is the shape a person writes when they mean a server version
+# instead of an assembly version. It is refused for the floor rather than for the line, because the
+# floor is what cannot be derived from it and the message a reader gets has to say which.
+metadata short-abi.json '{"version":"1.2.3.4","targetAbi":"10.11.0"}'
+refuses "the release metadata names a targetAbi with no floor server in it" \
+    "which is not four numeric parts" \
+    -- "$reader" "$work/good.zip" "$work/good.sha256" "$work/short-abi.json" "$work/answers.txt"
 
 metadata unclaimed.json '{"version":"1.2.3.4","targetAbi":"99.9.9.9"}'
 refuses "the release names a line no packaging file at the root claims" \
