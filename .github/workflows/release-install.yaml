@@ -199,7 +199,13 @@ jobs:
               # printed as two.
               echo "note: ${named} declares floor ${floor}, which is the newest server of the line, so one install covers both ends."
             elif inspected=$(docker manifest inspect "${floor_image}" 2>&1); then
-              printf '%s\n' "${inspected}" | head -3
+              # OUT OF A FILE AND NEVER OUT OF A PIPE. `head` closes the pipe after three lines, the
+              # writer takes a SIGPIPE for it, and `pipefail` would end this job on a race that says
+              # nothing about the registry or the release. `scripts/verify-plugin-loads.sh` carries
+              # the same note over the same trap, watched happening once on a head that changed no
+              # code (#263).
+              printf '%s\n' "${inspected}" > "${RUNNER_TEMP}/floor-manifest.json"
+              head -3 "${RUNNER_TEMP}/floor-manifest.json"
               servers="${servers} ${floor_image}"
             else
               case "${inspected}" in
