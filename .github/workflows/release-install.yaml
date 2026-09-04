@@ -13,6 +13,25 @@
 # release is reported rather than passed over: a line with nothing published cannot fail an install,
 # and a run that had nothing to cover must not read afterwards as one that covered it.
 #
+# AT BOTH ENDS OF EACH LINE, WHICH IS #382 AND WHICH THIS READ ONLY ONE OF. `targetAbi` is the
+# OLDEST server a package claims and the manifest promises exactly that number; this installed on the
+# NEWEST server of the line, which is a different reading and the easier one to pass. A package built
+# against a newer server binds there and does not bind at the floor - the reference table is stamped
+# with the versions it compiled against, the older server carries them lower, and the load ends with
+# the plugin reported `NotSupported`. `0.2.0.0` shipped that way and every route was green. So the
+# install now runs the floor server each release's own metadata names beside the newest, and the last
+# line of the run names the servers rather than counting the lines.
+#
+# A LINE WHOSE FLOOR SERVER IS NOT PUBLISHED IS COVERED AT ONE END AND SAYS SO. `targetAbi 12.0.0.0`
+# names the server `12.0.0`, the 12.0 line is still in release candidates and nobody has published
+# it, and a note is the same distinction the no-release note makes one paragraph up. A registry that
+# could not be asked at all is an error rather than a note, because unknown and absent are opposite
+# statements about coverage.
+#
+# THE FLOOR INSTALL IS WATCHED REFUSING, in the job at the foot of this file, over the one release
+# this repository published that was built above its own floor. A check that had never failed would
+# look exactly like one that installs nothing on the server it names.
+#
 # WHAT IT DOES NOT DO, SAID HERE RATHER THAN DISCOVERED. It does not install the way a server
 # installs. A server fetches the archive named in a manifest and unpacks it itself; this puts the
 # unpacked bytes in the plugin directory, which is what every container check in this repository
@@ -89,7 +108,9 @@ jobs:
   install:
     name: the published release loads on a server of its line
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Two servers per claimed line rather than one since #382, and each one is a container start, a
+    # startup wizard and an authenticated read. The number was 20 for one server per line.
+    timeout-minutes: 40
     permissions:
       contents: read
 
@@ -114,6 +135,8 @@ jobs:
 
           covered=0
           port=18096
+          loaded_on="${RUNNER_TEMP}/loaded-on.txt"
+          : > "${loaded_on}"
 
           for packaging in build.yaml build-*.yaml; do
             [ -f "${packaging}" ] || continue
@@ -163,15 +186,50 @@ jobs:
             unzip -o "${archive}" -d "${staged}"
             ls -1 "${staged}"
 
-            image=$(./scripts/server-image-for.sh "${framework}")
+            # BOTH ENDS OF THE LINE, because they are two different questions and the newest one
+            # alone was answering neither. The manifest promises `targetAbi`, which is the OLDEST
+            # server the package claims; the check installed on the NEWEST server the line has
+            # published. A package built against the newer server loads there and does not bind on
+            # the older one, so the check was green about a server nobody who reads the promise is
+            # running. `floor` is the reader's, derived from the release's own `targetAbi`.
+            servers=$(./scripts/server-image-for.sh "${framework}")
+            floor_image=$(./scripts/server-image-for.sh "${framework}" "${floor}")
+            if [ "${floor_image}" = "${servers}" ]; then
+              # The floor and the newest are one server, so installing twice would be one reading
+              # printed as two.
+              echo "note: ${named} declares floor ${floor}, which is the newest server of the line, so one install covers both ends."
+            elif inspected=$(docker manifest inspect "${floor_image}" 2>&1); then
+              printf '%s\n' "${inspected}" | head -3
+              servers="${servers} ${floor_image}"
+            else
+              case "${inspected}" in
+                *"manifest unknown"*|*"not found"*|*"no such manifest"*)
+                  # A LINE STILL IN RELEASE CANDIDATES HAS NO FLOOR SERVER TO INSTALL ON, and that
+                  # is the 12.0 line today: `targetAbi 12.0.0.0` names `12.0.0`, which nobody has
+                  # published. Saying so is the same distinction the no-release note above makes.
+                  echo "note: ${named} declares floor ${floor}, and no ${floor_image} image is published, so the floor end of that line was not installed on."
+                  ;;
+                *)
+                  # ASKED AND COULD NOT BE ANSWERED IS NOT THE SAME AS ABSENT. A registry that
+                  # refused the question would otherwise read afterwards as a line with no floor.
+                  printf '%s\n' "${inspected}"
+                  echo "::error::Could not ask the registry about ${floor_image}, so whether the floor server exists is unknown. An unknown answer is not a line without a floor."
+                  exit 1
+                  ;;
+              esac
+            fi
+
             # The version the server must report is the release's, not this tree's: the archive was
             # built by a publish that may be several versions behind the working branch.
-            PLUGIN_FROM_DIRECTORY="${staged}" EXPECTED_PLUGIN_VERSION="${version}" \
-              ./scripts/verify-plugin-loads.sh "${image}" "${framework}" "${port}"
+            for image in ${servers}; do
+              PLUGIN_FROM_DIRECTORY="${staged}" EXPECTED_PLUGIN_VERSION="${version}" \
+                ./scripts/verify-plugin-loads.sh "${image}" "${framework}" "${port}"
+              port=$((port + 1))
+            done
             echo "::endgroup::"
 
             covered=$((covered + 1))
-            port=$((port + 1))
+            printf '  %s: %s loaded on %s\n' "${named}" "${tag}" "${servers}" >> "${loaded_on}"
           done
 
           # A run that installed nothing is not a run in which everything installed. The releases
@@ -180,4 +238,85 @@ jobs:
             echo "::error::No claimed line has a release, so nothing was installed. This job did not find a problem; it had nothing to look at."
             exit 1
           fi
-          echo "${covered} claimed line(s) had a release, and the published asset of each loaded on a server of its line."
+          # THE SUMMARY NAMES THE SERVERS RATHER THAN COUNTING THE LINES. A line whose floor server
+          # is not published is covered at one end, and a summary saying only how many lines passed
+          # reads identically to one where both ends were installed on.
+          echo "${covered} claimed line(s) had a release, and the published asset of each loaded on every server of its line named below:"
+          cat "${loaded_on}"
+
+  above-the-floor:
+    # The floor install watched failing, for the reason it exists. Everything else in this file is a
+    # check that has never said no, and a check that has never said no is indistinguishable from one
+    # that starts no server at all.
+    name: the floor server refuses a package built above its floor
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Put the release that was built above its own floor on the floor server, and require the refusal
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # THE SPECIMEN IS NAMED RATHER THAN BUILT, AND IT IS A REAL RELEASE RATHER THAN A FIXTURE.
+          # `0.2.0.0-stable` went out claiming `targetAbi 10.11.0.0` while asking a server for five
+          # assemblies at `10.11.11.0`, which is exactly the fault the floor install is for, and it
+          # is published for good. A mutant compiled inside this job would be an expensive way to
+          # reproduce bytes that already exist and that an operator could still download today.
+          specimen=0.2.0.0-stable
+
+          assets="${RUNNER_TEMP}/specimen"
+          rm -rf "${assets}"
+          mkdir -p "${assets}"
+          gh release download "${specimen}" --repo "${GITHUB_REPOSITORY}" --dir "${assets}" \
+            --pattern '*.zip' --pattern '*.sha256' --pattern '*.zip.meta.json'
+          ls -1 "${assets}"
+
+          # The same reader the install job uses, so the server this is put on is the one that job
+          # would derive from the same metadata rather than a version written here.
+          archive=$(ls -1 "${assets}"/*.zip | head -1)
+          ./scripts/check-released-package.sh \
+            "${archive}" "${archive%.zip}.sha256" "${archive}.meta.json" "${assets}/answers"
+          cat "${assets}/answers"
+          # shellcheck disable=SC1090
+          . "${assets}/answers"
+
+          staged="${assets}/unpacked"
+          rm -rf "${staged}"
+          mkdir -p "${staged}"
+          unzip -o "${archive}" -d "${staged}"
+
+          floor_image=$(./scripts/server-image-for.sh "${framework}" "${floor}")
+          echo "putting ${specimen} on ${floor_image} and requiring that server to refuse it"
+
+          set +e
+          PLUGIN_FROM_DIRECTORY="${staged}" EXPECTED_PLUGIN_VERSION="${version}" \
+            ./scripts/verify-plugin-loads.sh "${floor_image}" "${framework}" 18196 2>&1 \
+            | tee "${RUNNER_TEMP}/floor.log"
+          status=${PIPESTATUS[0]}
+          set -e
+
+          if [ "${status}" -eq 0 ]; then
+            # Either the specimen stopped being one, or the install stopped reaching the floor. Both
+            # are reasons to stop trusting the job above and neither is a reason to pass here.
+            echo "::error::${specimen} loaded on ${floor_image}. It asks that server for assemblies above what the server carries, so either the floor of ${framework} has moved above the versions this archive references and the specimen is no longer above any floor, or the install is not running on the server it names."
+            exit 1
+          fi
+
+          # REFUSED FOR ITS OWN REASON AND NOT FOR ANY OTHER. A container that never started, an
+          # image that could not be pulled and a wizard that timed out all end this script non-zero,
+          # and a job accepting any of those as the proof would be green for a floor it never
+          # reached. This sentence is the server's own verdict about the plugin.
+          if ! grep -q 'is NotSupported rather than Active' "${RUNNER_TEMP}/floor.log"; then
+            echo "::error::${specimen} did not install on ${floor_image}, and the run does not carry the server's verdict about the plugin. Something before the verdict ended it, so the floor install is unproven rather than proven by this run."
+            exit 1
+          fi
+
+          echo "${specimen} is refused by ${floor_image}, which reports the plugin NotSupported. The floor install sees the fault it is for."

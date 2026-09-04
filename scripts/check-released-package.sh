@@ -22,6 +22,12 @@
 #   * the archive's digest is the digest the release published beside it
 #   * the release metadata names a version
 #   * the release metadata names a targetAbi some packaging file at the root claims
+#   * that targetAbi is four numeric parts, so the floor server it claims can be named
+#
+# THE FLOOR IS DERIVED HERE AND THE STEP THAT INSTALLS DOES NOT DERIVE IT AGAIN. A `targetAbi` of
+# `A.B.C.D` is the version of the assemblies a server of `A.B.C` carries, so `A.B.C` is the oldest
+# server the package claims to load on. That number decides which server the install runs against,
+# and a second derivation of it in the workflow would be the copy that disagrees first.
 #
 # THE LINE IS DERIVED AND NEVER WRITTEN HERE. The published metadata names a `targetAbi` and no
 # framework, so the framework comes from the packaging file at the root that claims that `targetAbi`.
@@ -34,7 +40,8 @@
 # usage: scripts/check-released-package.sh <archive> <checksum-file> <metadata-file> <answers-file>
 #   the checksum file is the `.sha256` sidecar the publish attaches, in `sha256sum` shape
 #   the metadata file is the `.zip.meta.json` sidecar the publish attaches
-#   the answers file is written, not read: `version=`, `targetAbi=` and `framework=`, one per line
+#   the answers file is written, not read: `version=`, `targetAbi=`, `framework=` and `floor=`, one
+#   per line
 
 set -euo pipefail
 
@@ -89,6 +96,15 @@ if [ -z "$abi" ]; then
     exit 1
 fi
 
+# FOUR PARTS EXACTLY, because the floor server is this number with its last part dropped. A shorter
+# or longer one leaves a version no registry publishes, and `docker run` answers that several steps
+# later with a message about a tag rather than about the release that named it.
+if ! [[ $abi =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "check-released-package: ${metadata} names targetAbi ${abi}, which is not four numeric parts. The floor server a package claims is that number without its last part, and there is no server version to derive from this one." >&2
+    exit 1
+fi
+floor=${abi%.*}
+
 # Every line this repository claims, derived from the packaging files rather than listed here.
 framework=""
 claimed=""
@@ -112,6 +128,7 @@ fi
     printf 'version=%s\n' "$version"
     printf 'targetAbi=%s\n' "$abi"
     printf 'framework=%s\n' "$framework"
+    printf 'floor=%s\n' "$floor"
 } > "$answers"
 
-echo "$(basename "$archive") unpacks, hashes to the digest published beside it, and names version ${version} at targetAbi ${abi}, which is the line ${framework} packages for."
+echo "$(basename "$archive") unpacks, hashes to the digest published beside it, and names version ${version} at targetAbi ${abi}, which is the line ${framework} packages for and the floor server ${floor}."
