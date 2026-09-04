@@ -143,6 +143,32 @@ refuses "the two packages claim different plugins" \
     "holds one entry per plugin" -- \
     env -C "$work" SOURCE_URL_PREFIX="$prefix" "$generator" out.json requests_a.zip requests_g.zip
 
+# The same refusal reached through a field nobody would call an identity, and this is the shape it
+# arrives in. `guid` above is a divergence somebody has to mean; a per-line sentence in the
+# packaging prose is an ordinary documentation edit, and the generator holds seven fields once per
+# plugin rather than the two a reader remembers. Written as its own case because a proof that only
+# ever drives `guid` says nothing about the other six.
+#
+# The pair is otherwise legal - two version numbers, the newer one on the newer line - so the
+# only thing wrong with it is the sentence, and the refusal cannot be the duplicate-version rule
+# arriving first under another name.
+package requests_k.zip 0.6.0.0 10.11.0.0
+package requests_l.zip 0.7.0.0 12.0.0.0
+python3 - "$work/requests_l.zip.meta.json" <<'DIVERGE'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    document = json.load(handle)
+document["description"] += " On the 12.0 line, which is the sentence that arrives per line."
+with open(path, "w", encoding="utf-8", newline="\n") as handle:
+    json.dump(document, handle, indent=4, sort_keys=True)
+DIVERGE
+refuses "two packages whose prose diverges on one line" \
+    "holds one entry per plugin" -- \
+    env -C "$work" SOURCE_URL_PREFIX="$prefix" "$generator" out.json requests_k.zip requests_l.zip
+
 package requests_h.zip 0.5.0.0 12.0.0.0
 python3 - "$work/requests_h.zip.meta.json" <<'PY'
 import json

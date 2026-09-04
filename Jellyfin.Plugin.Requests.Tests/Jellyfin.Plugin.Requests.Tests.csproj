@@ -44,6 +44,10 @@
          files the release path reads instead of a number restated in a test. -->
     <None Include="../build.yaml" Link="build.yaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../build-jf12.yaml" Link="build-jf12.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The manifest generator, next to the suite, because the set of fields a catalogue holds
+         once per plugin is declared there and the identity check reads it from that file rather
+         than restating it. A second copy of that list is a list that drifts. -->
+    <None Include="../scripts/build-manifest.sh" Link="scripts/build-manifest.sh" CopyToOutputDirectory="PreserveNewest" />
     <!-- The plugin's own project file, for the one claim about it that is not visible from the
          built assembly: that the word catalogues are embedded by a wildcard, which is what makes
          adding a language a file and nothing else. -->
