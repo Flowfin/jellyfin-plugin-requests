@@ -825,6 +825,7 @@ own head.
 | `seam-probe.yaml`             | 32625777966, `throwaway/66-what-the-server-said`, both lines red at `Ask a second plugin what it can see` with no answer produced at all                                                                             | 32555794613, at `5b96f57` |
 | `sibling-set.yaml`            | 32624752477, `surface/66-a-view-of-your-own-requests`, both lines red at `Alone, then with the set`, on the alone half rather than the collision half                                                                | 32603611260               |
 | `user-isolation.yaml`         | 32560880189, `proof/67-the-queue-is-not-closed-to-everybody`, both lines red at the queue step                                                                                                                       | 32603611273               |
+| `manifest-install.yaml`       | none of this kind, below                                                                                                                                                                                             | 33946073165, at `a9b7480` |
 | `manifest-freshness.yaml`     | none of this kind, below                                                                                                                                                                                             | 33246667212, at `12182bf` |
 | `release-install.yaml`        | 33358848505, `release/152-the-floor-server-takes-the-published-release`, red at `Take the newest release of every claimed line, install it, and read the server back`, on the floor server rather than on the newest | 33357925338, at `501a943` |
 | `full-disk.yaml`              | 32623464033, `throwaway/46-a-mount-nobody-limited`, both lines red at `Does a full disk reach the caller` with nothing measured                                                                                      | 32623457801, at `d154ab3` |
@@ -849,6 +850,17 @@ every answer it refuses over files rather than over a fetch, and which has itsel
 failing: with the reader replaced by a script that exits zero it reports `12 of the rules above did
 not bite` and reds. The green cell is the first run of it on the mainline, which fetched the live
 document and compared it rather than only proving the reader.
+
+**`manifest-install.yaml` has the first cell unfilled and the reason is the same one.** Its
+`install` job reds when a server of a claimed line is offered another line's build, and arranging
+that on purpose means publishing a catalogue that is wrong for everybody who has added this
+repository, so there is no red run of the kind this column holds. What stands in its place is the
+`refusals` job, which serves doctored manifests from a container to the same check and watches it
+say no twice - this line's entry removed while the other line's stays, which is the state this board
+published in on 2026-08-28, and the package absent from the document entirely. Its own fixture has
+been watched failing: on the first run of it the doctored manifest never reached the container, the
+server found no package, and both cases were refused for that reason instead of their own, which is
+why the proof now reads back what it is serving before each case.
 
 **`release-install.yaml` HAD THE SAME SHAPE AND THIS PARAGRAPH SAID IT ALWAYS WOULD.** What stood
 here said the `install` job reds only when an asset a release has already published does not
