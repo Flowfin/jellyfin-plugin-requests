@@ -26,9 +26,15 @@ number, it carries the command that produced it.
 
 A pull request names its issue in the body: `Closes #12`, or `Part of #12` where
 it does not finish it. The `Deterministic pull request hygiene checks` job reads
-the body for that reference. It skips the blocking tier for a pull request from
-somebody outside this repository, so a first contribution is never refused on a
-convention nobody could have known.
+the body for that reference, and since #390 it reads it whoever the author is.
+
+So a first contribution can be refused on a convention nobody could have known,
+and what answers that is a hand rather than a skip: say so in the pull request
+and the reference is supplied, or the issue filed, by whoever handles the
+contribution. The skip it replaces was keyed on `author_association`, a field
+that answers differently on the two routes that read it, so which contributions
+it reached was not a thing anybody could state. A bot is the only author the
+blocking tier still skips, because an automated update has no issue to link.
 
 ## What the gate expects
 

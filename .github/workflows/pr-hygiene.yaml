@@ -32,10 +32,10 @@
 # touches no test, and a merge blocked for either teaches people to split a
 # change badly, which is the opposite of what a size check is for.
 #
-# The FAIL tier is skipped for two audiences, for two different reasons, and
-# both skips are written at the check rather than only here. A skipped run says
-# so in its own annotations, so a run that checked less than the whole set
-# cannot be read as one that checked it and found nothing.
+# The FAIL tier applies to every author. One skip is left, for a bot, and it is
+# written at the check rather than only here. A skipped run says so in its own
+# annotations, so a run that checked less than the whole set cannot be read as
+# one that checked it and found nothing.
 #
 # Two checks the sibling board runs are deliberately not adopted here, and the
 # reasons are at checks 1b and 1c below where a reader looking for them will be.
@@ -99,26 +99,23 @@ jobs:
             const changed = files.map((f) => f.filename);
 
             // --- Who the FAIL tier is for --------------------------------------
+            // Every author, and one skip is left, for a bot.
+            //
             // An automated dependency update opens a pull request with no issue
             // behind it, because there is no issue: the update is the whole
             // change and the tool has nothing to link. Failing it would mean a
             // permanently red check on every such pull request, which is the
-            // check that gets switched off rather than satisfied.
+            // check that gets switched off rather than satisfied. That skip is
+            // keyed on the account being a bot rather than on its relationship
+            // to this repository, so no reading of a payload moves it.
             //
-            // Somebody arriving from outside this repository is a separate case
-            // with a separate reason. The issue convention is this board's, they
-            // have no way to know the numbers before they file, and often no
-            // issue exists yet, so failing their contribution on it is a ritual
-            // rather than a caught slip. The linkage is still wanted: whoever
-            // handles the contribution supplies it.
-            //
-            // COLLABORATOR is in the inside set here, and the sibling board
-            // leaves it out. That is a difference measured rather than copied.
-            // `author_association` is not one value: the field a workflow reads
-            // out of the event payload and the field the REST API returns for
-            // the same pull request can disagree, and here they do. On the run
-            // that first exercised this check, the workflow read COLLABORATOR
-            // and the API answered MEMBER for the same number:
+            // THE SKIP FOR AN AUTHOR OUTSIDE THIS REPOSITORY IS GONE, #390, AND
+            // WHAT IT WAS KEYED ON IS WHY. `author_association` is not one
+            // value: the field a workflow reads out of the event payload and
+            // the field the REST API returns for the same pull request can
+            // disagree, and here they do. On the run that first exercised this
+            // check, the workflow read COLLABORATOR and the API answered MEMBER
+            // for the same number:
             //
             //   gh api repos/Flowfin/jellyfin-plugin-requests/pulls/163 --jq '.author_association'
             //   MEMBER
@@ -126,24 +123,27 @@ jobs:
             //   ##[warning]The blocking tier was skipped because the author is
             //   outside this repository (author_association: COLLABORATOR)
             //
-            // The value that decides the check is the one the workflow reads,
-            // so an inside set of OWNER and MEMBER skips the blocking tier for
-            // every pull request this board actually opens, which is a check
-            // that refuses nothing while reporting success. What the wider set
-            // costs is that somebody given push access is inside the tier from
-            // that moment. That is the right reading here: the convention this
-            // tier enforces follows write access, and somebody with none is the
-            // audience the skip is for.
+            // So which audience the skip reached depended on which route read
+            // the field, and a skip whose audience cannot be stated is coverage
+            // nobody can state either. The audience it was written for keeps
+            // what it was owed a different way: the issue convention is this
+            // board's, somebody arriving from outside has no way to know the
+            // numbers before they file, and where a first contribution is
+            // refused on it the reference is supplied by whoever handles the
+            // contribution rather than demanded of them. That is a sentence in
+            // CONTRIBUTING.md and a hand on the pull request, not a green check
+            // that checked nothing.
+            //
+            // The value is still read, and it is now reported rather than acted
+            // on, because the disagreement above is the thing a later reader
+            // will want the run to have recorded.
             const isBot = pr.user && pr.user.type === 'Bot';
-            const INSIDE_ASSOCIATIONS = ['OWNER', 'MEMBER', 'COLLABORATOR'];
-            const isOutside = !INSIDE_ASSOCIATIONS.includes(
-              pr.author_association || 'NONE',
-            );
-            const failTierApplies = !isBot && !isOutside;
+            const association = pr.author_association || 'NONE';
+            const failTierApplies = !isBot;
 
-            // Both skips are written at the check. A run that skipped the
-            // blocking tier says which checks it did not make and why, so it
-            // cannot be read as a run that made them and found nothing.
+            // The skip that is left is written at the check. A run that skipped
+            // the blocking tier says which checks it did not make and why, so
+            // it cannot be read as a run that made them and found nothing.
             if (isBot) {
               warnings.push(
                 'The blocking tier was skipped because this pull request was ' +
@@ -154,17 +154,6 @@ jobs:
                   'not owed here; a version bump from one would still owe a ' +
                   'changelog entry and is not checked, which is the cost of the ' +
                   'skip and is stated rather than hidden.',
-              );
-            } else if (isOutside) {
-              warnings.push(
-                'The blocking tier was skipped because the author is outside ' +
-                  `this repository (author_association: ${pr.author_association || 'NONE'}). ` +
-                  'The two checks not made are the issue reference in the body ' +
-                  'and the changelog entry behind a version bump. The issue ' +
-                  'linkage is still wanted: whoever handles this contribution ' +
-                  'supplies the reference, and files the issue where none ' +
-                  'exists yet. Read this as "not their obligation", never as ' +
-                  '"linkage does not matter here".',
               );
             }
 
@@ -272,6 +261,16 @@ jobs:
               core.warning(w);
             }
             const summary = core.summary.addHeading('Pull request hygiene', 2);
+            summary.addRaw(
+              failTierApplies
+                ? 'The blocking tier applied. The event payload carried ' +
+                    `author_association: ${association}, and since #390 that ` +
+                    'value decides nothing here; it is recorded because the ' +
+                    'two routes that read it have disagreed.'
+                : 'The blocking tier was skipped. The annotation says why, and ' +
+                    `the event payload carried author_association: ${association}.`,
+              true,
+            );
             if (failures.length === 0 && warnings.length === 0) {
               summary.addRaw('Every check passed and nothing was skipped.');
             } else {
