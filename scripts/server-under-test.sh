@@ -20,6 +20,14 @@
 # `EXPECTED_PLUGIN_VERSION` names the version the server must report, for a caller installing bytes
 # this tree did not build. Unset, the number comes from `Directory.Build.props` as it always did.
 #
+# NOTHING IS PUT ON THE SERVER WHERE THE SERVER IS THE THING INSTALLING. Setting
+# `PLUGIN_INSTALLED_BY_THE_SERVER` boots a server with no plugin on it and makes no claim about one:
+# the publish, the copy into `/config/plugins` and the verdict are all skipped, and the wizard, the
+# account, the token and `api` are what they were. A caller checking the route a manifest offers
+# needs a server that has not already been handed the thing it is supposed to fetch. The boot steps
+# are not copied into such a caller for the reason at the top of this file: two copies drift the
+# first time a server line changes one of them.
+#
 # What a caller gets, after `server_start`:
 #
 #   $BASE       the address to call, on the loopback interface
@@ -76,7 +84,9 @@ server_start() {
 
     AUTH_HEADER='MediaBrowser Client="plugin-load-check", Device="load-check", DeviceId="plugin-load-check", Version="1.0.0.0"'
 
-    if [ -n "${PLUGIN_FROM_DIRECTORY:-}" ]; then
+    if [ -n "${PLUGIN_INSTALLED_BY_THE_SERVER:-}" ]; then
+        step "build nothing: the caller is checking the server's own install route"
+    elif [ -n "${PLUGIN_FROM_DIRECTORY:-}" ]; then
         step "take the plugin from $PLUGIN_FROM_DIRECTORY instead of building one"
         # WHAT IS INSTALLED IS WHAT WOULD BE SHIPPED, WHICH IS THE POINT OF THIS MODE. A publish and
         # a package are two different sets of bytes: the package carries the files the artifact list
@@ -95,51 +105,57 @@ server_start() {
         dotnet publish "$project" -c Release -f "$framework" -o "$publish_dir" --nologo -v quiet
         ls -1 "$publish_dir"
     fi
-    host_dll=$(cygpath --windows "$publish_dir/$ASSEMBLY.dll" 2>/dev/null || printf '%s' "$publish_dir/$ASSEMBLY.dll")
+    if [ -z "${PLUGIN_INSTALLED_BY_THE_SERVER:-}" ]; then
+        host_dll=$(cygpath --windows "$publish_dir/$ASSEMBLY.dll" 2>/dev/null || printf '%s' "$publish_dir/$ASSEMBLY.dll")
+    fi
 
     step "start a server from $image"
     dk rm --force "$CONTAINER" >/dev/null 2>&1 || true
     dk run --detach --name "$CONTAINER" --publish "127.0.0.1:$port:8096" "$image" >/dev/null
 
-    step "install the plugin"
-    # The server is started first because /config is a volume: it is populated when the container
-    # runs, and a copy made before that lands under a directory the running server never reads.
-    local _
-    for _ in $(seq 1 60); do
-        if dk exec "$CONTAINER" test -d /config/plugins 2>/dev/null; then
-            break
-        fi
-        sleep 1
-    done
-    dk exec "$CONTAINER" mkdir -p "$plugin_dir"
-    if [ -n "${PLUGIN_FROM_DIRECTORY:-}" ]; then
-        # Everything the package holds, because leaving a file out here would be this check deciding
-        # what a server gets rather than the artifact list deciding it.
-        host_dir=$(cygpath --windows "$publish_dir" 2>/dev/null || printf '%s' "$publish_dir")
-        dk cp "$host_dir/." "$CONTAINER:$plugin_dir"
+    if [ -n "${PLUGIN_INSTALLED_BY_THE_SERVER:-}" ]; then
+        step "put nothing in /config/plugins: the caller is checking the server's own install route"
     else
-        # Only the assembly. The rest of the publish output is a symbol file and a documentation file,
-        # and a package shipping those would be shipping what a server has no use for.
-        dk cp "$host_dll" "$CONTAINER:$plugin_dir/$ASSEMBLY.dll"
-    fi
-    # A SECOND PLUGIN IN THE SAME PROCESS, WHERE A CALLER ASKS FOR ONE. Two plugins share a route
-    # table, a task list and whatever the host does about loading assemblies, and none of that is
-    # visible to a server running one plugin. A caller that wants the second names a directory of
-    # built files and the name the server is to install it under; every other caller passes neither
-    # and gets the server it had before.
-    if [ -n "${EXTRA_PLUGIN_DIRECTORY:-}" ]; then
-        step "install ${EXTRA_PLUGIN_NAME:?a directory name for the second plugin} beside it"
-        local extra_dir extra_host
-        extra_dir="/config/plugins/$EXTRA_PLUGIN_NAME"
-        extra_host=$(cygpath --windows "$EXTRA_PLUGIN_DIRECTORY" 2>/dev/null || printf '%s' "$EXTRA_PLUGIN_DIRECTORY")
-        dk exec "$CONTAINER" mkdir -p "$extra_dir"
-        dk cp "$extra_host/." "$CONTAINER:$extra_dir"
-        dk exec "$CONTAINER" ls -1 "$extra_dir"
-    fi
+        step "install the plugin"
+        # The server is started first because /config is a volume: it is populated when the container
+        # runs, and a copy made before that lands under a directory the running server never reads.
+        local _
+        for _ in $(seq 1 60); do
+            if dk exec "$CONTAINER" test -d /config/plugins 2>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
+        dk exec "$CONTAINER" mkdir -p "$plugin_dir"
+        if [ -n "${PLUGIN_FROM_DIRECTORY:-}" ]; then
+            # Everything the package holds, because leaving a file out here would be this check deciding
+            # what a server gets rather than the artifact list deciding it.
+            host_dir=$(cygpath --windows "$publish_dir" 2>/dev/null || printf '%s' "$publish_dir")
+            dk cp "$host_dir/." "$CONTAINER:$plugin_dir"
+        else
+            # Only the assembly. The rest of the publish output is a symbol file and a documentation file,
+            # and a package shipping those would be shipping what a server has no use for.
+            dk cp "$host_dll" "$CONTAINER:$plugin_dir/$ASSEMBLY.dll"
+        fi
+        # A SECOND PLUGIN IN THE SAME PROCESS, WHERE A CALLER ASKS FOR ONE. Two plugins share a route
+        # table, a task list and whatever the host does about loading assemblies, and none of that is
+        # visible to a server running one plugin. A caller that wants the second names a directory of
+        # built files and the name the server is to install it under; every other caller passes neither
+        # and gets the server it had before.
+        if [ -n "${EXTRA_PLUGIN_DIRECTORY:-}" ]; then
+            step "install ${EXTRA_PLUGIN_NAME:?a directory name for the second plugin} beside it"
+            local extra_dir extra_host
+            extra_dir="/config/plugins/$EXTRA_PLUGIN_NAME"
+            extra_host=$(cygpath --windows "$EXTRA_PLUGIN_DIRECTORY" 2>/dev/null || printf '%s' "$EXTRA_PLUGIN_DIRECTORY")
+            dk exec "$CONTAINER" mkdir -p "$extra_dir"
+            dk cp "$extra_host/." "$CONTAINER:$extra_dir"
+            dk exec "$CONTAINER" ls -1 "$extra_dir"
+        fi
 
-    # Plugins are read at start, so the server has to come up again with the plugin already in place.
-    dk restart "$CONTAINER" >/dev/null
-    dk exec "$CONTAINER" ls -1 "$plugin_dir"
+        # Plugins are read at start, so the server has to come up again with the plugin already in place.
+        dk restart "$CONTAINER" >/dev/null
+        dk exec "$CONTAINER" ls -1 "$plugin_dir"
+    fi
 
     step "wait for the server to answer"
     # THREE ANSWERS IN A ROW RATHER THAN ONE. The first run of this on a hosted runner ended here
@@ -191,6 +207,12 @@ server_start() {
     test -n "$TOKEN"
     test -n "$ADMIN_ID"
     echo "authenticated as $ADMIN_ID"
+
+    if [ -n "${PLUGIN_INSTALLED_BY_THE_SERVER:-}" ]; then
+        step "no verdict about a plugin, because none was put here"
+        echo "$image ($framework) is up with an empty plugin directory; what it installs is the caller's subject"
+        return 0
+    fi
 
     step "what the server says about its plugins"
     local plugins

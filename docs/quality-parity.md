@@ -457,12 +457,16 @@ Thirteen files here map onto a file there and are placed by the table above:
 `dco.yml`, `dependency-review.yml`, `invariant-lint.yaml`, `mutation.yaml`,
 `package.yaml`, `prettier.yml`, `pr-hygiene.yaml`,
 `publish-failure-alert.yaml`, `publish.yaml`, `scan-codeql.yaml`,
-`scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Twelve of the rows below
-name a file that is present, and thirteen plus twelve is what the directory
-holds:
+`scorecard.yml`, `unicode-guard.yml` and `zizmor.yml`. Thirteen of the rows
+below name a file that is present, and thirteen plus thirteen is what the
+directory holds:
 
     $ ls .github/workflows/ | wc -l
-    25
+    26
+
+The lower number moved with `manifest-install.yaml`, which landed for #110 with
+its row and its place in the arithmetic in the same change. Both are said here
+because the paragraph below is a record of the two rounds where they were not.
 
 THIS PARAGRAPH SAID TWELVE AND NINE AND PASTED 21 WHILE THE DIRECTORY HELD 23,
 and it was found by running the pasted command before adding a file to that
@@ -505,6 +509,7 @@ longer tracks it.
 | `full-disk.yaml`          | adopted, landed   | What a caller sees when the volume the store writes to runs out of room, on a mount with a hard size, on the runtime of each line. The suite cannot ask it: filling a filesystem needs one to fill, and the headless rule refuses a test that needs a container engine. #46.                                                                                                                                                                                                                                                                        |
 | `manifest.yaml`           | adopted, landed   | The manifest generator watched refusing what it says it refuses, over one manifest per defect, with a clean pair of packages beside them. A generator that has never said no writes a manifest for a clean pair, which is also what a generator with no rules does. #110.                                                                                                                                                                                                                                                                           |
 | `manifest-freshness.yaml` | adopted, landed   | The document a server fetches, read back against the releases that exist, once a day and on its own files. It is not the publish checking itself: the incident behind #111 is a publish whose manifest write failed while the run stayed green, so the step that failed would have been the step reporting it. A claimed line with no release is reported rather than passed over. What it finds is raised by `publish-failure-alert.yaml`, which sweeps every workflow here rather than this one. #111.                                            |
+| `manifest-install.yaml`   | adopted, landed   | A server of each claimed line, handed the manifest an operator adds, installing what it chooses out of it. The three routes beside it stop short of the selection: the generator judges its own output, the freshness reading installs nothing, and the released-package install unpacks an archive rather than letting the server fetch one. #110.                                                                                                                                                                                                 |
 | `release-install.yaml`    | adopted, landed   | The archive a published release attaches, downloaded, checked against the digest published beside it, and installed both on the newest server of its line and on the floor server its own `targetAbi` names. `package.yaml` installs the package the run just built, so a publish that attached the wrong bytes passes it, and `manifest-freshness.yaml` hashes no archive and installs nothing. A claimed line with no release, and a claimed line whose floor server nobody has published, are each reported rather than passed over. #152, #382. |
 | `changelog.yaml`          | declined, deleted | It drafts a release changelog against a version scheme this repository had not fixed, and nothing covered that risk because there was nothing to release; #107. Both premises have gone: `docs/versioning.md` fixes the scheme and two releases are published. Whether it is re-adopted has not been decided and this row does not decide it. `CHANGELOG.md` is written by hand, and a version bump that does not touch it reds `Deterministic pull request hygiene checks`; #26.                                                                   |
 | `command-dispatch.yaml`   | declined, deleted | It turns issue comments into workflow runs, which is a surface this repository does not use, and nothing here needs covering because nothing depends on it.                                                                                                                                                                                                                                                                                                                                                                                         |
