@@ -161,33 +161,55 @@ named it: the decision said self-hosted under Flowfin's control and stopped ther
 an operator has to type had nowhere to be read from, and the price accepted above -- that somebody
 reaches this plugin only by being told the URL -- was being paid without the URL being written down.
 
-Read back rather than asserted, on 2026-08-28:
+Read back rather than asserted, on 2026-09-05:
 
     curl -sS -o manifest.json -w '%{http_code}\n' https://flowfin.dev/manifest.json
     200
 
     jq -r '.[] | select(.name == "Requests") | .versions[] | [.version, .targetAbi] | @tsv' manifest.json
+    0.3.0.0 12.0.0.0
+    0.3.0.0 10.11.0.0
     0.2.0.0 10.11.0.0
     0.1.0.0 10.11.0.0
 
 ### The checksums are the ones the packages hash to
 
 The one field of an entry that describes bytes rather than metadata, checked against the archives
-the entries name rather than against the `.md5` published beside them:
+the entries name rather than against the `.md5` published beside them. The two `0.3.0.0` archives
+carry one filename between them, so each is fetched under its own tag's name:
 
-    curl -sSL -O https://github.com/Flowfin/jellyfin-plugin-requests/releases/download/0.1.0.0-stable/requests_0.1.0.0.zip
-    curl -sSL -O https://github.com/Flowfin/jellyfin-plugin-requests/releases/download/0.2.0.0-stable/requests_0.2.0.0.zip
-    md5sum requests_0.1.0.0.zip requests_0.2.0.0.zip
-    1167d5e454c800bc024d98a6899cdb4c *requests_0.1.0.0.zip
-    76c0a82e31d04228e7daf1f67383182d *requests_0.2.0.0.zip
+    for tag in 0.1.0.0-stable 0.2.0.0-stable 0.3.0.0-stable 0.3.0.0-jf12-stable; do
+      version=${tag%%-*}
+      curl -sSL -o "$tag.zip" \
+        "https://github.com/Flowfin/jellyfin-plugin-requests/releases/download/$tag/requests_$version.zip"
+    done
+    md5sum ./*.zip
+    1167d5e454c800bc024d98a6899cdb4c *./0.1.0.0-stable.zip
+    76c0a82e31d04228e7daf1f67383182d *./0.2.0.0-stable.zip
+    40244c20cdb86c936f488cb2f622dd8b *./0.3.0.0-jf12-stable.zip
+    840ca9cb5b496d45ae4fc2d6aee04874 *./0.3.0.0-stable.zip
 
-Both equal the `checksum` of their entry, so a server that downloads either one and hashes it gets
-the value the manifest promised.
+    jq -r '.[] | select(.name == "Requests") | .versions[] | [.version, .targetAbi, .checksum] | @tsv' manifest.json
+    0.3.0.0 12.0.0.0        40244c20cdb86c936f488cb2f622dd8b
+    0.3.0.0 10.11.0.0       840ca9cb5b496d45ae4fc2d6aee04874
+    0.2.0.0 10.11.0.0       76c0a82e31d04228e7daf1f67383182d
+    0.1.0.0 10.11.0.0       1167d5e454c800bc024d98a6899cdb4c
 
-### Both entries the manifest serves claim the 10.11 line, and the 12.0 line's package is not in it
+All four match, so a server that downloads any of them and hashes it gets the value the manifest
+promised. A server does that comparison itself and refuses an entry that fails it, which is why an
+install that completed is a second reading of the same field.
 
-The scheme is one entry per server line, each carrying its line's `targetAbi`. What the manifest
-serves is two entries for one line. This board claims two:
+### Each claimed line has an entry now, and this section said neither did
+
+THIS SECTION SAID BOTH ENTRIES THE MANIFEST SERVES CLAIM THE 10.11 LINE AND THAT THE 12.0 LINE'S
+PACKAGE IS NOT IN IT. Read on 2026-09-03 that was true and the manifest carried no `0.3.0.0` at all.
+It carries both lines' `0.3.0.0` today, which is the reading at the top of this section, and what
+changed is not on this board: `Flowfin/hub#161` taught the catalogue's declaration for this
+repository one tag pattern per server line and merged on 2026-09-04, so a `-jf12-stable` release
+reaches the manifest.
+
+The scheme is one entry per server line, each carrying its line's `targetAbi`, and this board claims
+two lines:
 
     grep -nE '^(version|targetAbi|framework):' build.yaml build-jf12.yaml
     build.yaml:5:version: "0.3.0.0"
@@ -197,26 +219,35 @@ serves is two entries for one line. This board claims two:
     build-jf12.yaml:15:targetAbi: "12.0.0.0"
     build-jf12.yaml:16:framework: "net10.0"
 
-and since `0.3.0.0` the release route publishes a package per line, deriving the line from the tag,
-which `publish.yaml` says about itself in its own header. `0.3.0.0-jf12-stable` names
-`targetAbi 12.0.0.0` in the metadata published beside it; read on 2026-09-03, the manifest carries no
-entry for it and none for the 10.11 line's `0.3.0.0` either, and nothing on this board writes the
-manifest.
+One version number across both, with the line living in the tag suffix, which `publish.yaml` says
+about itself in its own header.
 
-**So a server on the 12.0 line is offered the `net9.0` build.** A server keeps every entry whose
-`targetAbi` is at or below its own version and then takes the highest version number of what is
-left, read at the 10.11 line's own source on 2026-08-28:
+### A server of each line was asked, and each took its own line's build
 
-    gh api "repos/jellyfin/jellyfin/contents/Emby.Server.Implementations/Updates/InstallationManager.cs?ref=release-10.11.z" \
-      -H "Accept: application/vnd.github.raw" \
-      | grep -nE 'Version.Parse\(x.TargetAbi\) <= appVer|OrderByDescending\(x => x.VersionNumber\)'
-    266:                .Where(x => string.IsNullOrEmpty(x.TargetAbi) || Version.Parse(x.TargetAbi) <= appVer);
-    277:            foreach (var v in availableVersions.OrderByDescending(x => x.VersionNumber))
+The paragraph this replaces described the comparison the server's source makes. A server makes it
+now, on each claimed line, and `scripts/verify-manifest-install.sh` is what asks: it starts a server
+of the line with an empty plugin directory, adds the address above as its only plugin repository,
+asks for `Requests` without naming a version or a repository so the choice is the server's, and
+reads the entry the server wrote out beside the files it unpacked. The two lines share one version
+number, so what identifies the entry is `targetAbi` in that record rather than a number on a
+filename.
 
-`10.11.0.0` is at or below `12.0.0.0`, so the filter keeps it and there is nothing else for the
-ordering to prefer.
+    ./scripts/verify-manifest-install.sh jellyfin/jellyfin:10.11.11 net9.0 10.11.0.0 https://flowfin.dev/manifest.json 18096
+    the server of the 10.11.0.0 line took the 10.11.0.0 entry at 0.3.0.0
+    Requests is Active at 0.3.0.0
 
-**Nothing here was installed into a server.** The address was fetched and the archives were hashed;
-no Jellyfin was started, no repository was added to one, and no install was attempted on either
-line. What the paragraph above describes is the comparison the server's source makes, not an install
-anybody watched take the wrong package.
+    ./scripts/verify-manifest-install.sh jellyfin/jellyfin:12.0-rc4 net10.0 12.0.0.0 https://flowfin.dev/manifest.json 18097
+    the server of the 12.0.0.0 line took the 12.0.0.0 entry at 0.3.0.0
+    Requests is Active at 0.3.0.0
+
+The 12.0 line is the half that could have gone wrong. A server keeps every entry whose `targetAbi`
+is at or below its own version, so a 12.0 server keeps all four and has to choose between two
+entries carrying `0.3.0.0`; the 10.11 server never sees the `12.0.0.0` entry at all. It took its own.
+`.github/workflows/manifest-install.yaml` runs both readings daily, and the refusals job beside it
+serves doctored manifests to the same check and watches it say no.
+
+**What was not installed into anything.** The servers are containers of the newest published image
+of each line, started for the reading and removed after it. Nothing was installed on an operator's
+own server, nothing was installed on the floor server each line claims -- that is
+`release-install.yaml` and #382 rather than this -- and no server holding an older version was
+offered a newer one, so the upgrade an installed plugin takes is unmeasured here.

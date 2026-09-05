@@ -1,0 +1,198 @@
+# Does a server of each claimed line install this plugin from the manifest, and does it take its own
+# line's build?
+#
+# #110's first and third conditions, and the pair nothing else here reaches. Three routes come close.
+# `scripts/build-manifest.sh` refuses a manifest it cannot write correctly, which is a generator
+# judging its own output. `.github/workflows/manifest-freshness.yaml` reads the published document
+# against the releases that exist and says of itself that it installs nothing. `release-install.yaml`
+# puts the published bytes into a plugin directory, which is the unpacked archive rather than the
+# server's own download-and-unpack path, and its own header says so. What none of them touches is the
+# selection: the manifest carries one entry per server line and the server decides which it takes.
+#
+# THE FAILURE THIS WATCHES FOR HAS ARRIVED TWICE AND WAS NEVER WATCHED. On 2026-08-17 both packaging
+# files carried one version at two `targetAbi` values, and a server keeps every entry whose
+# `targetAbi` is at or below its own and then orders by version number, so two entries at one version
+# were indistinguishable to a server of the newer line. On 2026-08-28 the newer line had no entry at
+# all, so a server of that line was offered the older line's build for want of anything else. Both
+# were read off the server's source. This one asks a server.
+#
+# THE ADDRESS IS NOT WRITTEN TWICE. `docs/catalogue.md` is where the manifest address an operator
+# adds is recorded, and the step below reads it out of that document. A copy here would be the copy
+# that disagrees the day the address moves.
+#
+# EVERY CLAIMED LINE, READ OUT OF THE PACKAGING FILES. Adding a line is adding a packaging file at
+# the root, so a list of lines in this file would be the second list that disagrees first. That is
+# the same derivation `abi-floor.yaml`, `package.yaml` and `release-install.yaml` make.
+#
+# IT REACHES THE NETWORK AND THAT IS THE POINT. Every other reader on this board takes its inputs as
+# files so that a proof can hand it every answer it refuses. This one cannot: the subject is a server
+# fetching a document and downloading what the document names. What stands in its place is the
+# refusals job below, which serves doctored manifests from a container and watches the check say no.
+#
+# IT RAISES NOTHING ON ITS OWN. A failed scheduled run sits in a run list, which is the bound
+# `manifest-freshness.yaml` names for itself, and `publish-failure-alert.yaml` sweeps every run no
+# pull request shows and files what it finds. Nothing has to register this one with that sweep -
+# what it watches is derived from the run list rather than from a list of names.
+#
+# THIS IS NOT A REQUIRED CHECK. The required set is a repository setting rather than a line in this
+# tree, and #30 is where it is written down and applied.
+name: Manifest install
+
+on:
+  schedule:
+    # Once a day, away from the hours the other scheduled readings take. What this bounds is how long
+    # a catalogue that offers a line the wrong build stays unreported. The manifest is rebuilt when a
+    # release is published and when the hub's own routes run, neither of which is on this board's
+    # schedule, so a daily reading is a reading of something that moved without this repository.
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/verify-manifest-install.sh'
+      - 'scripts/prove-manifest-install-refusals.sh'
+      - 'scripts/server-under-test.sh'
+      - 'scripts/server-image-for.sh'
+      - 'scripts/server-lines.tsv'
+      - '.github/workflows/manifest-install.yaml'
+      - 'docs/catalogue.md'
+      - 'build.yaml'
+      - 'build-*.yaml'
+  push:
+    branches: [master]
+    paths:
+      - 'scripts/verify-manifest-install.sh'
+      - 'scripts/prove-manifest-install-refusals.sh'
+      - 'scripts/server-under-test.sh'
+      - 'scripts/server-image-for.sh'
+      - 'scripts/server-lines.tsv'
+      - '.github/workflows/manifest-install.yaml'
+      - 'docs/catalogue.md'
+      - 'build.yaml'
+      - 'build-*.yaml'
+
+# Explicit deny-all at workflow level; each job grants only what it needs.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    name: a server of each claimed line installs from the manifest
+    runs-on: ubuntu-latest
+    # A container start, a startup wizard, a download from the release host and a restart, per
+    # claimed line.
+    timeout-minutes: 40
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No step pushes via git, so do not persist the GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+
+      - name: Add the manifest to a server of every claimed line and read back which entry it took
+        run: |
+          set -euo pipefail
+
+          # Read out of the document that records it rather than written here. `docs/catalogue.md`
+          # is where the address an operator adds is decided.
+          address=$(grep -oE 'https://[^ )]*manifest\.json' docs/catalogue.md | head -1)
+          if [ -z "${address}" ]; then
+            echo "::error::docs/catalogue.md names no manifest address, so there is nothing for a server to add. The address is recorded there and this step reads it rather than carrying a copy."
+            exit 1
+          fi
+          echo "the address an operator adds: ${address}"
+
+          covered=0
+          port=18096
+          for packaging in build.yaml build-*.yaml; do
+            [ -f "${packaging}" ] || continue
+            abi=$(sed -n 's/^targetAbi: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "${packaging}" | head -1)
+            framework=$(sed -n 's/^framework: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "${packaging}" | head -1)
+            if [ -z "${abi}" ] || [ -z "${framework}" ]; then
+              echo "::error file=${packaging}::packaging metadata declares no targetAbi or no framework, so there is no line here to start a server for."
+              exit 1
+            fi
+            image=$(./scripts/server-image-for.sh "${framework}")
+
+            echo "::group::${packaging}: targetAbi ${abi} on ${image}"
+            ./scripts/verify-manifest-install.sh "${image}" "${framework}" "${abi}" "${address}" "${port}"
+            echo "::endgroup::"
+
+            covered=$((covered + 1))
+            port=$((port + 1))
+          done
+
+          # A run that started no server must not read afterwards as one that started them and found
+          # nothing wrong. There is no packaging file this could legitimately skip: a line with no
+          # release is a line the manifest offers nothing for, which is the thing being refused
+          # rather than a reason to pass over it.
+          if [ "${covered}" -eq 0 ]; then
+            echo "::error::no packaging metadata found at the repository root, so no line was covered."
+            exit 1
+          fi
+          echo "installed from ${address} on a server of each of the ${covered} claimed line(s), and each took its own line's entry."
+
+  refusals:
+    # The check watched saying no, because it is green for as long as the catalogue is correct, which
+    # is every day until the day it matters.
+    name: the manifest install check refuses what it says it refuses
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Doctor the published manifest and watch the check refuse each case for its own reason
+        run: |
+          set -euo pipefail
+
+          address=$(grep -oE 'https://[^ )]*manifest\.json' docs/catalogue.md | head -1)
+          if [ -z "${address}" ]; then
+            echo "::error::docs/catalogue.md names no manifest address, so there is nothing to doctor."
+            exit 1
+          fi
+          code=$(curl --silent --show-error --location --max-time 60 --retry 3 --retry-connrefused \
+                   -o "${RUNNER_TEMP}/manifest.json" -w '%{http_code}' "${address}" || echo "000")
+          echo "GET ${address} -> ${code}"
+          if [ "${code}" != "200" ]; then
+            echo "::error::the manifest could not be fetched, so the cases below would be doctoring nothing. This is the fetch failing rather than the check failing."
+            exit 1
+          fi
+
+          # THE LINE THE SELECTION CAN GO WRONG ON, DERIVED RATHER THAN NAMED. A server keeps every
+          # entry whose targetAbi is at or below its own, so only the servers of the highest claimed
+          # targetAbi can be handed another line's build at all. On any other line the removed entry
+          # leaves nothing that line's servers can take, which is a different refusal. The number is
+          # read out of the packaging files for the same reason the job above reads them.
+          newest_abi=""
+          newest_framework=""
+          for packaging in build.yaml build-*.yaml; do
+            [ -f "${packaging}" ] || continue
+            abi=$(sed -n 's/^targetAbi: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "${packaging}" | head -1)
+            framework=$(sed -n 's/^framework: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "${packaging}" | head -1)
+            if [ -z "${abi}" ] || [ -z "${framework}" ]; then
+              echo "::error file=${packaging}::packaging metadata declares no targetAbi or no framework."
+              exit 1
+            fi
+            if [ -z "${newest_abi}" ] || [ "$(printf '%s\n%s\n' "${newest_abi}" "${abi}" | sort -V | tail -1)" = "${abi}" ]; then
+              newest_abi=${abi}
+              newest_framework=${framework}
+            fi
+          done
+          if [ -z "${newest_abi}" ]; then
+            echo "::error::no packaging metadata found at the repository root."
+            exit 1
+          fi
+          echo "the highest claimed targetAbi is ${newest_abi} on ${newest_framework}"
+
+          image=$(./scripts/server-image-for.sh "${newest_framework}")
+          ./scripts/prove-manifest-install-refusals.sh \
+            "${RUNNER_TEMP}/manifest.json" "${image}" "${newest_framework}" "${newest_abi}"

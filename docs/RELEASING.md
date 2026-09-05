@@ -127,10 +127,26 @@ than written, and `scripts/prove-manifest-refusals.sh` drives one manifest per d
 and asserts each is refused for its own reason, with a clean pair beside them that has
 to pass.
 
-**Two things stand between this and an operator adding a repository, and neither is
-in this document.** The release route publishes one package for the one line
-`build.yaml` names and does not call the generator, and both packaging files declare
-one version number, which is the pair the generator refuses. #110 carries both.
+**AN OPERATOR CAN ADD A REPOSITORY NOW, AND THIS PARAGRAPH SAID TWO THINGS STOOD
+BETWEEN THEM AND IT.** What stood here said the release route publishes one package for
+the one line `build.yaml` names and does not call the generator, and that both packaging
+files declare one version number, which is the pair the generator refuses.
+
+The first half went with #319: the route derives the server line from the tag suffix and
+publishes a package per line, and `0.3.0.0-stable` and `0.3.0.0-jf12-stable` are the two
+releases that exist. The second half is not a defect of the document an operator adds,
+because this board does not write that document. The hub at `flowfin.dev` builds it from
+the releases, one entry per server line, and breaks a tie between two entries at one
+version by their timestamps, which is a rule the generator here has no way to apply to a
+document it writes on its own. The address is in [catalogue.md](catalogue.md).
+
+Which entry a server of each line then takes is watched rather than reasoned about:
+`scripts/verify-manifest-install.sh` adds the address to a server of each claimed line and
+reads back the entry the server chose, `.github/workflows/manifest-install.yaml` runs it
+daily, and the refusals job beside it serves doctored manifests to the same check and
+watches it say no. What that leaves untouched is the generator's own rule, which is right
+for the document it writes: two entries at one version, in a manifest with nothing to order
+them by, are one entry to a server.
 
 ## The bill of materials
 
