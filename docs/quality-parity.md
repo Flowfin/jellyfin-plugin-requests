@@ -392,10 +392,15 @@ merge.
   repository scans three languages rather than one.
 - `Deterministic PR-hygiene checks` there is
   `Deterministic pull request hygiene checks` here, which is the same job under a
-  name written out, and its blocking tier reaches a different audience: the
-  inside set there is owner and member, and here it also holds collaborator,
+  name written out. Its blocking tier reached a different audience until #390:
+  the inside set there was owner and member, and here it also held collaborator,
   because the value a workflow reads out of the event payload and the value the
-  API returns for the same pull request disagree on this board.
+  API returns for the same pull request disagree on this board. Neither board
+  keys the tier on that value now, so the audience is the same on both and this
+  is parity rather than a difference. What each does with the value it reads
+  still differs: there it is a warning annotation on every run, and here it is a
+  line in the job summary, because an annotation that fires on every pull
+  request is a yellow flag on runs where nothing was skipped.
 - `Enforce greppable invariants` is the same name on both boards, over a
   different rule set. A rule is added the first time an invariant on this board
   is decided, so each set says what its own tree has decided rather than what the
